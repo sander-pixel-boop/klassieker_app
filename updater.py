@@ -4,10 +4,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import time
 
-st.set_page_config(page_title="PCS Startlijst Updater")
-
-st.title("🔄 PCS Startlijst Updater")
-st.write("Klik op de knop hieronder om de nieuwste startlijsten van ProCyclingStats op te halen.")
+st.title("🏆 PCS Master Namen Generator")
 
 YEAR = "2026"
 RACES = {
@@ -30,46 +27,26 @@ RACES = {
     "LBL": f"https://www.procyclingstats.com/race/liege-bastogne-liege/{YEAR}/startlist"
 }
 
-def get_riders(url):
+if st.button("🚀 Haal ALLE PCS namen op"):
+    all_pcs_riders = set()
     headers = {'User-Agent': 'Mozilla/5.0'}
-    try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(resp.content, 'html.parser')
-        return [a.text.strip().lower() for a in soup.find_all('a', href=True) if 'rider/' in a['href']]
-    except:
-        return []
-
-if st.button("Start Scraping (duurt ca. 20 seconden)"):
-    # Probeer rennerslijst te laden voor de basis
-    try:
-        base_df = pd.read_csv("renners_prijzen.csv", sep=None, engine='python')
-        all_names = base_df.iloc[:, 0].tolist()
-    except:
-        all_names = []
-        st.error("renners_prijzen.csv niet gevonden. Upload die eerst.")
-
-    if all_names:
-        results = {}
-        progress = st.progress(0)
-        
-        for i, (abbr, url) in enumerate(RACES.items()):
-            st.write(f"Ophalen: {abbr}...")
-            results[abbr] = get_riders(url)
-            progress.progress((i + 1) / len(RACES))
+    
+    for abbr, url in RACES.items():
+        st.write(f"Scannen: {abbr}...")
+        try:
+            resp = requests.get(url, headers=headers, timeout=10)
+            soup = BeautifulSoup(resp.content, 'html.parser')
+            # Pak alle namen uit de startlijst tabel
+            for a in soup.find_all('a', href=True):
+                if 'rider/' in a['href'] and len(a.text.strip()) > 3:
+                    all_pcs_riders.add(a.text.strip())
             time.sleep(0.5)
+        except:
+            st.error(f"Fout bij {abbr}")
 
-        # Bouw de matrix
-        final_data = []
-        for name in all_names:
-            row = {"Naam": name}
-            # Pak de achternaam voor de check
-            last_name = name.lower().split()[-1]
-            for abbr in RACES.keys():
-                row[abbr] = 1 if any(last_name in r for r in results[abbr]) else 0
-            final_data.append(row)
-
-        df_out = pd.DataFrame(final_data)
-        
-        st.success("Klaar! Download de CSV en vervang 'startlijsten.csv' in je GitHub.")
-        csv = df_out.to_csv(index=False).encode('utf-8')
-        st.download_button("Download startlijsten.csv", csv, "startlijsten.csv", "text/csv")
+    df_master = pd.DataFrame(sorted(list(all_pcs_riders)), columns=["Naam"])
+    st.success(f"Totaal {len(df_master)} unieke renners gevonden op PCS.")
+    st.dataframe(df_master)
+    
+    csv = df_master.to_csv(index=False).encode('utf-8')
+    st.download_button("Download Master Namenlijst", csv, "pcs_namen.csv", "text/csv")
