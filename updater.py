@@ -4,7 +4,10 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import time
 
+st.set_page_config(page_title="PCS Master List Generator", layout="wide")
+
 st.title("🏆 PCS Master Namen Generator")
+st.write("Als de lijst leeg blijft, blokkeert PCS de server. Gebruik dan de knoppen per koers.")
 
 YEAR = "2026"
 RACES = {
@@ -27,26 +30,48 @@ RACES = {
     "LBL": f"https://www.procyclingstats.com/race/liege-bastogne-liege/{YEAR}/startlist"
 }
 
-if st.button("🚀 Haal ALLE PCS namen op"):
-    all_pcs_riders = set()
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    
-    for abbr, url in RACES.items():
-        st.write(f"Scannen: {abbr}...")
-        try:
-            resp = requests.get(url, headers=headers, timeout=10)
+if 'master_list' not in st.session_state:
+    st.session_state['master_list'] = set()
+
+def scrape_race(abbr, url):
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/110.0.0.0 Safari/537.36'}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
             soup = BeautifulSoup(resp.content, 'html.parser')
-            # Pak alle namen uit de startlijst tabel
+            found = 0
             for a in soup.find_all('a', href=True):
                 if 'rider/' in a['href'] and len(a.text.strip()) > 3:
-                    all_pcs_riders.add(a.text.strip())
-            time.sleep(0.5)
-        except:
-            st.error(f"Fout bij {abbr}")
+                    st.session_state['master_list'].add(a.text.strip())
+                    found += 1
+            return found
+        else:
+            return f"Error {resp.status_code}"
+    except Exception as e:
+        return str(e)
 
-    df_master = pd.DataFrame(sorted(list(all_pcs_riders)), columns=["Naam"])
-    st.success(f"Totaal {len(df_master)} unieke renners gevonden op PCS.")
-    st.dataframe(df_master)
-    
-    csv = df_master.to_csv(index=False).encode('utf-8')
-    st.download_button("Download Master Namenlijst", csv, "pcs_namen.csv", "text/csv")
+col1, col2 = st.columns(2)
+
+with col1:
+    if st.button("🚀 Start Alles (met pauzes)"):
+        for abbr, url in RACES.items():
+            res = scrape_race(abbr, url)
+            st.write(f"{abbr}: {res} renners gevonden.")
+            time.sleep(2) # Wacht 2 seconden tussen koersen
+        st.success("Klaar!")
+
+with col2:
+    if st.button("🗑️ Wis lijst"):
+        st.session_state['master_list'] = set()
+        st.rerun()
+
+st.divider()
+
+# Laat de verzamelde lijst zien
+master_df = pd.DataFrame(sorted(list(st.session_state['master_list'])), columns=["Naam"])
+st.subheader(f"Verzamelde Namen ({len(master_df)})")
+st.dataframe(master_df, use_container_width=True)
+
+if not master_df.empty:
+    csv = master_df.to_csv(index=False).encode('utf-8')
+    st.download_button("📩 Download pcs_namen.csv", csv, "pcs_namen.csv", "text/csv")
