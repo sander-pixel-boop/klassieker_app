@@ -1,187 +1,161 @@
 import streamlit as st
 import pandas as pd
 import pulp
-import requests
-from bs4 import BeautifulSoup
 import unicodedata
 import re
+from difflib import get_close_matches
 
 st.set_page_config(page_title="Klassiekers 2026", layout="wide")
 
-# --- 1. CONFIGURATIE ---
-YEAR = "2026"
-RACES_CONFIG = {
-    "OHN": {"url": f"https://www.procyclingstats.com/race/omloop-het-nieuwsblad/{YEAR}/startlist", "full": "Omloop Het Nieuwsblad", "stat": "COB"},
-    "KBK": {"url": f"https://www.procyclingstats.com/race/kuurne-brussel-kuurne/{YEAR}/startlist", "full": "Kuurne-Brussel-Kuurne", "stat": "SPR"},
-    "SB":  {"url": f"https://www.procyclingstats.com/race/strade-bianche/{YEAR}/startlist", "full": "Strade Bianche", "stat": "HLL"},
-    "PN7": {"url": f"https://www.procyclingstats.com/race/paris-nice/{YEAR}/startlist", "full": "Parijs-Nice Etappe 7", "stat": "MTN"},
-    "TA7": {"url": f"https://www.procyclingstats.com/race/tirreno-adriatico/{YEAR}/startlist", "full": "Tirreno-Adriatico Etappe 7", "stat": "SPR"},
-    "MSR": {"url": f"https://www.procyclingstats.com/race/milano-sanremo/{YEAR}/startlist", "full": "Milano-Sanremo", "stat": "SPR"},
-    "BDP": {"url": f"https://www.procyclingstats.com/race/classic-brugge-de-panne/{YEAR}/startlist", "full": "Brugge-De Panne", "stat": "SPR"},
-    "E3":  {"url": f"https://www.procyclingstats.com/race/e3-harelbeke/{YEAR}/startlist", "full": "E3 Saxo Classic", "stat": "COB"},
-    "GW":  {"url": f"https://www.procyclingstats.com/race/gent-wevelgem/{YEAR}/startlist", "full": "Gent-Wevelgem", "stat": "COB"},
-    "DDV": {"url": f"https://www.procyclingstats.com/race/dwars-door-vlaanderen/{YEAR}/startlist", "full": "Dwars door Vlaanderen", "stat": "COB"},
-    "RVV": {"url": f"https://www.procyclingstats.com/race/ronde-van-vlaanderen/{YEAR}/startlist", "full": "Ronde van Vlaanderen", "stat": "COB"},
-    "SP":  {"url": f"https://www.procyclingstats.com/race/scheldeprijs/{YEAR}/startlist", "full": "Scheldeprijs", "stat": "SPR"},
-    "PR":  {"url": f"https://www.procyclingstats.com/race/paris-roubaix/{YEAR}/startlist", "full": "Parijs-Roubaix", "stat": "COB"},
-    "BP":  {"url": f"https://www.procyclingstats.com/race/brabantse-pijl/{YEAR}/startlist", "full": "Brabantse Pijl", "stat": "HLL"},
-    "AGR": {"url": f"https://www.procyclingstats.com/race/amstel-gold-race/{YEAR}/startlist", "full": "Amstel Gold Race", "stat": "HLL"},
-    "WP":  {"url": f"https://www.procyclingstats.com/race/fleche-wallonne/{YEAR}/startlist", "full": "Waalse Pijl", "stat": "HLL"},
-    "LBL": {"url": f"https://www.procyclingstats.com/race/liege-bastogne-liege/{YEAR}/startlist", "full": "Luik-Bastenaken-Luik", "stat": "HLL"}
-}
-races_all = list(RACES_CONFIG.keys())
-
-# --- 2. HULPFUNCTIES ---
-
-def simplify_name(text):
+# --- 1. HULPFUNCTIES VOOR MATCHING ---
+def normalize_name(text):
+    """Maakt namen kaal voor betere matching (geen accenten, kleine letters)."""
     if pd.isna(text): return ""
     text = str(text).lower()
-    # Verwijder initialen en accenten
+    # Verwijder initialen (e.g., 't. ')
     text = re.sub(r'^[a-z]\.\s*', '', text)
-    text = re.sub(r'\s[a-z]\.\s*', ' ', text)
+    # Verwijder accenten
     text = "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
     return text.strip()
 
+def fuzzy_merge(df_left, df_right, left_on, right_on, threshold=0.8):
+    """Koppelt dataframes zelfs als namen net iets anders gespeld zijn."""
+    s_left = df_left[left_on].apply(normalize_name).tolist()
+    s_right = df_right[right_on].apply(normalize_name).tolist()
+    
+    mapping = {}
+    for name in s_left:
+        match = get_close_matches(name, s_right, n=1, cutoff=threshold)
+        if match:
+            mapping[name] = match[0]
+            
+    df_left['match_key'] = df_left[left_on].apply(normalize_name)
+    df_right['match_key'] = df_right[right_on].apply(normalize_name)
+    
+    # Gebruik de mapping om de keys in df_left gelijk te maken aan die in df_right
+    df_left['match_key'] = df_left['match_key'].map(mapping)
+    
+    return pd.merge(df_left, df_right, on='match_key', how='inner')
+
+# --- 2. DATA INLADEN ---
 @st.cache_data
-def load_base_data():
+def load_data():
     try:
-        # Expliciet laden met detectie van scheidingsteken
-        df_p = pd.read_csv("renners_prijzen.csv", sep=None, engine='python', encoding='utf-8-sig')
-        df_wo = pd.read_csv("renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig')
-        
-        # Kolomkoppen extreem schoonmaken
+        # Laden van bestanden (negeer delimiters door sep=None)
+        df_p = pd.read_csv("renners_prijzen.csv", sep=None, engine='python')
+        df_wo = pd.read_csv("renners_stats.csv", sep=None, engine='python')
+        df_sl = pd.read_csv("startlijsten.csv", sep=None, engine='python')
+
+        # Kolomnamen opschonen naar HOOFDLETTERS
         df_p.columns = [c.strip().upper() for c in df_p.columns]
         df_wo.columns = [c.strip().upper() for c in df_wo.columns]
+        df_sl.columns = [c.strip().upper() for c in df_sl.columns]
+
+        # Stap 1: Koppel Prijzen aan Stats (Fuzzy)
+        df = fuzzy_merge(df_p, df_wo, 'NAAM', 'NAAM')
+
+        # Stap 2: Koppel Startlijsten (Fuzzy)
+        # We droppen de extra NAAM kolommen om chaos te voorkomen
+        df_sl_clean = df_sl.copy()
+        df = fuzzy_merge(df, df_sl_clean, 'NAAM_x', 'NAAM')
+
+        # Prijs naar getal converteren
+        df['PRIJS_NUM'] = pd.to_numeric(df['PRIJS'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
         
-        # Maak universele match-keys
-        df_p['MATCH_KEY'] = df_p['NAAM'].apply(simplify_name)
-        df_wo['MATCH_KEY'] = df_wo['NAAM'].apply(simplify_name)
-        
-        # Merge
-        df = pd.merge(df_p, df_wo, on='MATCH_KEY', how='inner', suffixes=('', '_WO'))
-        
-        # Prijs opschonen naar getal
-        if 'PRIJS' in df.columns:
-            df['PRIJS'] = pd.to_numeric(df['PRIJS'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
-        
+        # Zorg dat alle koerskolommen aanwezig zijn
+        races = ["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"]
+        for r in races:
+            if r not in df.columns:
+                df[r] = 0
+            df[r] = pd.to_numeric(df[r], errors='coerce').fillna(0)
+
         return df
     except Exception as e:
-        st.error(f"Fout bij laden: {e}")
+        st.error(f"Fout bij laden van bestanden: {e}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=3600)
-def scrape_pcs():
-    results = {}
-    for abbr, info in RACES_CONFIG.items():
-        try:
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            resp = requests.get(info["url"], headers=headers, timeout=10)
-            soup = BeautifulSoup(resp.content, 'html.parser')
-            riders = [simplify_name(a.text) for a in soup.find_all('a', href=True) if 'rider/' in a['href']]
-            results[abbr] = riders
-        except:
-            results[abbr] = []
-    return results
+df = load_data()
+races_all = ["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"]
 
-# --- 3. UI ---
+# --- 3. UI & OPTIMALISATIE ---
 st.title("Klassiekers 2026")
 
-df_base = load_base_data()
-
-if df_base.empty:
-    st.error("Kritieke fout: Database leeg. Controleer of de namen in je CSV-bestanden overeenkomen.")
-    st.info("Check of de kolomnaam in beide bestanden exact 'Naam' is (zonder spaties).")
+if df.empty:
+    st.info("De bestanden worden geladen of de namen konden niet gekoppeld worden. Controleer of 'Naam' in elk bestand de eerste kolom is.")
 else:
     with st.sidebar:
         st.header("Strategie en Filters")
         budget = st.number_input("Budget (Euro)", value=46000000, step=500000)
-        st.divider()
-        startlist_source = st.radio("Bron Startlijsten:", ["Statisch (CSV)", "Live (PCS)"])
+        
         st.divider()
         w_cob = st.slider("Kassei (COB)", 0, 10, 8)
+        st.caption("OHN, KBK, E3, GW, DDV, RVV, PR")
         w_hll = st.slider("Heuvel (HLL)", 0, 10, 6)
+        st.caption("MSR, BP, AGR, WP, LBL")
         w_mtn = st.slider("Klim (MTN)", 0, 10, 4)
+        st.caption("Parijs-Nice (PN7)")
         w_spr = st.slider("Sprint (SPR)", 0, 10, 5)
+        st.caption("KBK, BDP, GW, SP, TA7")
         w_or  = st.slider("Eendags kwaliteit (OR)", 0, 10, 5)
+
         st.divider()
-        locked_riders = st.multiselect("Vastzetten (Locks):", df_base['NAAM'].unique())
-        excluded_riders = st.multiselect("Uitsluiten (Excludes):", df_base['NAAM'].unique())
+        # Gebruik NAAM_x omdat NAAM vaker voorkomt na de merges
+        locked = st.multiselect("Vastzetten:", df['NAAM_x'].unique())
+        excluded = st.multiselect("Uitsluiten:", df['NAAM_x'].unique())
 
-    df = df_base.copy()
-
-    # Startlijsten verwerken
-    if startlist_source == "Statisch (CSV)":
-        try:
-            df_sl = pd.read_csv("startlijsten.csv", sep=None, engine='python', encoding='utf-8-sig')
-            df_sl.columns = [c.strip().upper() for c in df_sl.columns]
-            df_sl['MATCH_KEY'] = df_sl['NAAM'].apply(simplify_name)
-            df = pd.merge(df, df_sl.drop(columns=['NAAM'], errors='ignore'), on='MATCH_KEY', how='left').fillna(0)
-        except:
-            st.sidebar.warning("startlijsten.csv niet gevonden.")
-    else:
-        with st.spinner('Live startlijsten ophalen...'):
-            pcs_data = scrape_pcs()
-            for abbr in races_all:
-                df[abbr] = df['MATCH_KEY'].apply(lambda x: 1 if x in pcs_data[abbr] else 0)
-
-    # Zorg dat alle race-kolommen bestaan
-    for r in races_all:
-        if r not in df.columns: df[r] = 0
-        df[r] = df[r].fillna(0)
-
+    # Score berekening
     df['SCORE'] = (df['COB']*w_cob) + (df['HLL']*w_hll) + (df['MTN']*w_mtn) + (df['SPR']*w_spr) + (df['OR']*w_or)
-    st.markdown("<style>[data-testid='stDataFrame'] th div { height: 100px; writing-mode: vertical-rl; transform: rotate(180deg); }</style>", unsafe_allow_html=True)
 
-    t1, t2, t3, t4 = st.tabs(["Team Samensteller", "Team Schema", "Programma volgens PCS", "Informatie"])
+    t1, t2, t3, t4 = st.tabs(["Team Samensteller", "Team Schema", "Programma", "Informatie"])
 
     with t1:
         if st.button("Genereer Optimaal Team"):
             prob = pulp.LpProblem("Scorito", pulp.LpMaximize)
             sel = pulp.LpVariable.dicts("Sel", df.index, cat='Binary')
             prob += pulp.lpSum([df['SCORE'][i] * sel[i] for i in df.index])
-            prob += pulp.lpSum([df['PRIJS'][i] * sel[i] for i in df.index]) <= budget
+            prob += pulp.lpSum([df['PRIJS_NUM'][i] * sel[i] for i in df.index]) <= budget
             prob += pulp.lpSum([sel[i] for i in df.index]) == 20
+            
             for i, row in df.iterrows():
-                if row['NAAM'] in locked_riders: prob += (sel[i] == 1)
-                if row['NAAM'] in excluded_riders: prob += (sel[i] == 0)
+                if row['NAAM_x'] in locked: prob += (sel[i] == 1)
+                if row['NAAM_x'] in excluded: prob += (sel[i] == 0)
+            
             prob.solve()
             if pulp.LpStatus[prob.status] == 'Optimal':
                 st.session_state['team_idx'] = [i for i in df.index if sel[i].varValue == 1]
-                st.success("Team gevonden ✅")
+                st.success("Team gevonden!")
             else:
                 st.error("Geen oplossing mogelijk.")
-        
+
         if 'team_idx' in st.session_state:
-            team_res = df.loc[st.session_state['team_idx']]
-            st.dataframe(team_res[['NAAM', 'PRIJS', 'SCORE']].sort_values('PRIJS', ascending=False), hide_index=True)
+            team = df.loc[st.session_state['team_idx']]
+            st.dataframe(team[['NAAM_x', 'PRIJS_NUM', 'SCORE']].sort_values('PRIJS_NUM', ascending=False), hide_index=True)
+            st.metric("Totaal besteed", f"€ {team['PRIJS_NUM'].sum():,.0f}")
 
     with t2:
         if 'team_idx' in st.session_state:
             team_sel = df.loc[st.session_state['team_idx']].copy()
-            disp = team_sel[['NAAM'] + races_all].copy()
+            disp = team_sel[['NAAM_x'] + races_all].copy()
             for r in races_all: disp[r] = disp[r].apply(lambda x: "✅" if x == 1 else "")
             st.dataframe(disp, hide_index=True)
             
             st.divider()
             st.subheader("Kopman Suggesties")
             kopman_list = []
-            for abbr, config in RACES_CONFIG.items():
-                starters = team_sel[team_sel[abbr] == 1]
+            race_stats = {"OHN":"COB","KBK":"SPR","SB":"HLL","PN7":"MTN","TA7":"SPR","MSR":"SPR","BDP":"SPR","E3":"COB","GW":"COB","DDV":"COB","RVV":"COB","SP":"SPR","PR":"COB","BP":"HLL","AGR":"HLL","WP":"HLL","LBL":"HLL"}
+            for r in races_all:
+                starters = team_sel[team_sel[r] == 1]
                 if not starters.empty:
-                    top_3 = starters.sort_values(config['stat'], ascending=False).head(3)['NAAM'].tolist()
-                    kopman_list.append({"Koers": abbr, "Top 3": " / ".join(top_3)})
+                    top = starters.sort_values(race_stats[r], ascending=False).head(3)['NAAM_x'].tolist()
+                    kopman_list.append({"Koers": r, "Top 3": " / ".join(top)})
             st.table(pd.DataFrame(kopman_list))
         else:
-            st.info("Maak eerst een team.")
+            st.info("Genereer eerst een team.")
 
     with t3:
-        st.subheader("Marktprogramma (Live PCS)")
-        live_list = scrape_pcs()
-        market = df[['NAAM', 'PRIJS']].copy()
-        for abbr in races_all:
-            market[abbr] = df['MATCH_KEY'].apply(lambda x: "✅" if x in live_list[abbr] else "")
-        st.dataframe(market.sort_values('PRIJS', ascending=False), hide_index=True)
+        market = df[['NAAM_x', 'PRIJS_NUM'] + races_all].copy()
+        for r in races_all: market[r] = market[r].apply(lambda x: "✅" if x == 1 else "")
+        st.dataframe(market.sort_values('PRIJS_NUM', ascending=False), hide_index=True)
 
     with t4:
-        st.header("Informatie en Methodiek")
-        st.write("Data bronnen: WielerOrakel & ProCyclingStats.")
+        st.write("Wiskundige optimalisatie voor Scorito 2026. Data via WielerOrakel & PCS.")
