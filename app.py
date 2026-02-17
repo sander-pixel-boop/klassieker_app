@@ -14,25 +14,10 @@ def load_data():
         df_wo = pd.read_csv("renners_stats.csv", sep=None, engine='python')
         df_sl = pd.read_csv("startlijsten.csv", sep=None, engine='python')
         
-        # Kolomnamen opschonen (lowercase en spaties verwijderen)
-        def clean_df_columns(df):
-            df.columns = [c.strip().lower() for c in df.columns]
-            return df
-
-        df_p = clean_df_columns(df_p)
-        df_wo = clean_df_columns(df_wo)
-        df_sl = clean_df_columns(df_sl)
-
-        # Zorg dat de naamkolom overal 'naam' heet
-        def rename_name_column(df):
-            for col in df.columns:
-                if col in ['naam', 'name', 'renner', 'rider']:
-                    return df.rename(columns={col: 'naam'})
-            return df
-
-        df_p = rename_name_column(df_p)
-        df_wo = rename_name_column(df_wo)
-        df_sl = rename_name_column(df_sl)
+        # Kolomnamen direct opschonen naar UPPERCASE om KeyErrors te voorkomen
+        df_p.columns = [c.strip().upper() for c in df_p.columns]
+        df_wo.columns = [c.strip().upper() for c in df_wo.columns]
+        df_sl.columns = [c.strip().upper() for c in df_sl.columns]
 
         # Naamconversie functie (Tadej Pogačar -> t. pogačar)
         def convert_to_short_name(full_name):
@@ -41,33 +26,29 @@ def load_data():
                 return f"{parts[0][0]}. {' '.join(parts[1:])}".lower().strip()
             return str(full_name).lower().strip()
 
-        # Matchkolommen maken
-        df_p['match_name'] = df_p['naam'].astype(str).str.lower().str.strip()
-        df_wo['match_name'] = df_wo['naam'].apply(convert_to_short_name)
-        df_sl['match_name'] = df_sl['naam'].astype(str).str.lower().str.strip()
+        # Matchkolommen maken (altijd kleine letters voor de match)
+        df_p['MATCH_NAME'] = df_p['NAAM'].astype(str).str.lower().str.strip()
+        df_wo['MATCH_NAME'] = df_wo['NAAM'].apply(convert_to_short_name)
+        df_sl['MATCH_NAME'] = df_sl['NAAM'].astype(str).str.lower().str.strip()
         
-        # Mergen van prijzen, stats en startlijsten
-        df = pd.merge(df_p, df_wo, on='match_name', how='inner', suffixes=('', '_wo'))
-        df_sl_clean = df_sl.drop(columns=['naam']) if 'naam' in df_sl.columns else df_sl
-        df = pd.merge(df, df_sl_clean, on='match_name', how='left')
+        # Stap 1: Prijzen + Stats
+        df = pd.merge(df_p, df_wo, on='MATCH_NAME', how='inner', suffixes=('', '_WO'))
+        
+        # Stap 2: Startlijsten toevoegen
+        cols_to_drop = [c for c in df_sl.columns if c in df.columns and c != 'MATCH_NAME']
+        df_sl_clean = df_sl.drop(columns=cols_to_drop)
+        df = pd.merge(df, df_sl_clean, on='MATCH_NAME', how='left')
         
         # Prijs opschonen
-        price_col = 'prijs' if 'prijs' in df.columns else 'price'
-        df['prijs_clean'] = pd.to_numeric(df[price_col].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
+        df['PRIJS_CLEAN'] = pd.to_numeric(df['PRIJS'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
         
-        # Races voorbereiden (0/1 naar vinkjes)
-        races_list = ["ohn","kbk","sb","pn7","ta7","msr","bdp","e3","gw","ddv","rvv","sp","pr","bp","agr","wp","lbl"]
+        # Zorg dat race kolommen (OHN, KBK etc) aanwezig zijn en gevuld met 0/1
+        races_list = ["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"]
         for r in races_list:
             if r in df.columns:
                 df[r] = pd.to_numeric(df[r], errors='coerce').fillna(0)
             else:
                 df[r] = 0
-            
-        # Terugzetten naar namen voor de rest van de app
-        df = df.rename(columns={'naam': 'Naam', 'prijs_clean': 'Prijs_Clean'})
-        # Zet race kolommen naar hoofdletters voor de weergave
-        for r in races_list:
-            df = df.rename(columns={r: r.upper()})
             
         return df
     except Exception as e:
@@ -79,14 +60,12 @@ df = load_data()
 # --- 2. GEDRAAIDE HEADERS CSS ---
 st.markdown("""
     <style>
-    [data-testid="stDataFrame"] th {
-        height: 120px;
-        white-space: nowrap;
-    }
     [data-testid="stDataFrame"] th div {
+        height: 120px;
         writing-mode: vertical-rl;
         transform: rotate(180deg);
         text-align: inherit;
+        white-space: nowrap;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -95,7 +74,7 @@ st.markdown("""
 st.title("🏆 Scorito Klassieker Master 2026")
 
 if df.empty:
-    st.info("De database is leeg. Controleer of de bestanden op GitHub staan en of de kolomnamen kloppen.")
+    st.warning("De database is leeg. Controleer of de namen in 'renners_prijzen.csv' en 'renners_stats.csv' wel matchen.")
 else:
     tab1, tab2, tab3 = st.tabs(["🚀 Team Samensteller", "📅 Wedstrijdschema", "ℹ️ Informatie"])
 
@@ -106,33 +85,34 @@ else:
         
         st.divider()
         st.subheader("🎯 Strategie Gewicht")
+        # We gebruiken hier de exacte hoofdletters uit de CSV
         w_cob = st.slider("Kassei (COB)", 0, 10, 8)
-        st.caption("OHN, KBK, E3, GW, DDV, RVV, PR")
         w_hll = st.slider("Heuvel (HLL)", 0, 10, 6)
-        st.caption("MSR, BP, AGR, WP, LBL")
         w_mtn = st.slider("Klim (MTN)", 0, 10, 4)
-        st.caption("Parijs-Nice Etappe 7")
         w_spr = st.slider("Sprint (SPR)", 0, 10, 5)
-        st.caption("BDP, SP, TA Etappe 7")
         w_or  = st.slider("Eendags (OR)", 0, 10, 5)
 
-    # Score berekening (stats van WO zijn hoofdletters in DF na merge)
-    df['Score'] = (df['COB']*w_cob) + (df['HLL']*w_hll) + (df['MTN']*w_mtn) + (df['SPR']*w_spr) + (df['OR']*w_or)
+    # Berekening met foutafhandeling voor kolomnamen
+    try:
+        df['SCORE'] = (df['COB']*w_cob) + (df['HLL']*w_hll) + (df['MTN']*w_mtn) + (df['SPR']*w_spr) + (df['OR']*w_or)
+    except KeyError as e:
+        st.error(f"Kolom niet gevonden in renners_stats.csv: {e}")
+        st.stop()
 
     # --- TAB 1: SAMENSTELLER ---
     with tab1:
         col_list, col_team = st.columns([1, 1])
         with col_list:
             st.subheader("📊 Toprenners")
-            st.dataframe(df[['Naam', 'Prijs_Clean', 'Score']].sort_values('Score', ascending=False).head(20))
+            st.dataframe(df[['NAAM', 'PRIJS_CLEAN', 'SCORE']].sort_values('SCORE', ascending=False).head(25))
         
         with col_team:
             st.subheader("🚀 Optimalisatie")
             if st.button("Genereer Optimaal Team"):
                 prob = pulp.LpProblem("Scorito", pulp.LpMaximize)
                 sel = pulp.LpVariable.dicts("Sel", df.index, cat='Binary')
-                prob += pulp.lpSum([df['Score'][i] * sel[i] for i in df.index])
-                prob += pulp.lpSum([df['Prijs_Clean'][i] * sel[i] for i in df.index]) <= budget
+                prob += pulp.lpSum([df['SCORE'][i] * sel[i] for i in df.index])
+                prob += pulp.lpSum([df['PRIJS_CLEAN'][i] * sel[i] for i in df.index]) <= budget
                 prob += pulp.lpSum([sel[i] for i in df.index]) == 20
                 prob.solve()
                 
@@ -144,7 +124,7 @@ else:
 
             if 'team_idx' in st.session_state:
                 team = df.loc[st.session_state['team_idx']]
-                st.dataframe(team[['Naam', 'Prijs_Clean', 'Score']].sort_values('Prijs_Clean', ascending=False))
+                st.dataframe(team[['NAAM', 'PRIJS_CLEAN', 'SCORE']].sort_values('PRIJS_CLEAN', ascending=False))
 
     # --- TAB 2: SCHEMA ---
     with tab2:
@@ -155,23 +135,13 @@ else:
             races = ["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"]
             
             # Weergave vinkjes
+            display_schema = team_schema[['NAAM'] + races].copy()
             for r in races:
-                team_schema[r] = team_schema[r].apply(lambda x: "✅" if x == 1 else "")
+                display_schema[r] = display_schema[r].apply(lambda x: "✅" if x == 1 else "")
             
-            st.dataframe(team_schema[['Naam'] + races], height=600)
-            
-            summary = {r: (team_schema[r] == "✅").sum() for r in races}
-            st.bar_chart(pd.Series(summary))
+            st.dataframe(display_schema, height=600)
 
     # --- TAB 3: INFO ---
     with tab3:
         st.header("ℹ️ Informatie")
-        st.write("Wiskundige optimalisatie voor het Scorito Klassiekerspel 2026.")
-        st.markdown("""
-        * **Kwaliteit:** Gebaseerd op **WielerOrakel.nl**.
-        * **Startlijsten:** Gebaseerd op data van **ProCyclingStats**.
-        * **Algoritme:** Vindt de 20 renners met de hoogste gecombineerde score binnen het budget.
-        """)
-        st.divider()
-        st.write("Afkortingen:")
-        st.text("OHN: Omloop, KBK: Kuurne, SB: Strade, PN7: PN Rit 7, TA7: TA Rit 7, MSR: Sanremo, BDP: De Panne, E3: E3, GW: Gent-W, DDV: Dwars door Vl, RVV: Vlaanderen, SP: Scheldeprijs, PR: Roubaix, BP: Brabantse, AGR: Amstel, WP: Waalse Pijl, LBL: Luik.")
+        st.write("Data: WielerOrakel.nl & ProCyclingStats.")
