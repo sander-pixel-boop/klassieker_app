@@ -51,11 +51,25 @@ def load_base_data():
     try:
         df_p = pd.read_csv("renners_prijzen.csv", sep=None, engine='python')
         df_wo = pd.read_csv("renners_stats.csv", sep=None, engine='python')
+        
         df_p.columns = [c.strip().upper() for c in df_p.columns]
         df_wo.columns = [c.strip().upper() for c in df_wo.columns]
-        df_p['MATCH_NAME'] = df_p['NAAM'].astype(str).str.lower().str.strip()
-        df = pd.merge(df_p, df_wo, on='NAAM', how='inner', suffixes=('', '_WO'))
+
+        def normalize(txt):
+            return str(txt).lower().strip().replace("'", "").replace("\"", "")
+
+        def convert_to_short(full_name):
+            parts = str(full_name).split()
+            if len(parts) >= 2:
+                return f"{parts[0][0]}. {' '.join(parts[1:])}".lower().strip()
+            return str(full_name).lower().strip()
+
+        df_p['MATCH_KEY'] = df_p['NAAM'].apply(normalize)
+        df_wo['MATCH_KEY'] = df_wo['NAAM'].apply(convert_to_short).apply(normalize)
+        
+        df = pd.merge(df_p, df_wo, on='MATCH_KEY', how='inner', suffixes=('', '_WO'))
         df['PRIJS'] = pd.to_numeric(df['PRIJS'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
+        
         return df
     except Exception as e:
         st.error(f"Fout bij laden basisdata: {e}")
@@ -63,9 +77,12 @@ def load_base_data():
 
 # --- 3. UI ---
 st.title("Klassiekers 2026")
-df = load_base_data()
 
-if not df.empty:
+df_base = load_base_data()
+
+if df_base.empty:
+    st.error("Kritieke fout: De database kon niet worden opgebouwd. Controleer je CSV-bestanden op GitHub.")
+else:
     with st.sidebar:
         st.header("Strategie en Filters")
         budget = st.number_input("Budget (Euro)", value=46000000, step=500000)
@@ -82,28 +99,34 @@ if not df.empty:
         st.caption("KBK, BDP, GW, SP, Tirreno (TA7)")
         w_or  = st.slider("Eendags kwaliteit (OR)", 0, 10, 5)
         st.divider()
-        locked_riders = st.multiselect("Renners vastzetten (Locks):", df['NAAM'].unique())
-        excluded_riders = st.multiselect("Renners uitsluiten (Excludes):", df['NAAM'].unique())
+        locked_riders = st.multiselect("Renners vastzetten (Locks):", df_base['NAAM'].unique())
+        excluded_riders = st.multiselect("Renners uitsluiten (Excludes):", df_base['NAAM'].unique())
 
-    # Startlijsten verwerken
-    if startlist_source == "Statisch (CSV)":
-        try:
-            df_sl = pd.read_csv("startlijsten.csv", sep=None, engine='python')
-            df_sl.columns = [c.strip().upper() for c in df_sl.columns]
-            df = pd.merge(df, df_sl.drop(columns=['NAAM']), on='NAAM', how='left').fillna(0)
-        except: st.error("startlijsten.csv niet gevonden op GitHub.")
-    else:
-        pcs_data = scrape_pcs()
-        for abbr in races_all:
-            def check_pcs_match(naam_uit_db, race_abbr):
-                achternaam = naam_uit_db.lower().split()[-1]
-                return 1 if any(achternaam in p for p in pcs_data[race_abbr]) else 0
-            df[abbr] = df['NAAM'].apply(lambda x: check_pcs_match(x, abbr))
+    # Maak kopie voor verdere verwerking
+    df = df_base.copy()
 
+    # Startlijsten verwerken met spinner
+    with st.spinner('Startlijsten worden geladen...'):
+        if startlist_source == "Statisch (CSV)":
+            try:
+                df_sl = pd.read_csv("startlijsten.csv", sep=None, engine='python')
+                df_sl.columns = [c.strip().upper() for c in df_sl.columns]
+                # Match op exacte naam uit prijzenlijst
+                df = pd.merge(df, df_sl.drop(columns=['NAAM'], errors='ignore'), left_on='NAAM', right_on='NAAM', how='left').fillna(0)
+            except:
+                st.sidebar.error("startlijsten.csv niet gevonden. Schakel over naar Live.")
+        else:
+            pcs_data = scrape_pcs()
+            for abbr in races_all:
+                def check_pcs_match(naam_db, race_abbr):
+                    achternaam = naam_db.lower().split()[-1]
+                    return 1 if any(achternaam in p for p in pcs_data[race_abbr]) else 0
+                df[abbr] = df['NAAM'].apply(lambda x: check_pcs_match(x, abbr))
+
+    # Score berekening
     df['SCORE'] = (df['COB']*w_cob) + (df['HLL']*w_hll) + (df['MTN']*w_mtn) + (df['SPR']*w_spr) + (df['OR']*w_or)
     st.markdown("<style>[data-testid='stDataFrame'] th div { height: 100px; writing-mode: vertical-rl; transform: rotate(180deg); }</style>", unsafe_allow_html=True)
 
-    # Tabbladen zonder emoticons
     tab1, tab2, tab3, tab4 = st.tabs(["Team Samensteller", "Team Schema", "Programma volgens PCS", "Informatie"])
 
     with tab1:
@@ -119,11 +142,13 @@ if not df.empty:
             prob.solve()
             if pulp.LpStatus[prob.status] == 'Optimal':
                 st.session_state['team_idx'] = [i for i in df.index if sel[i].varValue == 1]
-                st.success("Team geoptimaliseerd 🚴")
-            else: st.error("Geen oplossing mogelijk.")
+                st.success("Team geoptimaliseerd ✅")
+            else: st.error("Geen oplossing mogelijk. Check budget of locks.")
+        
         if 'team_idx' in st.session_state:
             team = df.loc[st.session_state['team_idx']]
             st.dataframe(team[['NAAM', 'PRIJS', 'SCORE', 'COB', 'HLL', 'SPR']].sort_values('PRIJS', ascending=False), hide_index=True)
+            st.metric("Besteed", f"€ {team['PRIJS'].sum():,.0f}", f"Over: € {budget - team['PRIJS'].sum():,.0f}")
 
     with tab2:
         if 'team_idx' in st.session_state:
@@ -135,18 +160,12 @@ if not df.empty:
             
             st.divider()
             st.subheader("Sterkte-analyse Bezetting")
-            check_data = []
-            for abbr in races_all:
-                aantal = int(team[abbr].sum())
-                status = "✅ Voldoende"
-                if aantal < 3: status = "🚨 KRITIEK: Te weinig"
-                elif aantal < 5: status = "⚠️ MATIG: Weinig reserves"
-                check_data.append({"Koers": abbr, "Starters": aantal, "Status": status})
-            
+            check_data = [{"Koers": r, "Starters": int(team[r].sum())} for r in races_all]
             check_df = pd.DataFrame(check_data)
+            
             c_warn, c_ok = st.columns(2)
             with c_warn:
-                st.write("Aandachtspunten:")
+                st.write("Aandachtspunten (< 5 starters):")
                 st.dataframe(check_df[check_df["Starters"] < 5], hide_index=True)
             with c_ok:
                 st.write("Goed bezet:")
@@ -169,8 +188,7 @@ if not df.empty:
         market_display = df[['NAAM', 'PRIJS']].copy()
         for abbr in races_all:
             def check_live(naam, r_abbr):
-                achternaam = naam.lower().split()[-1]
-                return "✅" if any(achternaam in p for p in pcs_live[r_abbr]) else ""
+                return "✅" if any(naam.lower().split()[-1] in p for p in pcs_live[r_abbr]) else ""
             market_display[abbr] = df['NAAM'].apply(lambda x: check_live(x, abbr))
         st.dataframe(market_display.sort_values('PRIJS', ascending=False), hide_index=True, height=600)
 
@@ -179,14 +197,9 @@ if not df.empty:
         c1, c2 = st.columns(2)
         with c1:
             st.subheader("Over deze applicatie")
-            st.write("Optimaliseer je Scorito team middels wiskundige modellen.")
+            st.write("Linear Programming model voor het vinden van de beste 20 renners.")
         with c2:
-            st.subheader("Databaas & Credits")
-            st.markdown("* WielerOrakel.nl: Ratings\n* ProCyclingStats: Startlijsten\n* Scorito.com: Prijzen")
+            st.subheader("Bronnen")
+            st.markdown("* WielerOrakel: Ratings\n* ProCyclingStats: Live startlijsten\n* Scorito: Prijzen")
         st.divider()
-        st.subheader("Uitleg Ratings")
-        st.write("COB: Kassei, HLL: Heuvel, MTN: Klim (PN), SPR: Sprint (BDP/TA), OR: Eendagskwaliteit")
-        st.divider()
-        c3, c4 = st.columns(2)
-        for i, (k, v) in enumerate({k: v['full'] for k, v in RACES_CONFIG.items()}.items()):
-            with (c3 if i % 2 == 0 else c4): st.write(f"**{k}**: {v}")
+        st.write("OHN: Omloop, KBK: Kuurne, SB: Strade, PN7: PN Rit 7, TA7: TA Rit 7, MSR: Sanremo, BDP: De Panne, E3: E3, GW: Gent-W, DDV: Dwars door Vl, RVV: Vlaanderen, SP: Scheldeprijs, PR: Roubaix, BP: Brabantse, AGR: Amstel, WP: Waalse Pijl, LBL: Luik.")
