@@ -3,12 +3,207 @@ import pandas as pd
 import pulp
 import io
 
-st.set_page_config(page_title="Scorito Pro", layout="wide")
-st.title("🚴 Scorito Klassiekers: The Ultimate Tool")
+st.set_page_config(page_title="Scorito Klassiekers Manager", layout="wide", page_icon="🚴")
 
-# --- 1. DE INGEBOUWDE DATABASE (Jouw nieuwe data) ---
-# We zetten dit direct in de code zodat je geen extra bestanden hoeft te regelen.
-SCORITO_RAW_DATA = """FirstName	LastName	MarketRiderId	NameShort	RiderId	TeamId	Type	Team	Scorito GC	Scorito Climb	Scorito Time trial	Scorito Punch	Scorito Hill	Scorito Cobbles	Scorito Sprint
+# --- 1. DATA: PRIJZEN (Uit jouw screenshots) ---
+PRICES_CSV = """Naam,Prijs
+T. Pogačar,7000000
+M. van der Poel,6000000
+J. Philipsen,5000000
+M. Pedersen,4500000
+W. van Aert,4500000
+J. Milan,3500000
+T. Pidcock,3000000
+M. Brennan,3000000
+A. De Lie,2500000
+C. Laporte,2500000
+T. Benoot,2500000
+T. Wellens,2500000
+M. Jorgenson,2500000
+T. Merlier,2500000
+R. Evenepoel,2500000
+F. Ganna,2000000
+O. Kooij,2000000
+B. Healy,2000000
+P. Magnier,2000000
+J. Stuyven,1500000
+S. Küng,1500000
+F. Vermeersch,1500000
+N. Politt,1500000
+N. Powless,1500000
+M. Matthews,1500000
+B. Girmay,1500000
+M. Bjerg,1500000
+M. Mohorič,1500000
+R. Grégoire,1500000
+M. Skjelmose,1500000
+B. Cosnefroy,1500000
+K. Groves,1500000
+M. Vacek,1500000
+T. Skujiņš,1000000
+M. Teunissen,1000000
+M. Trentin,1000000
+J. Narváez,1000000
+S. Dillier,1000000
+J. Meeus,1000000
+D. van Poppel,1000000
+T. Nys,1000000
+K. Vauquelin,1000000
+J. Almeida,1000000
+I. del Toro,1000000
+A. Yates,1000000
+B. McNulty,1000000
+F. Großschartner,1000000
+P. Bittner,1000000
+M. Van Gils,1000000
+J. Vingegaard,1000000
+G. Vermeersch,750000
+D. van Baarle,750000
+L. Mozzato,750000
+V. Madouas,750000
+L. Pithie,750000
+D. Teuns,750000
+H. Hofstetter,750000
+L. Rex,750000
+F. Wright,750000
+D. Ballerini,750000
+S. Wærenskjold,750000
+E. Planckaert,750000
+M. Gogl,750000
+F. Sénéchal,750000
+S. Kragh Andersen,750000
+G. Ciccone,750000
+M. van den Berg,750000
+A. Laurance,750000
+A. Zingle,750000
+O. Riesebeek,750000
+L. Martinez,750000
+L. Van Eetvelt,750000
+O. Onley,750000
+T. Bayer,750000
+Y. Lampaert,500000
+R. Tiller,500000
+A. Turgis,500000
+J. Degenkolb,500000
+B. Turner,500000
+K. Asgreen,500000
+J. Alaphilippe,500000
+J. Tratnik,500000
+M. Cort,500000
+M. Hoelgaard,500000
+E. Theuns,500000
+S. Bissegger,500000
+J. Rutsch,500000
+P. Eenkhoorn,500000
+P. Allegaert,500000
+M. Valgren,500000
+B. Van Lerberghe,500000
+C. Bol,500000
+I. García Cortina,500000
+O. Doull,500000
+J. Abrahamsen,500000
+O. Naesen,500000
+M. Haller,500000
+Q. Simmons,500000
+M. Louvel,500000
+A. Lutsenko,500000
+J. Stewart,500000
+B. Jungels,500000
+T. van der Hoorn,500000
+J. Biermans,500000
+J. Jacobs,500000
+M. Kwiatkowski,500000
+M. Walscheid,500000
+J. De Buyst,500000
+T. Van Asbroeck,500000
+G. Moscon,500000
+A. Capiot,500000
+L. Durbridge,500000
+T. Roosen,500000
+M. Hirschi,500000
+A. Bettiol,500000
+P. Roglič,500000
+A. Aranburu,500000
+A. Bagioli,500000
+J. Haig,500000
+A. Vlasov,500000
+V. Lafay,500000
+Q. Hermans,500000
+M. Schmid,500000
+P. Bilbao,500000
+S. Buitrago,500000
+D. Martínez,500000
+P. Konrad,500000
+M. Honoré,500000
+R. Adrià,500000
+G. Martin,500000
+C. Canal,500000
+Q. Pacher,500000
+T. Geoghegan Hart,500000
+B. Mollema,500000
+N. Schultz,500000
+A. Covi,500000
+W. Barguil,500000
+W. Kelderman,500000
+A. Kron,500000
+S. Higuita,500000
+A. Kirsch,500000
+X. Meurisse,500000
+S. Velasco,500000
+C. Strong,500000
+V. Albanese,500000
+A. De Gendt,500000
+M. Menten,500000
+D. Formolo,500000
+A. Segaert,500000
+M. Landa,500000
+T. Foss,500000
+E. Hayter,500000
+J. Mosca,500000
+D. Van Gestel,500000
+A. Vendrame,500000
+S. Bennett,500000
+A. Kamp,500000
+S. Battistella,500000
+J. Steimle,500000
+M. Schachmann,500000
+I. Van Wilder,500000
+D. Caruso,500000
+M. Govekar,500000
+B. Coquard,500000
+I. Izagirre,500000
+B. Thomas,500000
+F. Gall,500000
+G. Mühlberger,500000
+R. Carapaz,500000
+D. Gaudu,500000
+T. Gruel,500000
+R. Molard,500000
+E. Bernal,500000
+D. Godon,500000
+M. Sobrero,500000
+L. Rota,500000
+L. Taminiaux,500000
+G. Zimmermann,500000
+G. Serrano,500000
+N. Tesfatsion,500000
+G. Bennett,500000
+S. Clarke,500000
+K. Neilands,500000
+D. Smith,500000
+S. Williams,500000
+E. Dunbar,500000
+J. Hindley,500000
+K. Bouwman,500000
+F. Engelhardt,500000
+N. Eekhoff,500000
+W. Poels,500000
+A. Charmig,500000
+N. Conci,500000
+D. Ulissi,500000"""
+
+# --- 2. DATA: RATINGS (Met scores 0-10) ---
+STATS_CSV = """FirstName	LastName	MarketRiderId	NameShort	RiderId	TeamId	Type	Team	Scorito GC	Scorito Climb	Scorito Time trial	Scorito Punch	Scorito Hill	Scorito Cobbles	Scorito Sprint
 Tadej	Pogačar	12910	T. Pogačar	6432	14	Hills	UAE Team Emirates	10	10	10	10	10	8	0
 Mathieu	van der Poel	12889	M. van der Poel	6357	121	Cobbles	Alpecin-Premier Tech	0	2	4	10	10	10	4
 Mads	Pedersen	12766	M. Pedersen	532	16	Cobbles	Lidl - Trek	0	0	4	6	4	8	8
@@ -213,109 +408,80 @@ Enrico	Zanoncello	13371	E. Zanoncello	7582	20	Other	Bardiani CSF 7 Saber	0	0	0	0
 Dušan	Rajović	13374	D. Rajović	6942	212	Other	Solution Tech NIPPO Rali	0	0	0	0	0	0	2
 """
 
-# --- 2. LOGICA ---
+# --- 3. LOGICA ---
 
-# Data inladen uit de string hierboven
-stats_df = pd.read_csv(io.StringIO(SCORITO_RAW_DATA), sep='\t')
-# Kolommen opschonen
-stats_df.rename(columns={
-    'NameShort': 'Naam',
-    'Scorito Cobbles': 'Kassei',
-    'Scorito Hill': 'Heuvel',
-    'Scorito Sprint': 'Sprint',
-    'Scorito Punch': 'Punch',
-    'Scorito Climb': 'Klim'
-}, inplace=True)
-stats_df['Naam_Lower'] = stats_df['Naam'].str.lower().str.strip()
+def load_data():
+    # 1. Laad Prijzen
+    df_prices = pd.read_csv(io.StringIO(PRICES_CSV), sep=',')
+    df_prices['Prijs_Clean'] = pd.to_numeric(df_prices['Prijs'], errors='coerce').fillna(0)
+    df_prices['Match_Name'] = df_prices['Naam'].str.lower().str.strip()
+    
+    # 2. Laad Stats (Let op: separator is tab)
+    df_stats = pd.read_csv(io.StringIO(STATS_CSV), sep='\t')
+    df_stats.rename(columns={
+        'NameShort': 'Naam_Stats',
+        'Scorito Cobbles': 'Kassei',
+        'Scorito Hill': 'Heuvel',
+        'Scorito Sprint': 'Sprint',
+        'Scorito Punch': 'Punch'
+    }, inplace=True)
+    df_stats['Match_Name'] = df_stats['Naam_Stats'].str.lower().str.strip()
+    
+    # 3. Merge
+    merged = pd.merge(df_prices, df_stats, on='Match_Name', how='inner')
+    
+    return merged
 
-# Sidebar
-st.sidebar.header("1. Upload Prijzen")
-uploaded_file = st.sidebar.file_uploader("Upload je prijslijst (CSV)", type=["csv", "xlsx"])
-budget = st.sidebar.number_input("Budget (€)", value=46000000, step=500000)
+df = load_data()
 
-st.sidebar.header("2. Strategie")
-st.sidebar.write("Hoe belangrijk vind je:")
-w_kassei = st.sidebar.slider("Kasseien (RvV, Roubaix)", 0, 10, 8)
-w_heuvel = st.sidebar.slider("Heuvels (LBL, Waalse Pijl)", 0, 10, 6)
-w_sprint = st.sidebar.slider("Sprint (Scheldeprijs, Gent-W)", 0, 10, 4)
+st.title("🏆 Scorito Manager 2026")
+st.write(f"Database geladen: **{len(df)} renners** beschikbaar met prijs én statistieken.")
 
-# Hoofdvenster
-if uploaded_file:
-    # 1. Prijzen inladen
-    try:
-        if uploaded_file.name.endswith('.csv'):
-            price_df = pd.read_csv(uploaded_file, sep=None, engine='python')
+# --- SIDEBAR ---
+st.sidebar.header("Instellingen")
+budget = st.sidebar.number_input("Budget (€)", value=46000000, step=250000)
+
+st.sidebar.subheader("Strategie Gewicht")
+w_kassei = st.sidebar.slider("Kassei (RvV/Roubaix)", 0, 10, 8)
+w_heuvel = st.sidebar.slider("Heuvel (LBL/Waalse Pijl)", 0, 10, 6)
+w_sprint = st.sidebar.slider("Sprint (Gent/Schelde)", 0, 10, 4)
+
+# Score Berekening
+df['Score'] = (
+    (df['Kassei'] * w_kassei) +
+    (df['Heuvel'] * w_heuvel) +
+    (df['Sprint'] * w_sprint) +
+    (df['Punch'] * 0.5)
+)
+
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.subheader("Top Renners (op basis van jouw strategie)")
+    st.dataframe(df[['Naam', 'Prijs_Clean', 'Score', 'Kassei', 'Heuvel', 'Sprint']].sort_values('Score', ascending=False).head(10))
+
+with col2:
+    st.subheader("Optimalisatie")
+    if st.button("🚀 Maak Beste Team"):
+        prob = pulp.LpProblem("Scorito", pulp.LpMaximize)
+        selection = pulp.LpVariable.dicts("Sel", df.index, cat='Binary')
+        
+        # Doel
+        prob += pulp.lpSum([df['Score'][i] * selection[i] for i in df.index])
+        
+        # Budget
+        prob += pulp.lpSum([df['Prijs_Clean'][i] * selection[i] for i in df.index]) <= budget
+        
+        # Aantal (20)
+        prob += pulp.lpSum([selection[i] for i in df.index]) == 20
+        
+        prob.solve()
+        
+        if pulp.LpStatus[prob.status] == 'Optimal':
+            idx = [i for i in df.index if selection[i].varValue == 1]
+            team = df.loc[idx]
+            
+            st.success(f"Team Gevonden! Kosten: € {team['Prijs_Clean'].sum():,.0f}")
+            st.dataframe(team[['Naam', 'Prijs_Clean', 'Kassei', 'Heuvel', 'Sprint']].sort_values('Prijs_Clean', ascending=False))
         else:
-            price_df = pd.read_excel(uploaded_file)
-        
-        # Schoonmaak Prijzen
-        price_df.columns = price_df.columns.str.strip()
-        price_df['Prijs_Clean'] = price_df['Prijs'].astype(str).str.replace('€', '').str.replace('.', '').str.replace(' ', '')
-        price_df['Prijs_Clean'] = pd.to_numeric(price_df['Prijs_Clean'], errors='coerce').fillna(0)
-        price_df['Naam_Lower'] = price_df['Naam'].str.lower().str.strip()
-        
-        # 2. SAMENVOEGEN (MERGE)
-        # We koppelen de prijslijst aan de Scorito-statistieken op basis van naam
-        merged_df = pd.merge(price_df, stats_df, on='Naam_Lower', how='inner', suffixes=('', '_stats'))
-        
-        # Welke naam gebruiken we voor display?
-        if 'Naam' in merged_df.columns:
-            display_name = 'Naam'
-        else:
-            display_name = 'NameShort'
-
-        st.success(f"Gekoppeld! {len(merged_df)} renners gevonden met zowel prijs als statistieken.")
-        
-        # 3. SCORE BEREKENEN
-        # De formule: Score = (Kassei * Gewicht) + (Heuvel * Gewicht) + ...
-        merged_df['Total_Score'] = (
-            (merged_df['Kassei'] * w_kassei) +
-            (merged_df['Heuvel'] * w_heuvel) +
-            (merged_df['Sprint'] * w_sprint) + 
-            (merged_df['Punch'] * 0.5) # Punch telt half mee als bonus
-        )
-        
-        # Toon de top 10 op basis van jouw strategie
-        st.subheader("Toprenners voor jouw strategie")
-        st.dataframe(merged_df[[display_name, 'Prijs_Clean', 'Total_Score', 'Kassei', 'Heuvel', 'Sprint']].sort_values('Total_Score', ascending=False).head(10))
-
-        # 4. OPTIMALISATIE
-        if st.button("🚀 Genereer Beste Team"):
-            prob = pulp.LpProblem("ScoritoClassics", pulp.LpMaximize)
-            selection = pulp.LpVariable.dicts("Select", merged_df.index, cat='Binary')
-            
-            # Doel: Maximaliseer de berekende score
-            prob += pulp.lpSum([merged_df['Total_Score'][i] * selection[i] for i in merged_df.index])
-            
-            # Constraint: Budget
-            prob += pulp.lpSum([merged_df['Prijs_Clean'][i] * selection[i] for i in merged_df.index]) <= budget
-            
-            # Constraint: Precies 20 renners
-            prob += pulp.lpSum([selection[i] for i in merged_df.index]) == 20
-            
-            prob.solve()
-            
-            if pulp.LpStatus[prob.status] == 'Optimal':
-                idx = [i for i in merged_df.index if selection[i].varValue == 1]
-                team = merged_df.loc[idx]
-                
-                st.balloons()
-                st.write(f"### 🏆 Jouw Optimale Selectie (€ {team['Prijs_Clean'].sum():,.0f})")
-                
-                # Mooie tabel
-                st.dataframe(
-                    team[[display_name, 'Prijs_Clean', 'Kassei', 'Heuvel', 'Sprint']].sort_values('Prijs_Clean', ascending=False),
-                    column_config={
-                        "Kassei": st.column_config.ProgressColumn("Kassei", min_value=0, max_value=10, format="%d"),
-                        "Heuvel": st.column_config.ProgressColumn("Heuvel", min_value=0, max_value=10, format="%d"),
-                        "Sprint": st.column_config.ProgressColumn("Sprint", min_value=0, max_value=10, format="%d"),
-                    },
-                    height=800
-                )
-            else:
-                st.error("Kon geen oplossing vinden. Check je budget.")
-
-    except Exception as e:
-        st.error(f"Er ging iets mis: {e}")
-else:
-    st.info("Upload eerst je prijslijst (scorito_compleet.csv) in de sidebar.")
+            st.error("Geen team gevonden binnen budget.")
