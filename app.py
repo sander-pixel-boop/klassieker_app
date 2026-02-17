@@ -33,7 +33,8 @@ def load_data():
         df_sl_clean = df_sl.drop(columns=cols_to_drop)
         df = pd.merge(df, df_sl_clean, on='MATCH_NAME', how='left')
         
-        df['PRIJS_CLEAN'] = pd.to_numeric(df['PRIJS'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
+        # Prijs opschonen en hernoemen naar PRIJS voor de interface
+        df['PRIJS'] = pd.to_numeric(df['PRIJS'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
         
         races_list = ["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"]
         for r in races_list:
@@ -60,7 +61,7 @@ st.markdown("""
 st.title("🏆 Scorito Klassieker Master 2026")
 
 if df.empty:
-    st.warning("Database leeg. Check je CSV bestanden.")
+    st.warning("Database leeg. Check je CSV bestanden op GitHub.")
 else:
     tab1, tab2, tab3, tab4 = st.tabs(["🚀 Team Samensteller", "📅 Team Schema", "🗺️ PCS Markt-Programma", "ℹ️ Informatie"])
 
@@ -71,10 +72,19 @@ else:
         
         st.divider()
         w_cob = st.slider("Kassei (COB)", 0, 10, 8)
+        st.caption("OHN, KBK, E3, GW, DDV, RVV, PR")
+        
         w_hll = st.slider("Heuvel (HLL)", 0, 10, 6)
+        st.caption("MSR, BP, AGR, WP, LBL")
+        
         w_mtn = st.slider("Klim (MTN)", 0, 10, 4)
+        st.caption("Parijs-Nice (PN7)")
+        
         w_spr = st.slider("Sprint (SPR)", 0, 10, 5)
-        w_or  = st.slider("Eendags (OR)", 0, 10, 5)
+        st.caption("KBK, BDP, GW, SP, Tirreno (TA7)")
+        
+        w_or  = st.slider("Eendags kwaliteit (OR)", 0, 10, 5)
+        st.caption("Algemene score voor alle eendagskoersen")
 
         st.divider()
         st.subheader("📌 Renners Vastzetten (Locks)")
@@ -83,6 +93,7 @@ else:
         st.subheader("🚫 Renners Uitsluiten (Excludes)")
         excluded_riders = st.multiselect("Deze renners NOOIT meenemen:", df['NAAM'].unique())
 
+    # Berekening score
     df['SCORE'] = (df['COB']*w_cob) + (df['HLL']*w_hll) + (df['MTN']*w_mtn) + (df['SPR']*w_spr) + (df['OR']*w_or)
 
     # --- TAB 1: SAMENSTELLER ---
@@ -92,27 +103,24 @@ else:
             sel = pulp.LpVariable.dicts("Sel", df.index, cat='Binary')
             
             prob += pulp.lpSum([df['SCORE'][i] * sel[i] for i in df.index])
-            prob += pulp.lpSum([df['PRIJS_CLEAN'][i] * sel[i] for i in df.index]) <= budget
+            prob += pulp.lpSum([df['PRIJS'][i] * sel[i] for i in df.index]) <= budget
             prob += pulp.lpSum([sel[i] for i in df.index]) == 20
             
-            # Constraints voor Locks & Excludes
             for i, row in df.iterrows():
-                if row['NAAM'] in locked_riders:
-                    prob += (sel[i] == 1)
-                if row['NAAM'] in excluded_riders:
-                    prob += (sel[i] == 0)
+                if row['NAAM'] in locked_riders: prob += (sel[i] == 1)
+                if row['NAAM'] in excluded_riders: prob += (sel[i] == 0)
             
             prob.solve()
             if pulp.LpStatus[prob.status] == 'Optimal':
                 st.session_state['team_idx'] = [i for i in df.index if sel[i].varValue == 1]
-                st.success("Team geoptimaliseerd met jouw voorkeuren!")
+                st.success("Team geoptimaliseerd!")
             else:
-                st.error("Geen oplossing mogelijk. Check je budget of het aantal 'Locks'.")
+                st.error("Geen oplossing mogelijk. Check budget of locks.")
 
         if 'team_idx' in st.session_state:
             team = df.loc[st.session_state['team_idx']]
-            st.dataframe(team[['NAAM', 'PRIJS_CLEAN', 'SCORE', 'COB', 'HLL', 'SPR']].sort_values('PRIJS_CLEAN', ascending=False))
-            st.metric("Totaal besteed", f"€ {team['PRIJS_CLEAN'].sum():,.0f}", f"Over: € {budget - team['PRIJS_CLEAN'].sum():,.0f}")
+            st.dataframe(team[['NAAM', 'PRIJS', 'SCORE', 'COB', 'HLL', 'SPR']].sort_values('PRIJS', ascending=False), hide_index=True)
+            st.metric("Totaal besteed", f"€ {team['PRIJS'].sum():,.0f}", f"Over: € {budget - team['PRIJS'].sum():,.0f}")
 
     # --- TAB 2: TEAM SCHEMA ---
     with tab2:
@@ -121,56 +129,32 @@ else:
             display_schema = team_schema[['NAAM'] + races_all].copy()
             for r in races_all:
                 display_schema[r] = display_schema[r].apply(lambda x: "✅" if x == 1 else "")
-            st.dataframe(display_schema, height=600)
+            st.dataframe(display_schema, height=600, hide_index=True)
         else:
             st.info("Genereer eerst een team.")
 
-    # --- TAB 3: PCS MARKT-PROGRAMMA (NIEUW) ---
+    # --- TAB 3: PCS MARKT-PROGRAMMA ---
     with tab3:
         st.subheader("Wie rijdt wat? (Gehele Markt)")
-        st.write("Dit overzicht toont alle beschikbare renners en hun startlijst-status bij PCS.")
-        
         race_filter = st.selectbox("Filter op wedstrijd:", ["Alle Wedstrijden"] + races_all)
-        
-        market_display = df[['NAAM', 'PRIJS_CLEAN'] + races_all].copy()
+        market_display = df[['NAAM', 'PRIJS'] + races_all].copy()
         for r in races_all:
             market_display[r] = market_display[r].apply(lambda x: "✅" if x == 1 else "")
-        
         if race_filter != "Alle Wedstrijden":
             market_display = market_display[market_display[race_filter] == "✅"]
-            
-        st.dataframe(market_display.sort_values('PRIJS_CLEAN', ascending=False), height=700)
+        st.dataframe(market_display.sort_values('PRIJS', ascending=False), height=700, hide_index=True)
 
     # --- TAB 4: INFORMATIE ---
     with tab4:
         st.header("ℹ️ Informatie & Methodiek")
-        
         col_a, col_b = st.columns(2)
         with col_a:
             st.subheader("Hoe werkt de optimalisatie?")
-            st.write("""
-            Deze tool maakt gebruik van *Linear Programming*. In plaats van zelf te puzzelen, 
-            berekent de computer de mathematisch beste combinatie van 20 renners. 
-            Het model kijkt naar de totale 'Score' die jij aan de renners geeft via de sliders 
-            en zorgt dat het team nooit boven het ingestelde budget komt.
-            """)
-        
+            st.write("De computer vindt mathematisch de beste 20 renners op basis van de scores die voortvloeien uit jouw sliders.")
         with col_b:
-            st.subheader("De Kracht van WielerOrakel")
-            st.write("""
-            Ratings zoals **COB** (Cobbles) en **HLL** (Hills) zijn gebaseerd op de 
-            machine-learning modellen van **WielerOrakel.nl**. Deze cijfers (0-100) 
-            geven een veel nauwkeuriger beeld van de kansen van een renner dan de 
-            standaard sterren van Scorito.
-            """)
-
+            st.subheader("Data & Credits")
+            st.markdown("- **Kwaliteit:** [WielerOrakel.nl](https://www.cyclingoracle.com/)\n- **Startlijsten:** [ProCyclingStats.com](https://www.procyclingstats.com/)\n- **Prijzen:** [Scorito.com](https://www.scorito.com/)")
+        
         st.divider()
-        st.subheader("Nieuwe Koersen in 2026")
-        st.info("**Parijs-Nice (Et. 7)** en **Tirreno-Adriatico (Et. 7)** zijn dit jaar toegevoegd. De app weegt hiervoor de 'Klim' (MTN) en 'Sprint' (SPR) ratings mee, aangezien dit respectievelijk een bergrit en een massasprint zijn.")
-
-        st.subheader("Credits")
-        st.markdown("""
-        - **Ratings:** [WielerOrakel.nl](https://www.cyclingoracle.com/)
-        - **Startlijsten:** [ProCyclingStats.com](https://www.procyclingstats.com/)
-        - **Prijzen:** [Scorito.com](https://www.scorito.com/)
-        """)
+        st.subheader("Uitleg Afkortingen")
+        st.write("OHN: Omloop, KBK: Kuurne, SB: Strade, PN7: PN Rit 7, TA7: TA Rit 7, MSR: Sanremo, BDP: De Panne, E3: E3, GW: Gent-W, DDV: Dwars door Vl, RVV: Vlaanderen, SP: Scheldeprijs, PR: Roubaix, BP: Brabantse, AGR: Amstel, WP: Waalse Pijl, LBL: Luik.")
