@@ -31,16 +31,13 @@ RACES_CONFIG = {
 }
 races_all = list(RACES_CONFIG.keys())
 
-# --- 2. HULPFUNCTIES VOOR MATCHING ---
+# --- 2. HULPFUNCTIES ---
 
 def simplify_name(text):
-    """Maakt namen 'kaal': geen accenten, geen initialen, alles kleine letters."""
     if pd.isna(text): return ""
     text = str(text).lower()
-    # Verwijder initialen zoals 't. ' of 'm.v.d.'
     text = re.sub(r'^[a-z]\.\s*', '', text)
     text = re.sub(r'\s[a-z]\.\s*', ' ', text)
-    # Verwijder accenten (ç -> c, é -> e)
     text = "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
     return text.strip()
 
@@ -49,33 +46,13 @@ def load_base_data():
     try:
         df_p = pd.read_csv("renners_prijzen.csv", sep=None, engine='python')
         df_wo = pd.read_csv("renners_stats.csv", sep=None, engine='python')
-        
-        # Kolomnamen opschonen
         df_p.columns = [c.strip().upper() for c in df_p.columns]
         df_wo.columns = [c.strip().upper() for c in df_wo.columns]
-
-        # Naamkolom vinden
-        p_name_col = next((c for c in df_p.columns if "NAAM" in c or "NAME" in c), None)
-        wo_name_col = next((c for c in df_wo.columns if "NAAM" in c or "NAME" in c), None)
-
-        if not p_name_col or not wo_name_col:
-            st.error("Kon de kolom 'Naam' niet vinden in een van de bestanden.")
-            return pd.DataFrame()
-
-        # Maak sleutels voor matching
-        df_p['MATCH_KEY'] = df_p[p_name_col].apply(simplify_name)
-        df_wo['MATCH_KEY'] = df_wo[wo_name_col].apply(simplify_name)
-        
-        # Merge op de versimpelde sleutel
+        df_p['MATCH_KEY'] = df_p['NAAM'].apply(simplify_name)
+        df_wo['MATCH_KEY'] = df_wo['NAAM'].apply(simplify_name)
         df = pd.merge(df_p, df_wo, on='MATCH_KEY', how='inner', suffixes=('', '_WO'))
-        
-        # Prijs opschonen
-        price_col = next((c for c in df.columns if "PRIJS" in c or "PRICE" in c), None)
-        df['PRIJS'] = pd.to_numeric(df[price_col].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
-        
-        # Originele naam behouden voor display
-        df['NAAM'] = df[p_name_col]
-        
+        df['PRIJS'] = pd.to_numeric(df['PRIJS'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
+        df['NAAM'] = df['NAAM'] # Behoud originele naam uit prijzenbestand
         return df
     except Exception as e:
         st.error(f"Fout bij laden: {e}")
@@ -101,8 +78,7 @@ st.title("Klassiekers 2026")
 df_base = load_base_data()
 
 if df_base.empty:
-    st.error("Kritieke fout: Database leeg. Controleer of de namen in je CSV-bestanden exact overeenkomen.")
-    st.info("Tip: Zorg dat beide CSV-bestanden een kolom 'Naam' hebben.")
+    st.error("Kritieke fout: Database leeg. Controleer of de namen in je CSV-bestanden overeenkomen.")
 else:
     with st.sidebar:
         st.header("Strategie en Filters")
@@ -121,49 +97,9 @@ else:
 
     df = df_base.copy()
 
-    # Startlijsten
     if startlist_source == "Statisch (CSV)":
         try:
             df_sl = pd.read_csv("startlijsten.csv", sep=None, engine='python')
             df_sl.columns = [c.strip().upper() for c in df_sl.columns]
-            df_sl['MATCH_KEY'] = df_sl.iloc[:,0].apply(simplify_name) # Eerste kolom is naam
-            df = pd.merge(df, df_sl.drop(columns=[df_sl.columns[0]], errors='ignore'), on='MATCH_KEY', how='left').fillna(0)
-        except: st.sidebar.warning("startlijsten.csv niet gevonden.")
-    else:
-        with st.spinner('Live startlijsten ophalen...'):
-            pcs_data = scrape_pcs()
-            for abbr in races_all:
-                df[abbr] = df['MATCH_KEY'].apply(lambda x: 1 if x in pcs_data[abbr] else 0)
-
-    # Key check
-    for r in races_all: 
-        if r not in df.columns: df[r] = 0
-        df[r] = df[r].fillna(0)
-
-    df['SCORE'] = (df['COB']*w_cob) + (df['HLL']*w_hll) + (df['MTN']*w_mtn) + (df['SPR']*w_spr) + (df['OR']*w_or)
-    
-    st.markdown("<style>[data-testid='stDataFrame'] th div { height: 100px; writing-mode: vertical-rl; transform: rotate(180deg); }</style>", unsafe_allow_html=True)
-
-    t1, t2, t3, t4 = st.tabs(["Team Samensteller", "Team Schema", "Programma volgens PCS", "Informatie"])
-
-    with t1:
-        if st.button("Genereer Optimaal Team"):
-            prob = pulp.LpProblem("Scorito", pulp.LpMaximize)
-            sel = pulp.LpVariable.dicts("Sel", df.index, cat='Binary')
-            prob += pulp.lpSum([df['SCORE'][i] * sel[i] for i in df.index])
-            prob += pulp.lpSum([df['PRIJS'][i] * sel[i] for i in df.index]) <= budget
-            prob += pulp.lpSum([sel[i] for i in df.index]) == 20
-            for i, row in df.iterrows():
-                if row['NAAM'] in locked_riders: prob += (sel[i] == 1)
-                if row['NAAM'] in excluded_riders: prob += (sel[i] == 0)
-            prob.solve()
-            if pulp.LpStatus[prob.status] == 'Optimal':
-                st.session_state['team_idx'] = [i for i in df.index if sel[i].varValue == 1]
-                st.success("Team gevonden ✅")
-            else: st.error("Geen oplossing mogelijk.")
-        
-        if 'team_idx' in st.session_state:
-            team = df.loc[st.session_state['team_idx']]
-            st.dataframe(team[['NAAM', 'PRIJS', 'SCORE']].sort_values('PRIJS', ascending=False), hide_index=True)
-
-    with t2:
+            df_sl['MATCH_KEY'] = df_sl['NAAM'].apply(simplify_name)
+            df = pd.merge(df, df_sl.drop(columns=['NAAM']), on='MATCH_KEY', how='left').fillna(
