@@ -36,6 +36,7 @@ races_all = list(RACES_CONFIG.keys())
 def simplify_name(text):
     if pd.isna(text): return ""
     text = str(text).lower()
+    # Verwijder initialen en accenten
     text = re.sub(r'^[a-z]\.\s*', '', text)
     text = re.sub(r'\s[a-z]\.\s*', ' ', text)
     text = "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
@@ -44,14 +45,25 @@ def simplify_name(text):
 @st.cache_data
 def load_base_data():
     try:
-        df_p = pd.read_csv("renners_prijzen.csv", sep=None, engine='python')
-        df_wo = pd.read_csv("renners_stats.csv", sep=None, engine='python')
+        # Expliciet laden met detectie van scheidingsteken
+        df_p = pd.read_csv("renners_prijzen.csv", sep=None, engine='python', encoding='utf-8-sig')
+        df_wo = pd.read_csv("renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig')
+        
+        # Kolomkoppen extreem schoonmaken
         df_p.columns = [c.strip().upper() for c in df_p.columns]
         df_wo.columns = [c.strip().upper() for c in df_wo.columns]
+        
+        # Maak universele match-keys
         df_p['MATCH_KEY'] = df_p['NAAM'].apply(simplify_name)
         df_wo['MATCH_KEY'] = df_wo['NAAM'].apply(simplify_name)
+        
+        # Merge
         df = pd.merge(df_p, df_wo, on='MATCH_KEY', how='inner', suffixes=('', '_WO'))
-        df['PRIJS'] = pd.to_numeric(df['PRIJS'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
+        
+        # Prijs opschonen naar getal
+        if 'PRIJS' in df.columns:
+            df['PRIJS'] = pd.to_numeric(df['PRIJS'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
+        
         return df
     except Exception as e:
         st.error(f"Fout bij laden: {e}")
@@ -78,6 +90,7 @@ df_base = load_base_data()
 
 if df_base.empty:
     st.error("Kritieke fout: Database leeg. Controleer of de namen in je CSV-bestanden overeenkomen.")
+    st.info("Check of de kolomnaam in beide bestanden exact 'Naam' is (zonder spaties).")
 else:
     with st.sidebar:
         st.header("Strategie en Filters")
@@ -96,12 +109,13 @@ else:
 
     df = df_base.copy()
 
+    # Startlijsten verwerken
     if startlist_source == "Statisch (CSV)":
         try:
-            df_sl = pd.read_csv("startlijsten.csv", sep=None, engine='python')
+            df_sl = pd.read_csv("startlijsten.csv", sep=None, engine='python', encoding='utf-8-sig')
             df_sl.columns = [c.strip().upper() for c in df_sl.columns]
             df_sl['MATCH_KEY'] = df_sl['NAAM'].apply(simplify_name)
-            df = pd.merge(df, df_sl.drop(columns=['NAAM']), on='MATCH_KEY', how='left').fillna(0)
+            df = pd.merge(df, df_sl.drop(columns=['NAAM'], errors='ignore'), on='MATCH_KEY', how='left').fillna(0)
         except:
             st.sidebar.warning("startlijsten.csv niet gevonden.")
     else:
@@ -110,6 +124,7 @@ else:
             for abbr in races_all:
                 df[abbr] = df['MATCH_KEY'].apply(lambda x: 1 if x in pcs_data[abbr] else 0)
 
+    # Zorg dat alle race-kolommen bestaan
     for r in races_all:
         if r not in df.columns: df[r] = 0
         df[r] = df[r].fillna(0)
@@ -169,5 +184,4 @@ else:
 
     with t4:
         st.header("Informatie en Methodiek")
-        st.write("Wiskundige optimalisatie voor Scorito Klassiekers 2026.")
         st.write("Data bronnen: WielerOrakel & ProCyclingStats.")
