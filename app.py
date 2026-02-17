@@ -52,7 +52,6 @@ def load_base_data():
         df_wo['MATCH_KEY'] = df_wo['NAAM'].apply(simplify_name)
         df = pd.merge(df_p, df_wo, on='MATCH_KEY', how='inner', suffixes=('', '_WO'))
         df['PRIJS'] = pd.to_numeric(df['PRIJS'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
-        df['NAAM'] = df['NAAM'] # Behoud originele naam uit prijzenbestand
         return df
     except Exception as e:
         st.error(f"Fout bij laden: {e}")
@@ -102,4 +101,73 @@ else:
             df_sl = pd.read_csv("startlijsten.csv", sep=None, engine='python')
             df_sl.columns = [c.strip().upper() for c in df_sl.columns]
             df_sl['MATCH_KEY'] = df_sl['NAAM'].apply(simplify_name)
-            df = pd.merge(df, df_sl.drop(columns=['NAAM']), on='MATCH_KEY', how='left').fillna(
+            df = pd.merge(df, df_sl.drop(columns=['NAAM']), on='MATCH_KEY', how='left').fillna(0)
+        except:
+            st.sidebar.warning("startlijsten.csv niet gevonden.")
+    else:
+        with st.spinner('Live startlijsten ophalen...'):
+            pcs_data = scrape_pcs()
+            for abbr in races_all:
+                df[abbr] = df['MATCH_KEY'].apply(lambda x: 1 if x in pcs_data[abbr] else 0)
+
+    for r in races_all:
+        if r not in df.columns: df[r] = 0
+        df[r] = df[r].fillna(0)
+
+    df['SCORE'] = (df['COB']*w_cob) + (df['HLL']*w_hll) + (df['MTN']*w_mtn) + (df['SPR']*w_spr) + (df['OR']*w_or)
+    st.markdown("<style>[data-testid='stDataFrame'] th div { height: 100px; writing-mode: vertical-rl; transform: rotate(180deg); }</style>", unsafe_allow_html=True)
+
+    t1, t2, t3, t4 = st.tabs(["Team Samensteller", "Team Schema", "Programma volgens PCS", "Informatie"])
+
+    with t1:
+        if st.button("Genereer Optimaal Team"):
+            prob = pulp.LpProblem("Scorito", pulp.LpMaximize)
+            sel = pulp.LpVariable.dicts("Sel", df.index, cat='Binary')
+            prob += pulp.lpSum([df['SCORE'][i] * sel[i] for i in df.index])
+            prob += pulp.lpSum([df['PRIJS'][i] * sel[i] for i in df.index]) <= budget
+            prob += pulp.lpSum([sel[i] for i in df.index]) == 20
+            for i, row in df.iterrows():
+                if row['NAAM'] in locked_riders: prob += (sel[i] == 1)
+                if row['NAAM'] in excluded_riders: prob += (sel[i] == 0)
+            prob.solve()
+            if pulp.LpStatus[prob.status] == 'Optimal':
+                st.session_state['team_idx'] = [i for i in df.index if sel[i].varValue == 1]
+                st.success("Team gevonden ✅")
+            else:
+                st.error("Geen oplossing mogelijk.")
+        
+        if 'team_idx' in st.session_state:
+            team_res = df.loc[st.session_state['team_idx']]
+            st.dataframe(team_res[['NAAM', 'PRIJS', 'SCORE']].sort_values('PRIJS', ascending=False), hide_index=True)
+
+    with t2:
+        if 'team_idx' in st.session_state:
+            team_sel = df.loc[st.session_state['team_idx']].copy()
+            disp = team_sel[['NAAM'] + races_all].copy()
+            for r in races_all: disp[r] = disp[r].apply(lambda x: "✅" if x == 1 else "")
+            st.dataframe(disp, hide_index=True)
+            
+            st.divider()
+            st.subheader("Kopman Suggesties")
+            kopman_list = []
+            for abbr, config in RACES_CONFIG.items():
+                starters = team_sel[team_sel[abbr] == 1]
+                if not starters.empty:
+                    top_3 = starters.sort_values(config['stat'], ascending=False).head(3)['NAAM'].tolist()
+                    kopman_list.append({"Koers": abbr, "Top 3": " / ".join(top_3)})
+            st.table(pd.DataFrame(kopman_list))
+        else:
+            st.info("Maak eerst een team.")
+
+    with t3:
+        st.subheader("Marktprogramma (Live PCS)")
+        live_list = scrape_pcs()
+        market = df[['NAAM', 'PRIJS']].copy()
+        for abbr in races_all:
+            market[abbr] = df['MATCH_KEY'].apply(lambda x: "✅" if x in live_list[abbr] else "")
+        st.dataframe(market.sort_values('PRIJS', ascending=False), hide_index=True)
+
+    with t4:
+        st.header("Informatie en Methodiek")
+        st.write("Wiskundige optimalisatie voor Scorito Klassiekers 2026.")
+        st.write("Data bronnen: WielerOrakel & ProCyclingStats.")
