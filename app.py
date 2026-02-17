@@ -3,7 +3,7 @@ import pandas as pd
 import pulp
 import io
 
-st.set_page_config(page_title="Scorito Master 2026", layout="wide", page_icon="🚴")
+st.set_page_config(page_title="Klassiekers 2026", layout="wide")
 
 # --- 1. DATA INLADEN ---
 @st.cache_data
@@ -33,7 +33,6 @@ def load_data():
         df_sl_clean = df_sl.drop(columns=cols_to_drop)
         df = pd.merge(df, df_sl_clean, on='MATCH_NAME', how='left')
         
-        # Prijs opschonen en hernoemen naar PRIJS voor de interface
         df['PRIJS'] = pd.to_numeric(df['PRIJS'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
         
         races_list = ["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"]
@@ -58,17 +57,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 3. UI ---
-st.title("🏆 Scorito Klassieker Master 2026")
+st.title("Klassiekers 2026")
 
 if df.empty:
-    st.warning("Database leeg. Check je CSV bestanden op GitHub.")
+    st.warning("Database leeg. Check de CSV bestanden op GitHub.")
 else:
-    tab1, tab2, tab3, tab4 = st.tabs(["🚀 Team Samensteller", "📅 Team Schema", "🗺️ PCS Markt-Programma", "ℹ️ Informatie"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Team Samensteller", "Team Schema", "PCS Markt-Programma", "Informatie"])
 
     # --- SIDEBAR ---
     with st.sidebar:
-        st.header("⚙️ Strategie & Filters")
-        budget = st.number_input("Budget (€)", value=46000000, step=500000)
+        st.header("Strategie en Filters")
+        budget = st.number_input("Budget (Euro)", value=46000000, step=500000)
         
         st.divider()
         w_cob = st.slider("Kassei (COB)", 0, 10, 8)
@@ -87,10 +86,10 @@ else:
         st.caption("Algemene score voor alle eendagskoersen")
 
         st.divider()
-        st.subheader("📌 Renners Vastzetten (Locks)")
+        st.subheader("Renners Vastzetten (Locks)")
         locked_riders = st.multiselect("Deze renners MOETEN in het team:", df['NAAM'].unique())
         
-        st.subheader("🚫 Renners Uitsluiten (Excludes)")
+        st.subheader("Renners Uitsluiten (Excludes)")
         excluded_riders = st.multiselect("Deze renners NOOIT meenemen:", df['NAAM'].unique())
 
     # Berekening score
@@ -98,7 +97,7 @@ else:
 
     # --- TAB 1: SAMENSTELLER ---
     with tab1:
-        if st.button("🔄 Genereer Optimaal Team"):
+        if st.button("Genereer Optimaal Team"):
             prob = pulp.LpProblem("Scorito", pulp.LpMaximize)
             sel = pulp.LpVariable.dicts("Sel", df.index, cat='Binary')
             
@@ -113,14 +112,14 @@ else:
             prob.solve()
             if pulp.LpStatus[prob.status] == 'Optimal':
                 st.session_state['team_idx'] = [i for i in df.index if sel[i].varValue == 1]
-                st.success("Team geoptimaliseerd!")
+                st.success("Team geoptimaliseerd")
             else:
                 st.error("Geen oplossing mogelijk. Check budget of locks.")
 
         if 'team_idx' in st.session_state:
             team = df.loc[st.session_state['team_idx']]
             st.dataframe(team[['NAAM', 'PRIJS', 'SCORE', 'COB', 'HLL', 'SPR']].sort_values('PRIJS', ascending=False), hide_index=True)
-            st.metric("Totaal besteed", f"€ {team['PRIJS'].sum():,.0f}", f"Over: € {budget - team['PRIJS'].sum():,.0f}")
+            st.metric("Totaal besteed", f"{team['PRIJS'].sum():,.0f}", f"Over: {budget - team['PRIJS'].sum():,.0f}")
 
     # --- TAB 2: TEAM SCHEMA ---
     with tab2:
@@ -128,7 +127,7 @@ else:
             team_schema = df.loc[st.session_state['team_idx']].copy()
             display_schema = team_schema[['NAAM'] + races_all].copy()
             for r in races_all:
-                display_schema[r] = display_schema[r].apply(lambda x: "✅" if x == 1 else "")
+                display_schema[r] = display_schema[r].apply(lambda x: "JA" if x == 1 else "")
             st.dataframe(display_schema, height=600, hide_index=True)
         else:
             st.info("Genereer eerst een team.")
@@ -139,21 +138,21 @@ else:
         race_filter = st.selectbox("Filter op wedstrijd:", ["Alle Wedstrijden"] + races_all)
         market_display = df[['NAAM', 'PRIJS'] + races_all].copy()
         for r in races_all:
-            market_display[r] = market_display[r].apply(lambda x: "✅" if x == 1 else "")
+            market_display[r] = market_display[r].apply(lambda x: "JA" if x == 1 else "")
         if race_filter != "Alle Wedstrijden":
-            market_display = market_display[market_display[race_filter] == "✅"]
+            market_display = market_display[market_display[race_filter] == "JA"]
         st.dataframe(market_display.sort_values('PRIJS', ascending=False), height=700, hide_index=True)
 
     # --- TAB 4: INFORMATIE ---
     with tab4:
-        st.header("ℹ️ Informatie & Methodiek")
+        st.header("Informatie en Methodiek")
         col_a, col_b = st.columns(2)
         with col_a:
             st.subheader("Hoe werkt de optimalisatie?")
-            st.write("De computer vindt mathematisch de beste 20 renners op basis van de scores die voortvloeien uit jouw sliders.")
+            st.write("De computer vindt mathematisch de beste 20 renners op basis van de scores die voortvloeien uit de gekozen wegingsfactoren.")
         with col_b:
-            st.subheader("Data & Credits")
-            st.markdown("- **Kwaliteit:** [WielerOrakel.nl](https://www.cyclingoracle.com/)\n- **Startlijsten:** [ProCyclingStats.com](https://www.procyclingstats.com/)\n- **Prijzen:** [Scorito.com](https://www.scorito.com/)")
+            st.subheader("Data en Credits")
+            st.markdown("- Kwaliteit: WielerOrakel.nl\n- Startlijsten: ProCyclingStats.com\n- Prijzen: Scorito.com")
         
         st.divider()
         st.subheader("Uitleg Afkortingen")
