@@ -29,16 +29,23 @@ RACES = {
     "LBL": {"url": f"https://www.procyclingstats.com/race/liege-bastogne-liege/{YEAR}/startlist", "full": "Luik-Bastenaken-Luik"}
 }
 
-# --- 2. CUSTOM CSS VOOR GEDRAAIDE HEADERS ---
+# --- 2. GEDRAAIDE HEADERS CSS ---
 st.markdown("""
     <style>
-    th.header {
-        height: 120px;
-        white-space: nowrap;
+    /* Pas de breedte van de kolommen aan en draai de header */
+    .stDataFrame th div {
+        height: 100px;
     }
-    th.header div {
-        transform: translate(10px, 40px) rotate(-90deg);
-        width: 30px;
+    .stDataFrame th {
+        vertical-align: bottom;
+        text-align: center;
+    }
+    .rotated-header {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        white-space: nowrap;
+        font-size: 14px;
+        padding-bottom: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -69,11 +76,11 @@ def scrape_startlists():
     results = {}
     for abbr, info in RACES.items():
         try:
-            headers = {'User-Agent': 'Mozilla/5.0'}
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
             resp = requests.get(info["url"], headers=headers, timeout=10)
             soup = BeautifulSoup(resp.content, 'html.parser')
-            # Pak alle namen uit de links en vervang streepjes door spaties voor betere match
-            riders = [a['href'].split('/')[-1].replace('-', ' ').lower() for a in soup.find_all('a', href=True) if 'rider/' in a['href']]
+            # We zoeken naar de tekst in de namen-links
+            riders = [a.text.strip().lower() for a in soup.find_all('a', href=True) if 'rider/' in a['href']]
             results[abbr] = riders
         except: results[abbr] = []
     return results
@@ -86,64 +93,120 @@ st.title("🏆 Scorito Master 2026")
 if df.empty:
     st.error("Data kon niet worden geladen.")
 else:
-    tab1, tab2, tab3 = st.tabs(["🚀 Team", "📅 Schema", "ℹ️ Info"])
+    tab1, tab2, tab3 = st.tabs(["🚀 Team Samensteller", "📅 Wedstrijdschema", "ℹ️ Informatie"])
 
     with st.sidebar:
+        st.header("⚙️ Instellingen")
         budget = st.number_input("Budget (€)", value=46000000, step=500000)
-        w_cob = st.slider("Kassei (COB)", 0, 10, 8)
-        w_hll = st.slider("Heuvel (HLL)", 0, 10, 6)
-        w_mtn = st.slider("Klim (MTN)", 0, 10, 4)
-        w_spr = st.slider("Sprint (SPR)", 0, 10, 5)
-        w_or  = st.slider("Eendags (OR)", 0, 10, 5)
+        
+        st.divider()
+        st.subheader("🎯 Strategie Gewicht")
+        w_cob = st.slider("Kassei (COB)", 0, 10, 8, help="OHN, KBK, E3, GW, DDV, RVV, PR")
+        st.caption("OHN, KBK, E3, GW, DDV, RVV, PR")
+        
+        w_hll = st.slider("Heuvel (HLL)", 0, 10, 6, help="MSR, BP, AGR, WP, LBL")
+        st.caption("MSR, BP, AGR, WP, LBL")
+        
+        w_mtn = st.slider("Klim (MTN)", 0, 10, 4, help="Parijs-Nice Etappe 7")
+        st.caption("Parijs-Nice Etappe 7")
+        
+        w_spr = st.slider("Sprint (SPR)", 0, 10, 5, help="KBK, MSR, BDP, GW, SP, TA Etappe 7")
+        st.caption("KBK, MSR, BDP, GW, SP, TA Etappe 7")
+        
+        w_or  = st.slider("Eendags (OR)", 0, 10, 5, help="Algemene kwaliteit in klassiekers")
+        
+        st.divider()
         if st.button("🔄 Update PCS Data"):
             st.cache_data.clear()
             st.session_state['pcs_lists'] = scrape_startlists()
 
+    # Bereken score
     df['Score'] = (df['COB']*w_cob) + (df['HLL']*w_hll) + (df['MTN']*w_mtn) + (df['SPR']*w_spr) + (df['OR']*w_or)
 
     with tab1:
-        if st.button("Genereer Team"):
-            prob = pulp.LpProblem("Scorito", pulp.LpMaximize)
-            sel = pulp.LpVariable.dicts("Sel", df.index, cat='Binary')
-            prob += pulp.lpSum([df['Score'][i] * sel[i] for i in df.index])
-            prob += pulp.lpSum([df['Prijs_Clean'][i] * sel[i] for i in df.index]) <= budget
-            prob += pulp.lpSum([sel[i] for i in df.index]) == 20
-            prob.solve()
-            if pulp.LpStatus[prob.status] == 'Optimal':
-                st.session_state['selected_team_idx'] = [i for i in df.index if sel[i].varValue == 1]
-                st.success("Team samengesteld!")
-            else: st.error("Geen team mogelijk binnen budget.")
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            st.subheader("Toprenners")
+            st.dataframe(df[['Naam', 'Prijs_Clean', 'Score']].sort_values('Score', ascending=False).head(20))
+        with col2:
+            st.subheader("Optimalisatie")
+            if st.button("Genereer Optimaal Team"):
+                prob = pulp.LpProblem("Scorito", pulp.LpMaximize)
+                sel = pulp.LpVariable.dicts("Sel", df.index, cat='Binary')
+                prob += pulp.lpSum([df['Score'][i] * sel[i] for i in df.index])
+                prob += pulp.lpSum([df['Prijs_Clean'][i] * sel[i] for i in df.index]) <= budget
+                prob += pulp.lpSum([sel[i] for i in df.index]) == 20
+                prob.solve()
+                if pulp.LpStatus[prob.status] == 'Optimal':
+                    st.session_state['selected_team_idx'] = [i for i in df.index if sel[i].varValue == 1]
+                    st.success("Team samengesteld!")
+                else: st.error("Geen oplossing mogelijk binnen budget.")
 
-        if 'selected_team_idx' in st.session_state:
-            st.dataframe(df.loc[st.session_state['selected_team_idx'], ['Naam', 'Prijs_Clean', 'Score']].sort_values('Prijs_Clean', ascending=False))
+            if 'selected_team_idx' in st.session_state:
+                team_res = df.loc[st.session_state['selected_team_idx']]
+                st.dataframe(team_res[['Naam', 'Prijs_Clean', 'Score']].sort_values('Prijs_Clean', ascending=False))
 
     with tab2:
         if 'selected_team_idx' not in st.session_state:
-            st.info("Maak eerst een team bij het tabblad 'Team'.")
+            st.info("Maak eerst een team bij het tabblad 'Team Samensteller'.")
         else:
             if 'pcs_lists' not in st.session_state:
-                st.session_state['pcs_lists'] = scrape_startlists()
+                with st.spinner("Startlijsten ophalen..."):
+                    st.session_state['pcs_lists'] = scrape_startlists()
             
             team = df.loc[st.session_state['selected_team_idx']].copy()
             pcs = st.session_state['pcs_lists']
 
-            # Robuuste match functie
+            # Betere matching functie
             def check_start(name_short, race_list):
-                # Pak achternaam: "t. pogačar" -> "pogačar"
-                last_name = name_short.split('. ')[-1].lower() if '. ' in name_short else name_short.lower()
-                # Check of achternaam in een van de namen op de PCS lijst staat
-                return "✅" if any(last_name in p for p in race_list) else ""
+                # t. pogačar -> pogačar
+                clean_name = name_short.split('. ')[-1].lower() if '. ' in name_short else name_short.lower()
+                for p in race_list:
+                    if clean_name in p: return "✅"
+                return ""
 
             for abbr in RACES.keys():
                 team[abbr] = team['Match_Name'].apply(lambda x: check_start(x, pcs[abbr]))
 
-            # Display tabel met afkortingen
-            st.subheader("Wedstrijdschema (✅ = op PCS startlijst)")
+            # We gebruiken st.write met HTML voor de headers omdat de dataframe dit niet standaard kan
+            st.subheader("Gedetailleerd Wedstrijdschema")
+            
+            # Tabel tonen
             st.dataframe(team[['Naam'] + list(RACES.keys())], height=600)
+            
+            # Legenda
+            st.write("Aantal renners per koers:")
+            counts = {abbr: (team[abbr] == "✅").sum() for abbr in RACES.keys()}
+            st.bar_chart(pd.Series(counts))
 
     with tab3:
-        st.header("Bronnen")
-        st.write("Data: **WielerOrakel.nl** & **ProCyclingStats**.")
-        st.write("De afkortingen in de tabel staan voor:")
-        for k, v in RACES.items():
-            st.write(f"**{k}**: {v['full']}")
+        st.header("ℹ️ Over deze applicatie")
+        st.write("""
+        Deze tool helpt bij het samenstellen van het optimale Scorito Klassiekerspel-team door gebruik te maken van wiskundige optimalisatie.
+        """)
+        
+        st.subheader("Bronnen & Shout-outs")
+        st.markdown("""
+        De data in deze app wordt mogelijk gemaakt door:
+        
+        * **[WielerOrakel.nl](https://www.cyclingoracle.com/):** Alle kwaliteitsratings (COB, HLL, SPR, etc.) zijn gebaseerd op hun geavanceerde modellen. Een enorme shout-out naar het team van WielerOrakel voor het openbaar maken van deze data!
+        * **[ProCyclingStats (PCS)](https://www.procyclingstats.com/):** Voor de live startlijsten. Zonder hen zouden we niet weten wie er daadwerkelijk aan de start staat.
+        * **[Scorito.com](https://www.scorito.com/):** Voor de prijzen en de basis van dit spel.
+        """)
+        
+        st.subheader("Uitleg Ratings")
+        st.markdown("""
+        * **COB (Cobbles):** Geschiktheid voor kasseien (Vlaanderen, Roubaix).
+        * **HLL (Hills):** Geschiktheid voor heuvels (Amstel, Luik).
+        * **MTN (Mountain):** Cruciaal voor de bergrit in **Parijs-Nice Etappe 7**.
+        * **SPR (Sprint):** Voor massasprints en finales in **Tirreno Etappe 7** of Brugge-De Panne.
+        * **OR (One Day Race):** Algemene indicator voor eendagswedstrijden.
+        """)
+        
+        st.divider()
+        st.write("De afkortingen in het schema staan voor:")
+        cols = st.columns(2)
+        r_keys = list(RACES.keys())
+        for i, k in enumerate(r_keys):
+            with cols[i % 2]:
+                st.write(f"**{k}**: {RACES[k]['full']}")
