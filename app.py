@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 import unicodedata
 import re
+import time
 
 st.set_page_config(page_title="Klassiekers 2026", layout="wide")
 
@@ -34,29 +35,35 @@ races_all = list(RACES_CONFIG.keys())
 # --- 2. HULPFUNCTIES ---
 
 def super_clean(text):
-    """Normaliseert namen: kleine letters, geen accenten, alleen de achternaam."""
     if pd.isna(text): return ""
     text = str(text).lower()
-    text = re.sub(r'^[a-z]\.\s*', '', text) # Verwijder voorletters zoals 'T. '
-    # Verwijder accenten (bijv. ç -> c)
+    text = re.sub(r'^[a-z]\.\s*', '', text) 
     text = "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
     parts = text.split()
-    return parts[-1] if parts else "" # Pak laatste deel (achternaam)
+    return parts[-1] if parts else ""
 
 @st.cache_data(ttl=3600)
 def scrape_all_pcs():
-    """Haalt alle startlijsten op van PCS en slaat de volledige tekst per race op."""
     results = {}
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    for abbr, info in RACES_CONFIG.items():
+    # Gebruik een realistische User-Agent
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+    
+    progress_text = st.empty()
+    for i, (abbr, info) in enumerate(RACES_CONFIG.items()):
         try:
-            resp = requests.get(info["url"], headers=headers, timeout=10)
-            soup = BeautifulSoup(resp.content, 'html.parser')
-            # Pak de hele tekst van de startlijst-tabel om matching-fouten te voorkomen
-            table = soup.find('div', {'class': 'startlist-wrapper'})
-            results[abbr] = table.text.lower() if table else ""
+            progress_text.text(f"Laden van PCS: {abbr}...")
+            resp = requests.get(info["url"], headers=headers, timeout=15)
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.content, 'html.parser')
+                # We pakken de hele tekst van de rennerslijst sectie
+                main_content = soup.find('div', {'class': 'page-content'})
+                results[abbr] = main_content.text.lower() if main_content else ""
+            else:
+                results[abbr] = "BLOCKED"
+            time.sleep(0.5) # Korte pauze om blokkades te voorkomen
         except:
             results[abbr] = ""
+    progress_text.empty()
     return results
 
 @st.cache_data
@@ -64,63 +71,63 @@ def load_base_data():
     try:
         df_p = pd.read_csv("renners_prijzen.csv", sep=None, engine='python', encoding='utf-8-sig')
         df_wo = pd.read_csv("renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig')
-        
         df_p.columns = [c.strip().upper() for c in df_p.columns]
         df_wo.columns = [c.strip().upper() for c in df_wo.columns]
-        
         df_p['MATCH_KEY'] = df_p['NAAM'].apply(super_clean)
         df_wo['MATCH_KEY'] = df_wo['NAAM'].apply(super_clean)
-        
         df = pd.merge(df_p, df_wo.drop(columns=['NAAM'], errors='ignore'), on='MATCH_KEY', how='left')
-        
         df['PRIJS_NUM'] = pd.to_numeric(df['PRIJS'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(500000)
-        for c in ['COB', 'HLL', 'MTN', 'SPR', 'OR']:
-            df[c] = pd.to_numeric(df.get(c, 20), errors='coerce').fillna(20)
-            
         return df
     except Exception as e:
-        st.error(f"Fout bij inladen CSV: {e}")
+        st.error(f"Fout bij inladen: {e}")
         return pd.DataFrame()
 
-# --- 3. UI & LOGICA ---
+# --- 3. UI ---
 st.title("Klassiekers 2026")
 
 df_base = load_base_data()
 
 if df_base.empty:
-    st.error("Kon de basisbestanden niet koppelen.")
+    st.error("Basisbestanden niet gevonden.")
 else:
     with st.sidebar:
         st.header("Instellingen")
         budget = st.number_input("Budget (Euro)", value=46000000, step=500000)
-        
-        if st.button("🔄 Forceer PCS Update"):
+        if st.button("🔄 Ververs PCS Data"):
             st.cache_data.clear()
             st.rerun()
 
         st.divider()
-        w_cob = st.slider("Kassei", 0, 10, 8)
-        w_hll = st.slider("Heuvel", 0, 10, 6)
-        w_mtn = st.slider("Klim", 0, 10, 4)
-        w_spr = st.slider("Sprint", 0, 10, 5)
-        w_or  = st.slider("Eendag", 0, 10, 5)
-
         locked = st.multiselect("Vastzetten:", df_base['NAAM'].unique())
         excluded = st.multiselect("Uitsluiten:", df_base['NAAM'].unique())
 
     df = df_base.copy()
 
-    # PCS DATA INTEGRATIE
-    with st.spinner("Live startlijsten ophalen van PCS..."):
-        pcs_data = scrape_all_pcs()
+    # PCS DATA OPHALEN
+    pcs_raw = scrape_all_pcs()
+    
+    # Check of we geblokkeerd zijn
+    if any(v == "BLOCKED" for v in pcs_raw.values()):
+        st.warning("PCS blokkeert momenteel directe toegang. De app probeert startlijsten.csv te gebruiken.")
+        try:
+            df_sl = pd.read_csv("startlijsten.csv", sep=None, engine='python', encoding='utf-8-sig')
+            df_sl.columns = [c.strip().upper() for c in df_sl.columns]
+            df_sl['MATCH_KEY'] = df_sl['NAAM'].apply(super_clean)
+            df = pd.merge(df, df_sl.drop(columns=['NAAM'], errors='ignore'), on='MATCH_KEY', how='left').fillna(0)
+        except:
+            st.error("Backup startlijsten.csv ook niet gevonden.")
+    else:
         for r in races_all:
-            # We kijken of de achternaam van onze renner voorkomt in de tekst van de PCS pagina
-            df[r] = df['MATCH_KEY'].apply(lambda x: 1 if x and x in pcs_data[r] else 0)
+            df[r] = df['MATCH_KEY'].apply(lambda x: 1 if x and x in pcs_raw.get(r, "") else 0)
 
-    df['SCORE'] = (df['COB']*w_cob) + (df['HLL']*w_hll) + (df['MTN']*w_mtn) + (df['SPR']*w_spr) + (df['OR']*w_or)
+    # Berekening scores
+    for c in ['COB', 'HLL', 'MTN', 'SPR', 'OR']:
+        df[c] = pd.to_numeric(df.get(c, 20), errors='coerce').fillna(20)
+    
+    df['SCORE'] = (df['COB']*8) + (df['HLL']*6) + (df['MTN']*4) + (df['SPR']*5) + (df['OR']*5)
     st.markdown("<style>[data-testid='stDataFrame'] th div { height: 100px; writing-mode: vertical-rl; transform: rotate(180deg); }</style>", unsafe_allow_html=True)
 
-    t1, t2, t3, t4 = st.tabs(["Team Samensteller", "Team Schema", "Programma & Scores", "Informatie"])
+    t1, t2, t3 = st.tabs(["Team Samensteller", "Team Schema", "Programma & Scores"])
 
     with t1:
         if st.button("Genereer Optimaal Team"):
@@ -135,23 +142,21 @@ else:
             prob.solve()
             if pulp.LpStatus[prob.status] == 'Optimal':
                 st.session_state['team_idx'] = [i for i in df.index if sel[i].varValue == 1]
-                st.success("Team gevonden op basis van PCS startlijsten!")
+                st.success("Team gevonden!")
             else: st.error("Geen oplossing mogelijk.")
 
         if 'team_idx' in st.session_state:
             team = df.loc[st.session_state['team_idx']]
             st.dataframe(team.sort_values('PRIJS_NUM', ascending=False)[['NAAM', 'PRIJS', 'SCORE']], hide_index=True)
-            st.metric("Totaal Budget", f"€ {team['PRIJS_NUM'].sum():,.0f}")
 
     with t2:
         if 'team_idx' in st.session_state:
             team_sel = df.loc[st.session_state['team_idx']].sort_values('PRIJS_NUM', ascending=False).copy()
-            for r in races_all: 
-                team_sel[r] = team_sel[r].apply(lambda x: "✅" if x == 1 else "")
+            for r in races_all: team_sel[r] = team_sel[r].apply(lambda x: "✅" if x == 1 else "")
             st.dataframe(team_sel[['NAAM'] + races_all], hide_index=True)
             
             st.divider()
-            st.subheader("Kopman Suggesties (op basis van PCS deelname)")
+            st.subheader("Kopman Suggesties")
             kop_data = []
             race_stats = {"OHN":"COB","KBK":"SPR","SB":"HLL","PN7":"MTN","TA7":"SPR","MSR":"SPR","BDP":"SPR","E3":"COB","GW":"COB","DDV":"COB","RVV":"COB","SP":"SPR","PR":"COB","BP":"HLL","AGR":"HLL","WP":"HLL","LBL":"HLL"}
             for r in races_all:
@@ -160,15 +165,9 @@ else:
                     top = starters.sort_values(race_stats[r], ascending=False).head(3)['NAAM'].tolist()
                     kop_data.append({"Koers": r, "Top 3": " / ".join(top)})
             st.table(pd.DataFrame(kop_data))
-        else: st.info("Maak eerst een team.")
 
     with t3:
-        st.subheader("Marktoverzicht (Live PCS)")
+        st.subheader("Marktoverzicht")
         market_disp = df.sort_values('PRIJS_NUM', ascending=False).copy()
-        for r in races_all:
-            market_disp[r] = market_disp[r].apply(lambda x: "✅" if x == 1 else "")
-        cols = ['NAAM', 'PRIJS', 'COB', 'HLL', 'SPR', 'MTN', 'OR'] + races_all
-        st.dataframe(market_disp[cols], hide_index=True)
-
-    with t4:
-        st.write("Data bronnen: WielerOrakel & Live ProCyclingStats.")
+        for r in races_all: market_disp[r] = market_disp[r].apply(lambda x: "✅" if x == 1 else "")
+        st.dataframe(market_disp[['NAAM', 'PRIJS', 'COB', 'HLL', 'SPR', 'MTN', 'OR'] + races_all], hide_index=True)
