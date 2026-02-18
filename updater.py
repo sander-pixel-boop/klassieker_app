@@ -3,17 +3,16 @@ import pandas as pd
 import unicodedata
 import re
 
-st.set_page_config(page_title="PCS Master Sync - Hersteld", layout="wide")
+st.set_page_config(page_title="PCS Master Sync", layout="wide")
 
 def deep_clean(text):
     if not text: return ""
     text = str(text).lower()
     text = "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
     text = text.replace('ø', 'o').replace('æ', 'ae').replace('ð', 'd')
-    # We behouden hier even de nummers en punten omdat we regel-voor-regel checken
     return text.strip()
 
-st.title("🔄 Wieler-Updater: Herstelde Match-Logica")
+st.title("🔄 Wieler-Updater: PCS vs Nieuws")
 
 # 1. Laden van de data
 if 'matrix' not in st.session_state:
@@ -31,53 +30,49 @@ plak_veld = st.text_area("Plak hier de PCS PDF tekst:", height=250)
 
 if st.button(f"Start Update {race}"):
     if plak_veld:
-        # Sla oude status op voor de vergelijking
+        # Sla oude status op om te zien wie er al op 1 stond
         oud_vinkjes = st.session_state['matrix'][race].copy()
         
-        # Split de tekst in losse regels (zoals de PDF binnenkomt)
+        # We maken de tekstbak schoon maar behouden de regels
         regels = plak_veld.split('\n')
         schoon_regels = [deep_clean(r) for r in regels if r.strip()]
+        volledige_tekst = " ".join(schoon_regels)
         
         herkende_namen = []
         
-        # Stap 1: Match per regel (de succesvolle methode)
         for naam in st.session_state['matrix'].index:
             schoon_naam = deep_clean(naam)
             delen = schoon_naam.split()
             
             if len(delen) >= 2:
-                # We pakken de belangrijkste delen: vaak de eerste en de laatste
                 voornaam = delen[0]
                 achternaam = delen[-1]
                 
-                # Check elke regel uit de PDF
-                for regel in schoon_regels:
-                    # De "Gouden Match": staan beide woorden in deze specifieke regel?
-                    if achternaam in regel and voornaam in regel:
+                # We zoeken de achternaam in de tekst
+                if achternaam in volledige_tekst:
+                    # Als de voornaam of de eerste letter van de voornaam ook in de tekst staat: MATCH
+                    if voornaam in volledige_tekst or (len(voornaam) > 0 and voornaam[0] in volledige_tekst):
                         st.session_state['matrix'].at[naam, race] = 1
                         herkende_namen.append(naam)
-                        break
 
-        # Stap 2: Resultaten tonen
-        st.success(f"Klaar! {len(herkende_namen)} renners herkend in de PDF.")
+        # Statistieken
+        totaal_deelnemers = (st.session_state['matrix'][race] == 1).sum()
+        
+        st.metric(label=f"Totaal aantal renners voor {race}", value=totaal_deelnemers)
+        st.success(f"Er zijn {len(herkende_namen)} matches gevonden in de PDF.")
         
         col1, col2 = st.columns(2)
-        
         with col1:
             st.subheader("📋 Bevestigd door PCS")
-            st.write(", ".join(sorted(herkende_namen)) if herkende_namen else "Geen matches.")
+            st.write(", ".join(sorted(herkende_namen)))
 
         with col2:
-            # Wie stond op 1 (nieuws), maar staat NIET in de PDF?
             niet_gevonden = [naam for naam in st.session_state['matrix'].index 
                              if oud_vinkjes[naam] == 1 and naam not in herkende_namen]
-            
             st.subheader("⚠️ Niet in PDF (Nieuws-data)")
             if niet_gevonden:
-                st.warning(f"Deze {len(niet_gevonden)} renners stonden in je nieuws-data maar NIET in de PDF.")
+                st.warning(f"Deze {len(niet_gevonden)} renners stonden op 1 maar zijn niet gevonden.")
                 st.write(", ".join(sorted(niet_gevonden)))
-            else:
-                st.success("Alle nieuws-vinkjes zijn bevestigd!")
 
 st.subheader("Tabel Preview")
 st.dataframe(st.session_state['matrix'])
