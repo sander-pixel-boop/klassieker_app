@@ -3,17 +3,17 @@ import pandas as pd
 import unicodedata
 import re
 
-st.set_page_config(page_title="PCS & News Master Sync", layout="wide")
+st.set_page_config(page_title="PCS Master Sync - Hersteld", layout="wide")
 
 def deep_clean(text):
     if not text: return ""
     text = str(text).lower()
     text = "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
-    text = text.replace('ø', 'o').replace('æ', 'ae').replace('ð', 'd').replace('-', ' ')
-    text = re.sub(r'[^a-z\s]', ' ', text)
-    return " ".join(text.split())
+    text = text.replace('ø', 'o').replace('æ', 'ae').replace('ð', 'd')
+    # We behouden hier even de nummers en punten omdat we regel-voor-regel checken
+    return text.strip()
 
-st.title("🔄 Wieler-Updater: PCS vs Nieuws Check")
+st.title("🔄 Wieler-Updater: Herstelde Match-Logica")
 
 # 1. Laden van de data
 if 'matrix' not in st.session_state:
@@ -31,36 +31,41 @@ plak_veld = st.text_area("Plak hier de PCS PDF tekst:", height=250)
 
 if st.button(f"Start Update {race}"):
     if plak_veld:
-        # We slaan de huidige status op om te kunnen vergelijken (wie stond er al op 1?)
+        # Sla oude status op voor de vergelijking
         oud_vinkjes = st.session_state['matrix'][race].copy()
         
-        tekst_bak = deep_clean(plak_veld)
+        # Split de tekst in losse regels (zoals de PDF binnenkomt)
+        regels = plak_veld.split('\n')
+        schoon_regels = [deep_clean(r) for r in regels if r.strip()]
+        
         herkende_namen = []
         
-        # Stap 1: Nieuwe vinkjes zetten op basis van PCS
+        # Stap 1: Match per regel (de succesvolle methode)
         for naam in st.session_state['matrix'].index:
             schoon_naam = deep_clean(naam)
             delen = schoon_naam.split()
             
             if len(delen) >= 2:
+                # We pakken de belangrijkste delen: vaak de eerste en de laatste
                 voornaam = delen[0]
                 achternaam = delen[-1]
                 
-                # Check op achternaam + voornaam (of initiaal)
-                if achternaam in tekst_bak:
-                    if voornaam in tekst_bak or (len(voornaam) > 0 and f" {voornaam[0]} " in f" {tekst_bak} "):
+                # Check elke regel uit de PDF
+                for regel in schoon_regels:
+                    # De "Gouden Match": staan beide woorden in deze specifieke regel?
+                    if achternaam in regel and voornaam in regel:
                         st.session_state['matrix'].at[naam, race] = 1
                         herkende_namen.append(naam)
+                        break
 
-        # Stap 2: Analyse van de verschillen
-        st.success(f"Update voltooid! {len(herkende_namen)} renners herkend in de PDF.")
+        # Stap 2: Resultaten tonen
+        st.success(f"Klaar! {len(herkende_namen)} renners herkend in de PDF.")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("📋 Herkend door PCS")
-            st.caption("Deze renners staan nu sowieso op 1.")
-            st.write(", ".join(sorted(herkende_namen)))
+            st.subheader("📋 Bevestigd door PCS")
+            st.write(", ".join(sorted(herkende_namen)) if herkende_namen else "Geen matches.")
 
         with col2:
             # Wie stond op 1 (nieuws), maar staat NIET in de PDF?
@@ -69,11 +74,10 @@ if st.button(f"Start Update {race}"):
             
             st.subheader("⚠️ Niet in PDF (Nieuws-data)")
             if niet_gevonden:
-                st.warning(f"Deze {len(niet_gevonden)} renners stonden in je nieuws-data maar NIET in de PCS PDF.")
-                st.info("Check of ze zijn afgevallen of een andere spelling hebben.")
+                st.warning(f"Deze {len(niet_gevonden)} renners stonden in je nieuws-data maar NIET in de PDF.")
                 st.write(", ".join(sorted(niet_gevonden)))
             else:
-                st.success("Alle nieuws-vinkjes zijn bevestigd door de PDF!")
+                st.success("Alle nieuws-vinkjes zijn bevestigd!")
 
 st.subheader("Tabel Preview")
 st.dataframe(st.session_state['matrix'])
