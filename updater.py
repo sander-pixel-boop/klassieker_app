@@ -3,18 +3,19 @@ import pandas as pd
 import unicodedata
 import re
 
-st.set_page_config(page_title="PCS & News Master Sync", layout="wide")
+st.set_page_config(page_title="PCS Master Sync - Restore", layout="wide")
 
 def deep_clean(text):
     if not text: return ""
     text = str(text).lower()
     text = "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
-    text = text.replace('ø', 'o').replace('æ', 'ae').replace('ð', 'd')
-    # Verwijder alles behalve letters
+    # Belangrijk: Deense ø en andere varianten platstaan
+    text = text.replace('ø', 'o').replace('æ', 'ae').replace('ð', 'd').replace('-', ' ')
     text = re.sub(r'[^a-z\s]', ' ', text)
     return " ".join(text.split())
 
-st.title("🔄 Wieler-Updater: Deense & Tussenvoegsel Fix")
+st.title("🔄 Wieler-Updater: Herstelde Match-Logica")
+st.info("Deze versie geeft prioriteit aan de achternaam om het hoge aantal matches (165+) terug te krijgen.")
 
 # 1. Laden van de data
 if 'matrix' not in st.session_state:
@@ -34,38 +35,31 @@ if st.button(f"Start Update {race}"):
     if plak_veld:
         # We maken één grote tekstbak van de PDF
         tekst_bak = deep_clean(plak_veld)
-        
         herkende_namen = []
         
         for naam in st.session_state['matrix'].index:
             schoon_naam = deep_clean(naam)
             delen = schoon_naam.split()
             
-            # Filter tussenvoegsels eruit (van, den, der, etc.)
-            # We houden alleen de 'echte' namen over (meestal voornaam + achternaam)
-            stopwoorden = {'van', 'den', 'der', 'de', 'het', 'ten', 'ter'}
-            belangrijke_delen = [d for d in delen if d not in stopwoorden and len(d) > 2]
-            
-            if belangrijke_delen:
-                # Check of de belangrijkste delen in de tekst staan
-                # Voor 'Marijn van den Berg' checkt hij nu op 'marijn' EN 'berg'
-                if all(d in tekst_bak for d in belangrijke_delen):
-                    st.session_state['matrix'].at[naam, race] = 1
-                    herkende_namen.append(naam)
-                # Backup check voor namen met koppeltekens die PDF soms splitst
-                elif len(belangrijke_delen) > 2:
-                    match_count = sum(1 for d in belangrijke_delen if d in tekst_bak)
-                    if match_count >= 2:
+            if len(delen) >= 2:
+                voornaam = delen[0]
+                achternaam = delen[-1]
+                
+                # LOGICA: We zoeken eerst de achternaam. 
+                # Als die er is, checken we of de voornaam (of de eerste letter) er ook is.
+                if achternaam in tekst_bak:
+                    # Check voor volledige voornaam OF eerste letter van de voornaam (bijv. 'k' voor 'kasper')
+                    if voornaam in tekst_bak or (len(voornaam) > 0 and f" {voornaam[0]} " in f" {tekst_bak} "):
                         st.session_state['matrix'].at[naam, race] = 1
                         herkende_namen.append(naam)
 
         st.success(f"Klaar! {len(herkende_namen)} renners herkend voor {race}.")
-        with st.expander("Bekijk herkende renners"):
+        with st.expander("Bekijk de lijst van herkende renners"):
             st.write(", ".join(sorted(herkende_namen)))
 
 st.subheader("Tabel Preview")
 st.dataframe(st.session_state['matrix'])
 
-if st.button("💾 Download startlijsten.csv"):
+if st.button("💾 Genereer startlijsten.csv"):
     csv = st.session_state['matrix'].reset_index().to_csv(index=False).encode('utf-8')
     st.download_button("Download", csv, "startlijsten.csv", "text/csv")
