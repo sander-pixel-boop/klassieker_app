@@ -2,72 +2,69 @@ import streamlit as st
 import pandas as pd
 import pulp
 
-st.set_page_config(page_title="Klassiekers 2026 - Live", layout="wide")
+st.set_page_config(page_title="Klassieker Optimizer 2026", layout="wide")
 
-def style_market(df, races):
-    def color_coding(val):
-        if val == "✅": return 'background-color: #d4edda; color: #155724;'
-        if val == "❓": return 'background-color: #fff3cd; color: #856404;'
-        return ''
-    return df.style.applymap(color_coding, subset=races)
+# Styling voor de tabel
+def style_df(df, races):
+    return df.style.applymap(lambda x: 'background-color: #d4edda;' if x == 1 else '', subset=races)
 
-# 1. Data Laden
 @st.cache_data
-def load_all():
+def get_data():
     df_wo = pd.read_csv("renners_stats.csv")
-    df_sl = pd.read_csv("startlijsten.csv")
+    # Zorg voor consistente kolomnamen
     df_wo.columns = [c.strip().upper() for c in df_wo.columns]
-    df_sl.columns = [c.strip().upper() for c in df_sl.columns]
     
+    # Check of de startlijst al gegenereerd is, anders lege fallback
+    if os.path.exists("startlijsten.csv"):
+        df_sl = pd.read_csv("startlijsten.csv")
+    else:
+        df_sl = pd.DataFrame(0, index=range(len(df_wo)), columns=["OHN","KBK","SB"])
+        df_sl['NAAM'] = df_wo['NAAM']
+        
+    df_sl.columns = [c.strip().upper() for c in df_sl.columns]
     merged = pd.merge(df_wo, df_sl, on="NAAM", how="left").fillna(0)
     merged['PRIJS_NUM'] = pd.to_numeric(merged['PRIJS'], errors='coerce').fillna(500000)
     return merged
 
-df = load_all()
+df = get_data()
 races = ["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"]
+races_present = [r for r in races if r in df.columns]
 
-st.sidebar.title("Instellingen")
-budget = st.sidebar.number_input("Budget (M)", value=48.0, step=0.5) * 1000000
+st.title("🏆 Klassieker Team Optimizer")
 
-# --- TABBLADEN ---
-t1, t2 = st.tabs(["🏆 Team Optimalisatie", "📊 Transfermarkt"])
+# --- ZIJB BALK ---
+st.sidebar.header("Parameters")
+budget = st.sidebar.slider("Totaal Budget (M)", 40.0, 60.0, 48.0) * 1000000
+min_starts = st.sidebar.number_input("Minimaal aantal starts per renner", 0, 5, 1)
 
-with t2:
-    st.subheader("Volledige Markt")
-    display_df = df.copy()
-    for r in races:
-        if r in display_df.columns:
-            display_df[r] = display_df[r].map({1: "✅", 2: "❓", 0: ""}).fillna("")
-    st.dataframe(style_market(display_df, races), height=600)
-
-with t1:
-    st.subheader("Beste Team op basis van jouw data")
-    
-    # PuLP Optimalisatie
+# --- OPTIMALISATIE ---
+if st.button("Bereken Ideaal Team"):
     prob = pulp.LpProblem("ClassicTeam", pulp.LpMaximize)
-    sel = pulp.LpVariable.dicts("rider", range(len(df)), cat='Binary')
-    
-    # Score berekening (simpel voorbeeld op COB + SPR)
-    # Belangrijk: we tellen zowel 1 als 2 als starters
-    total_score = pulp.lpSum([
-        (df['COB'][i] + df['SPR'][i]) * sel[i] for i in range(len(df))
-    ])
-    prob += total_score
-    
+    riders = range(len(df))
+    select = pulp.LpVariable.dicts("select", riders, cat='Binary')
+
+    # Doel: Maximaal puntenpotentieel (COB + SPR)
+    prob += pulp.lpSum([(df['COB'][i] + df['SPR'][i]) * select[i] for i in riders])
+
     # Constraints
-    prob += pulp.lpSum([df['PRIJS_NUM'][i] * sel[i] for i in range(len(df))]) <= budget
-    prob += pulp.lpSum([sel[i] for i in range(len(df))]) == 20
+    prob += pulp.lpSum([df['PRIJS_NUM'][i] * select[i] for i in riders]) <= budget
+    prob += pulp.lpSum([select[i] for i in riders]) == 20
     
+    # Alleen renners die minimaal X keer starten
+    for i in riders:
+        if sum(df[r][i] for r in races_present) < min_starts:
+            prob += select[i] == 0
+
     prob.solve(pulp.PULP_CBC_CMD(msg=0))
-    
+
     if pulp.LpStatus[prob.status] == 'Optimal':
-        chosen_indices = [i for i in range(len(df)) if sel[i].varValue > 0]
-        team_df = df.iloc[chosen_indices].copy()
-        
-        for r in races:
-            team_df[r] = team_df[r].map({1: "✅", 2: "❓", 0: ""}).fillna("")
-            
-        st.write(f"**Totaal Budget Gebruikt:** {team_df['PRIJS_NUM'].sum():,.0f}")
-        st.dataframe(style_market(team_df[['NAAM', 'PRIJS', 'COB', 'SPR'] + races], races))
+        final_team = df.iloc[[i for i in riders if select[i].varValue > 0]]
+        st.success(f"Team gevonden! Puntenpotentieel: {pulp.value(prob.objective):.0f}")
+        st.dataframe(style_df(final_team[['NAAM', 'PRIJS', 'COB', 'SPR'] + races_present], races_present))
     else:
-        st.error("Kon geen optimaal team vinden met dit budget.")
+        st.error("Geen team mogelijk met deze filters.")
+
+# --- MARKT OVERZICHT ---
+st.divider()
+st.subheader("📊 De Volledige Markt")
+st.dataframe(style_df(df[['NAAM', 'PRIJS', 'COB', 'SPR'] + races_present], races_present))
