@@ -1,39 +1,59 @@
 import streamlit as st
 import pandas as pd
+import unicodedata
 
-st.set_page_config(page_title="Handmatige PCS Sync")
+st.set_page_config(page_title="Data Sync Tool")
 
-st.title("📋 PCS Data Plak-Tool")
-st.write("Omdat PCS de server blokkeert, doen we het zo: kopieer de startlijst op de PCS website en plak de tekst hieronder.")
+def clean_text(text):
+    if not text: return ""
+    text = str(text).lower()
+    # Verwijder accenten voor betere matching
+    text = "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
+    return text
 
-# Laad de namen die we MOETEN matchen
+st.title("🔄 Renners & Startlijst Updater")
+st.write("Kopieer de volledige pagina van een PCS startlijst (Ctrl+A) en plak deze hieronder.")
+
+# 1. Laden van de referentie (WielerOrakel lijst)
 try:
-    base_df = pd.read_csv("renners_prijzen.csv", sep=None, engine='python')
-    master_names = base_df.iloc[:, 0].tolist()
+    df_ref = pd.read_csv("renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig')
+    df_ref.columns = [c.strip().upper() for c in df_ref.columns]
+    master_names = df_ref['NAAM'].tolist()
 except:
-    st.error("Upload eerst renners_prijzen.csv naar GitHub")
+    st.error("Kan renners_stats.csv niet vinden op GitHub.")
     st.stop()
 
-race = st.selectbox("Voor welke koers plak je data?", ["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"])
-plak_veld = st.text_area("Plak hier de volledige tekst van de PCS startlijst pagina (Ctrl+A / Ctrl+V)")
+# 2. Selectie van de koers
+race = st.selectbox("Selecteer de koers:", ["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"])
 
-if st.button("Verwerk deze koers"):
+# 3. Het plakveld
+plak_veld = st.text_area("Plak hier de PCS tekst:", height=300)
+
+# Initialiseer de matrix in de sessie als die nog niet bestaat
+if 'matrix' not in st.session_state:
+    # Probeer de bestaande startlijsten te laden, anders maak een nieuwe
+    try:
+        st.session_state['matrix'] = pd.read_csv("startlijsten.csv", index_col='Naam')
+    except:
+        st.session_state['matrix'] = pd.DataFrame(0, index=master_names, columns=["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"])
+        st.session_state['matrix'].index.name = "Naam"
+
+if st.button("Verwerk Gegevens"):
     if plak_veld:
-        # We kijken simpelweg of de namen uit onze lijst voorkomen in de geplakte tekst
         gevonden = 0
-        if 'matrix' not in st.session_state:
-            # Maak een lege tabel met 0 voor alle koersen
-            st.session_state['matrix'] = pd.DataFrame(0, index=master_names, columns=["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"])
-            st.session_state['matrix'].index.name = "Naam"
-
-        for name in master_names:
-            if name.lower() in plak_veld.lower():
-                st.session_state['matrix'].at[name, race] = 1
+        data_schoon = clean_text(plak_veld)
+        
+        for naam in master_names:
+            # We zoeken op de achternaam om kleine verschillen in voorletters op te vangen
+            achternaam = clean_text(naam).split()[-1]
+            if achternaam in data_schoon:
+                st.session_state['matrix'].at[naam, race] = 1
                 gevonden += 1
         
-        st.success(f"Klaar! {gevonden} renners herkend voor {race}.")
+        st.success(f"Klaar! {gevonden} renners uit WielerOrakel herkend in deze lijst.")
         st.dataframe(st.session_state['matrix'])
 
-if 'matrix' in st.session_state:
+# 4. Export
+if st.button("Genereer startlijsten.csv"):
     csv = st.session_state['matrix'].reset_index().to_csv(index=False).encode('utf-8')
-    st.download_button("📩 Download startlijsten.csv", csv, "startlijsten.csv", "text/csv")
+    st.download_button("Download Bestand", csv, "startlijsten.csv", "text/csv")
