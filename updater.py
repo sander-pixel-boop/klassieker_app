@@ -5,19 +5,21 @@ import re
 
 st.set_page_config(page_title="PCS PDF Master Sync", layout="wide")
 
-def clean_text(text):
+def deep_clean(text):
     if not text: return ""
+    # Omzetten naar kleine letters
     text = str(text).lower()
-    # Verwijder accenten
+    # Accenten en speciale tekens zoals ø verwijderen
     text = "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
-    # Verwijder punten en speciale tekens
-    text = re.sub(r'[^a-z0-9\s]', '', text)
-    return text.strip()
+    # De Deense ø wordt soms niet door NFD gepakt, dus handmatig:
+    text = text.replace('ø', 'o').replace('æ', 'ae').replace('ð', 'd')
+    # Alleen letters en cijfers overhouden
+    text = re.sub(r'[^a-z0-9\s]', ' ', text)
+    return " ".join(text.split())
 
-st.title("🔄 PCS PDF/Print Updater - Verbeterde Herkenning")
-st.write("Plak de tekst uit de PDF hieronder. Deze versie pakt ook namen met punten (11.) en complexe achternamen.")
+st.title("🔄 PCS PDF Master Updater - Accenten Fix")
+st.write("Deze versie herkent ook Søren, Frølich, Søjberg en namen met koppeltekens.")
 
-# 1. Laden van de referentie (Stats lijst)
 try:
     df_ref = pd.read_csv("renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig')
     df_ref.columns = [c.strip().upper() for c in df_ref.columns]
@@ -26,7 +28,6 @@ except:
     st.error("Kan renners_stats.csv niet vinden.")
     st.stop()
 
-# 2. Setup Matrix
 if 'matrix' not in st.session_state:
     st.session_state['matrix'] = pd.DataFrame(0, index=master_names, columns=["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"])
     st.session_state['matrix'].index.name = "Naam"
@@ -39,40 +40,36 @@ if st.button(f"Update {race}"):
         st.session_state['matrix'][race] = 0
         regels = plak_veld.split('\n')
         
-        # Stap A: Extraheer alleen de regels die met een nummer beginnen (ook 11. of 0.)
+        # Stap A: Filter op regels met nummers
         gevalideerde_regels = []
         for r in regels:
-            s_regel = r.strip()
-            # Zoek naar regels die beginnen met een getal, gevolgd door optioneel een punt
-            if re.match(r'^\d+', s_regel):
-                gevalideerde_regels.append(clean_text(s_regel))
+            if re.search(r'\d+', r):
+                gevalideerde_regels.append(deep_clean(r))
 
         gevonden = 0
         herkende_namen = []
         
         # Stap B: Matching
         for naam in master_names:
-            schoon_naam = clean_text(naam)
+            schoon_naam = deep_clean(naam)
             naam_delen = schoon_naam.split()
             
-            if len(naam_delen) >= 2:
-                # We checken of ALLE delen van de naam in de regel voorkomen (voornaam + achternaam)
+            # We filteren korte woordjes zoals 'van', 'de', 'der' eruit voor de match
+            belangrijke_delen = [d for d in naam_delen if len(d) > 2]
+            
+            if belangrijke_delen:
                 for regel in gevalideerde_regels:
-                    # Match als elk deel van de naam in de regel staat
-                    if all(deel in regel for deel in naam_delen):
+                    # Match als ALLE belangrijke delen van de naam in de regel staan
+                    if all(deel in regel for deel in belangrijke_delen):
                         st.session_state['matrix'].at[naam, race] = 1
                         gevonden += 1
                         herkende_namen.append(naam)
                         break
 
-        st.success(f"Gereed! {gevonden} renners uniek geïdentificeerd voor {race}.")
-        
-        # Toon de lijst met herkende renners
-        if herkende_namen:
-            st.write("**Herkend:** " + ", ".join(herkende_namen))
+        st.success(f"Gereed! {gevonden} renners herkend.")
+        st.write("**Nieuw herkend:** " + ", ".join(herkende_namen))
 
-# 3. Export
 st.divider()
-if st.button("Download nieuwe startlijsten.csv"):
+if st.button("Download startlijsten.csv"):
     csv = st.session_state['matrix'].reset_index().to_csv(index=False).encode('utf-8')
     st.download_button("Klik om te downloaden", csv, "startlijsten.csv", "text/csv")
