@@ -3,7 +3,7 @@ import pandas as pd
 import unicodedata
 import re
 
-st.set_page_config(page_title="Strikte PCS Sync")
+st.set_page_config(page_title="PDF Startlijst Sync")
 
 def clean_text(text):
     if not text: return ""
@@ -11,64 +11,66 @@ def clean_text(text):
     text = "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
     return text
 
-st.title("🔄 Strikte PCS Updater")
-st.write("Deze versie filtert footer-renners eruit door alleen naar de tabelregels te kijken.")
+st.title("🔄 PCS PDF/Print Updater")
+st.write("Ga op PCS naar de startlijst, klik op **'Print'** of **'PDF'**, kopieer alle tekst (Ctrl+A) en plak deze hieronder.")
 
-# 1. Laden van de referentie (Altijd de basis)
+# 1. Laden van de referentie (Stats lijst)
 try:
+    # We laden stats.csv als de masterlijst
     df_ref = pd.read_csv("renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig')
     df_ref.columns = [c.strip().upper() for c in df_ref.columns]
     master_names = df_ref['NAAM'].tolist()
 except:
-    st.error("Kan renners_stats.csv niet vinden. Zorg dat deze op GitHub staat.")
+    st.error("Kan renners_stats.csv niet vinden op GitHub.")
     st.stop()
 
-# 2. Setup van de Matrix (Geen startlijsten.csv nodig als basis)
+# 2. Setup Matrix
 if 'matrix' not in st.session_state:
-    # We maken altijd een nieuwe lege matrix op basis van de stats lijst
     st.session_state['matrix'] = pd.DataFrame(0, index=master_names, columns=["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"])
     st.session_state['matrix'].index.name = "Naam"
 
 race = st.selectbox("Selecteer koers:", st.session_state['matrix'].columns)
-plak_veld = st.text_area("Plak hier de PCS tekst (Ctrl+A):", height=300)
+plak_veld = st.text_area("Plak hier de PDF/Print tekst:", height=300)
 
-if st.button(f"Overschrijf {race}"):
+if st.button(f"Update {race}"):
     if plak_veld:
-        # Stap A: Reset de kolom voor deze race
+        # Stap A: Reset de kolom
         st.session_state['matrix'][race] = 0
         
-        # Stap B: Super-strikte filtering
+        # Stap B: Filteren op PDF-structuur
+        # PDF-lijsten hebben vaak de structuur: "1 Pogačar Tadej" of "1. Pogačar Tadej"
         regels = plak_veld.split('\n')
         gevalideerde_tekst = ""
         
         for regel in regels:
             s_regel = regel.strip()
-            # Een echte startlijst-regel begint bijna altijd met:
-            # - Een getal (rugnummer)
-            # - Streepjes '---'
-            # - Of bevat specifieke ploeg-indicators die niet in de footer staan
-            if re.match(r'^\d+', s_regel) or s_regel.startswith('---'):
+            # We zoeken regels die beginnen met een nummer (rugnummer)
+            if re.match(r'^\d+', s_regel):
                 gevalideerde_tekst += " " + s_regel
 
         gevonden = 0
         data_schoon = clean_text(gevalideerde_tekst)
         
-        # Stap C: Matching op achternaam
+        # Stap C: Matching
         for naam in master_names:
             parts = clean_text(naam).split()
             if not parts: continue
+            # Gebruik de achternaam voor de match
             achternaam = parts[-1]
             
-            # We zoeken de achternaam in de gefilterde tekst
-            if f" {achternaam}" in f" {data_schoon}":
+            # Check of de achternaam in de gefilterde regels voorkomt
+            if achternaam and achternaam in data_schoon:
                 st.session_state['matrix'].at[naam, race] = 1
                 gevonden += 1
         
-        st.success(f"Gereed! {gevonden} renners gevonden in de tabel van {race}.")
-        st.dataframe(st.session_state['matrix'][st.session_state['matrix'][race] == 1])
+        st.success(f"Gereed! {gevonden} renners uit je database herkend voor {race}.")
+        
+        # Toon alleen de herkende renners als controle
+        check_df = st.session_state['matrix'][st.session_state['matrix'][race] == 1]
+        st.dataframe(check_df[[race]])
 
 # 3. Export
 st.divider()
-if not st.session_state['matrix'].empty:
+if st.button("Download nieuwe startlijsten.csv"):
     csv = st.session_state['matrix'].reset_index().to_csv(index=False).encode('utf-8')
-    st.download_button("Download nieuwe startlijsten.csv", csv, "startlijsten.csv", "text/csv")
+    st.download_button("Klik om te downloaden", csv, "startlijsten.csv", "text/csv")
