@@ -1,68 +1,49 @@
 import streamlit as st
 import pandas as pd
-import unicodedata
-import re
+import os
 
-st.set_page_config(page_title="Wieler Updater - Kleurcodes", layout="wide")
+st.set_page_config(page_title="Bronbeheer Startlijsten", layout="wide")
 
-def deep_clean(text):
-    if not text: return ""
-    text = str(text).lower()
-    text = "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
-    text = text.replace('ø', 'o').replace('æ', 'ae').replace('ð', 'd').replace('-', ' ')
-    text = re.sub(r'[^a-z0-9\s]', ' ', text)
-    return " ".join(text.split())
+st.title("📝 Bronbeheer: Nieuws & Geruchten")
+st.info("Gebruik dit paneel om handmatig vinkjes te zetten op basis van het laatste nieuws.")
 
-def style_df(df):
-    def color_cells(val):
-        if val == "1": return 'background-color: #d4edda; color: #155724;' # Groen
-        if val == "?": return 'background-color: #fff3cd; color: #856404;' # Oranje
-        return ''
-    return df.style.applymap(color_cells)
+# 1. Laden van de data
+@st.cache_data
+def load_source():
+    if os.path.exists("bron_startlijsten.csv"):
+        df = pd.read_csv("bron_startlijsten.csv")
+        name_col = 'Naam' if 'Naam' in df.columns else 'NAAM'
+        return df.set_index(name_col)
+    else:
+        # Fallback als bron nog niet bestaat
+        df_stats = pd.read_csv("renners_stats.csv")
+        name_col = 'Naam' if 'Naam' in df_stats.columns else 'NAAM'
+        races = ["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"]
+        df = pd.DataFrame(0, index=df_stats[name_col], columns=races)
+        return df
 
-st.title("🔄 Kleur-Gecodeerde Updater")
-st.info("🟢 Groen (1) = PCS Bevestigd | 🟠 Oranje (?) = Alleen Nieuws/Geruchten")
+if 'matrix' not in st.session_state:
+    st.session_state['matrix'] = load_source()
 
-# 1. Bestanden laden
-try:
-    df_stats = pd.read_csv("renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig')
-    df_stats.columns = [c.strip().upper() for c in df_stats.columns]
-    master_names = df_stats['NAAM'].tolist()
-    
-    df_bron = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', encoding='utf-8-sig')
-    name_col = 'Naam' if 'Naam' in df_bron.columns else 'NAAM'
-    df_bron = df_bron.set_index(name_col)
-except Exception as e:
-    st.error(f"Bestanden missen: {e}")
-    st.stop()
+# 2. Handmatige aanpassingen
+with st.expander("Snel zoeken & vinken"):
+    search_name = st.text_input("Zoek renner:")
+    if search_name:
+        matches = st.session_state['matrix'].index[st.session_state['matrix'].index.str.contains(search_name, case=False)]
+        selected_renner = st.selectbox("Selecteer:", matches)
+        if selected_renner:
+            race_to_update = st.selectbox("Voor koers:", st.session_state['matrix'].columns)
+            current_val = st.session_state['matrix'].at[selected_renner, race_to_update]
+            new_val = st.radio("Status:", [0, 1], index=int(current_val), horizontal=True)
+            if st.button("Bijwerken"):
+                st.session_state['matrix'].at[selected_renner, race_to_update] = new_val
+                st.success(f"{selected_renner} bijgewerkt voor {race_to_update}")
 
-# 2. Matrix initialiseren
-if 'matrix_display' not in st.session_state:
-    st.session_state['matrix_display'] = pd.DataFrame("0", index=master_names, columns=df_bron.columns)
-    for col in df_bron.columns:
-        news_indices = df_bron[df_bron[col] == 1].index
-        st.session_state['matrix_display'].loc[st.session_state['matrix_display'].index.isin(news_indices), col] = "?"
+# 3. Overzicht en Export
+st.subheader("Huidige Matrix")
+st.dataframe(st.session_state['matrix'])
 
-race = st.selectbox("Update koers via PCS PDF:", st.session_state['matrix_display'].columns.tolist())
-plak_veld = st.text_area("Plak hier de PCS PDF tekst:", height=200)
-
-if st.button(f"Update {race}"):
-    if plak_veld:
-        regels = plak_veld.split('\n')
-        gevalideerde_regels = [deep_clean(r) for r in regels if re.match(r'^\d+', r.strip())]
-        tekst_bak = " ".join(gevalideerde_regels)
-        
-        for naam in st.session_state['matrix_display'].index:
-            schoon_naam = deep_clean(naam)
-            naam_delen = [d for d in schoon_naam.split() if len(d) > 2 and d not in {'van', 'den', 'der', 'de'}]
-            if naam_delen and all(deel in tekst_bak for deel in naam_delen):
-                st.session_state['matrix_display'].at[naam, race] = "1"
-        st.success(f"Update voor {race} voltooid.")
-
-st.dataframe(style_df(st.session_state['matrix_display']), height=400)
-
-if st.button("💾 Genereer startlijsten.csv"):
-    # Export-logica: ? wordt 2, 1 blijft 1, rest 0
-    df_export = st.session_state['matrix_display'].replace("?", "2").astype(int)
-    csv = df_export.reset_index().to_csv(index=False).encode('utf-8')
-    st.download_button("Download voor App", csv, "startlijsten.csv", "text/csv")
+if st.button("💾 Export naar GitHub"):
+    # We slaan het op als startlijsten.csv (die de hoofd-app gebruikt)
+    csv = st.session_state['matrix'].reset_index().to_csv(index=False).encode('utf-8')
+    st.download_button("Download startlijsten.csv", csv, "startlijsten.csv", "text/csv")
