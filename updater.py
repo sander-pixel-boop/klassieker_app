@@ -3,90 +3,87 @@ import pandas as pd
 import unicodedata
 import re
 
-st.set_page_config(page_title="WielerOrakel PCS Sync", layout="wide")
+st.set_page_config(page_title="Wieler Updater - Kleurcodes", layout="wide")
 
 def deep_clean(text):
     if not text: return ""
     text = str(text).lower()
-    # Verwijder accenten (é -> e, ø -> o)
     text = "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
     text = text.replace('ø', 'o').replace('æ', 'ae').replace('ð', 'd').replace('-', ' ')
-    # Behoud alleen letters en spaties
-    text = re.sub(r'[^a-z\s]', ' ', text)
+    text = re.sub(r'[^a-z0-9\s]', ' ', text)
     return " ".join(text.split())
 
-st.title("🔄 Master Updater: WielerOrakel + Nieuws + PCS")
+def style_dataframe(df):
+    """
+    Functie om de tabel te kleuren: 
+    1 = Groen, ? = Oranje
+    """
+    def color_cells(val):
+        if val == "1":
+            return 'background-color: #d4edda; color: #155724;' # Groen
+        if val == "?":
+            return 'background-color: #fff3cd; color: #856404;' # Oranje
+        return ''
+    return df.style.applymap(color_cells)
 
-# 1. LADEN VAN DE REFERENTIE (WielerOrakel - Alle mogelijke renners)
+st.title("🔄 Kleur-Gecodeerde Updater")
+st.info("🟢 Groen (1) = PCS Bevestigd | 🟠 Oranje (?) = Alleen Nieuws/Geruchten")
+
+# 1. Referentie & Bron laden
 try:
     df_stats = pd.read_csv("renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig')
     df_stats.columns = [c.strip().upper() for c in df_stats.columns]
     master_names = df_stats['NAAM'].tolist()
-except:
-    st.error("❌ Kan renners_stats.csv niet vinden. Dit is je Master-lijst.")
+    
+    df_bron = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', encoding='utf-8-sig')
+    name_col = 'Naam' if 'Naam' in df_bron.columns else 'NAAM'
+    df_bron = df_bron.set_index(name_col)
+except Exception as e:
+    st.error(f"Bestanden missen: {e}")
     st.stop()
 
-# 2. LADEN VAN HET BRONBESTAND (Jouw Nieuws/Geruchten)
-if 'matrix' not in st.session_state:
-    try:
-        df_bron = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', encoding='utf-8-sig')
-        # Zorg dat alle renners uit de stats-lijst in onze matrix zitten
-        name_col = 'Naam' if 'Naam' in df_bron.columns else 'NAAM'
-        df_bron = df_bron.set_index(name_col)
-        
-        # We maken een nieuwe matrix op basis van ALLE namen van WielerOrakel
-        # En we vullen die aan met de vinkjes die je al had in bron_startlijsten
-        new_matrix = pd.DataFrame(0, index=master_names, columns=df_bron.columns)
-        for col in df_bron.columns:
-            # Match vinkjes op basis van index (Naam)
-            new_matrix[col] = df_bron[col].reindex(new_matrix.index, fill_value=0)
-            
-        st.session_state['matrix'] = new_matrix
-        st.success("✅ WielerOrakel lijst geladen en aangevuld met jouw nieuws-data.")
-    except Exception as e:
-        st.warning(f"Geen bron_startlijsten.csv gevonden of fout bij laden. We starten met een lege lijst op basis van WielerOrakel. ({e})")
-        # Fallback: start met lege matrix op basis van stats
-        races = ["OHN","KBK","SB","PN7","TA7","MSR","BDP","E3","GW","DDV","RVV","SP","PR","BP","AGR","WP","LBL"]
-        st.session_state['matrix'] = pd.DataFrame(0, index=master_names, columns=races)
+# 2. Matrix opbouw in Session State
+if 'matrix_display' not in st.session_state:
+    # We maken een matrix met strings om '?' te kunnen tonen
+    st.session_state['matrix_display'] = pd.DataFrame("0", index=master_names, columns=df_bron.columns)
+    for col in df_bron.columns:
+        # Zet de huidige nieuws-vinkjes op '?'
+        news_indices = df_bron[df_bron[col] == 1].index
+        st.session_state['matrix_display'].loc[st.session_state['matrix_display'].index.isin(news_indices), col] = "?"
 
-race = st.selectbox("Update koers:", st.session_state['matrix'].columns.tolist())
-plak_veld = st.text_area("Plak hier de PCS PDF tekst (Ctrl+A uit de PDF):", height=250)
+race = st.selectbox("Update koers met PCS PDF:", st.session_state['matrix_display'].columns.tolist())
+plak_veld = st.text_area("Plak hier de PCS PDF tekst:", height=200)
 
-if st.button(f"Verwerk PCS data voor {race}"):
+if st.button(f"Update {race} via PDF"):
     if plak_veld:
-        # Stap A: Tekstbak maken van de PDF
-        tekst_bak = deep_clean(plak_veld)
+        regels = plak_veld.split('\n')
+        # Filter op regels die met een nummer beginnen (rugnummers)
+        gevalideerde_regels = [deep_clean(r) for r in regels if re.match(r'^\d+', r.strip())]
+        schone_tekst_bak = " ".join(gevalideerde_regels)
         
-        herkende_namen_pcs = []
-        
-        # Stap B: Matching
-        for naam in st.session_state['matrix'].index:
+        pcs_count = 0
+        for naam in st.session_state['matrix_display'].index:
             schoon_naam = deep_clean(naam)
-            # Filter stopwoorden en korte namen
             stopwoorden = {'van', 'den', 'der', 'de', 'het', 'ten', 'ter'}
             naam_delen = [d for d in schoon_naam.split() if d not in stopwoorden and len(d) > 2]
             
             if naam_delen:
-                # MATCH: Alle delen van de naam moeten in de tekst voorkomen
-                if all(deel in tekst_bak for deel in naam_delen):
-                    st.session_state['matrix'].at[naam, race] = 1
-                    herkende_namen_pcs.append(naam)
-                # Backup voor namen met 3+ delen (bijv. Henri-Francois Renard-Haquin)
-                elif len(naam_delen) > 2:
-                    if sum(1 for d in naam_delen if d in tekst_bak) >= 2:
-                        st.session_state['matrix'].at[naam, race] = 1
-                        herkende_namen_pcs.append(naam)
+                # Als match in PDF, wordt het een harde '1'
+                if all(deel in schone_tekst_bak for deel in naam_delen):
+                    st.session_state['matrix_display'].at[naam, race] = "1"
+                    pcs_count += 1
+        
+        st.success(f"PCS Update klaar: {pcs_count} renners bevestigd (Groen).")
 
-        # Statistieken
-        totaal_vinkjes = (st.session_state['matrix'][race] == 1).sum()
-        st.metric(label=f"Totaal aantal renners voor {race}", value=int(totaal_vinkjes))
-        st.success(f"PCS Check voltooid: {len(herkende_namen_pcs)} renners uit de PDF herkend.")
+# 3. Tonen van de tabel
+st.subheader("Huidige Status")
+st.table(style_dataframe(st.session_state['matrix_display'].head(50))) # Head voor performance, gebruik dataframe voor scrollen
+st.dataframe(style_dataframe(st.session_state['matrix_display']))
 
-# 3. OVERZICHT & DOWNLOAD
+# 4. Export (Zet ? om naar 1 voor de hoofd-app)
 st.divider()
-st.subheader("Overzicht van alle vinkjes")
-st.dataframe(st.session_state['matrix'])
-
-if st.button("💾 Genereer startlijsten.csv"):
-    csv = st.session_state['matrix'].reset_index().to_csv(index=False).encode('utf-8')
+if st.button("💾 Genereer startlijsten.csv voor de App"):
+    # Voor de app.py maken we er weer overal een '1' van (zowel ? als 1)
+    df_export = st.session_state['matrix_display'].replace("?", "1").replace("0", "0").astype(int)
+    csv = df_export.reset_index().to_csv(index=False).encode('utf-8')
     st.download_button("Download startlijsten.csv", csv, "startlijsten.csv", "text/csv")
