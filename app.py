@@ -10,18 +10,13 @@ st.set_page_config(page_title="Scorito Klassiekers Solver 2026", layout="wide", 
 @st.cache_data
 def load_and_merge_data():
     try:
-        # 1. Lees startlijsten
         df_prog = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', on_bad_lines='skip')
-        
-        # Gebruikersregel: 0.8M is 750000
         df_prog.loc[df_prog['Prijs'] == 800000, 'Prijs'] = 750000
         
-        # 2. Lees stats
         df_stats = pd.read_csv("renners_stats.csv", sep='\t') 
         if 'Naam' in df_stats.columns:
             df_stats = df_stats.rename(columns={'Naam': 'Renner'})
         
-        # 3. Fuzzy Matching
         short_names = df_prog['Renner'].unique()
         full_names = df_stats['Renner'].unique()
         name_mapping = {}
@@ -44,12 +39,10 @@ def load_and_merge_data():
 
         df_prog['Renner_Full'] = df_prog['Renner'].map(name_mapping)
         
-        # Correcties dubbele namen
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 1500000), 'Renner_Full'] = 'Florian Vermeersch'
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 750000), 'Renner_Full'] = 'Gianni Vermeersch'
         df_prog.loc[(df_prog['Renner'] == 'Pedersen') & (df_prog['Prijs'] == 4500000), 'Renner_Full'] = 'Mads Pedersen'
 
-        # 4. Merge
         merged_df = pd.merge(df_prog, df_stats, left_on='Renner_Full', right_on='Renner', how='inner')
         
         if 'Renner_x' in merged_df.columns:
@@ -57,13 +50,13 @@ def load_and_merge_data():
         merged_df = merged_df.rename(columns={'Renner_Full': 'Renner'})
         merged_df = merged_df.drop_duplicates(subset=['Renner', 'Prijs'])
         
-        # 5. EV Berekening
         race_cols = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'BDP', 'E3', 'GW', 'DDV', 'RVV', 'SP', 'PR', 'BP', 'AGR', 'WP', 'LBL']
         available_races = [k for k in race_cols if k in merged_df.columns]
         
         koers_stat_map = {
-            'OHN': 'COB', 'KBK': 'SPR', 'SB': 'HLL', 'PN': 'HLL', 'TA': 'HLL',
-            'MSR': 'SPR', 'BDP': 'SPR', 'E3': 'COB', 'GW': 'SPR', 'DDV': 'COB',
+            'OHN': 'COB', 'KBK': 'SPR', 'SB': 'HLL', 
+            'PN': 'HLL', 'TA': 'SPR', 'MSR': 'AVG', 
+            'BDP': 'SPR', 'E3': 'COB', 'GW': 'SPR', 'DDV': 'COB',
             'RVV': 'COB', 'SP': 'SPR', 'PR': 'COB', 'BP': 'HLL', 'AGR': 'HLL',
             'WP': 'HLL', 'LBL': 'HLL'
         }
@@ -142,7 +135,7 @@ with col_selection:
     st.header("1. Jouw Team")
     st.multiselect("Selectie:", options=df['Renner'].tolist(), key="rider_multiselect")
 
-# --- DASHBOARD & FINETUNER ---
+# --- DASHBOARDS ---
 if st.session_state.rider_multiselect:
     current_df = df[df['Renner'].isin(st.session_state.rider_multiselect)].copy()
     
@@ -152,8 +145,8 @@ if st.session_state.rider_multiselect:
     m2.metric("Renners", f"{len(current_df)} / {max_renners}")
     m3.metric("Team EV", f"{current_df['Scorito_EV'].sum():.0f}")
 
-    # VERVANG OPTIE (FINETUNER)
-    st.header("🔄 Finetuner")
+    # --- SECTIE 2: FINETUNER ---
+    st.header("🔄 2. Finetuner")
     edit_df = current_df[['Renner', 'Prijs', 'Scorito_EV']].copy()
     edit_df.insert(0, 'Vervang', False)
     edited = st.data_editor(edit_df, hide_index=True, use_container_width=True, disabled=["Renner", "Prijs", "Scorito_EV"])
@@ -161,7 +154,6 @@ if st.session_state.rider_multiselect:
     if st.button("🔄 Vervang geselecteerde renners"):
         to_keep = edited[edited['Vervang'] == False]['Renner'].tolist()
         to_replace = edited[edited['Vervang'] == True]['Renner'].tolist()
-        # Los op met behoud van niet-vervangen renners en uitsluiting van de geselecteerden
         new_team = solve_knapsack(df, max_budget, 0, max_renners, min_per_race, 
                                   list(set(force_list + to_keep)), 
                                   list(set(exclude_list + to_replace)), 
@@ -170,12 +162,14 @@ if st.session_state.rider_multiselect:
             st.session_state.rider_multiselect = new_team
             st.rerun()
 
-    st.header("🗓️ Startlijst Matrix")
+    # --- SECTIE 3: MATRIX ---
+    st.header("🗓️ 3. Startlijst Matrix")
     matrix = current_df[['Renner'] + race_cols].set_index('Renner')
     matrix = matrix.applymap(lambda x: '✅' if x == 1 else '-')
     st.dataframe(matrix, use_container_width=True)
 
-    st.header("🥇 Kopman Advies")
+    # --- SECTIE 4: KOPMAN ADVIES ---
+    st.header("🥇 4. Kopman Advies")
     kopman_lijst = []
     for koers in race_cols:
         starters = current_df[current_df[koers] == 1]
@@ -189,3 +183,6 @@ if st.session_state.rider_multiselect:
                 "K3": top[2] if len(top)>2 else "-"
             })
     st.dataframe(pd.DataFrame(kopman_lijst), hide_index=True, use_container_width=True)
+
+    # --- SECTIE 5: SCORES OVERZICHT ---
+    st.header("
