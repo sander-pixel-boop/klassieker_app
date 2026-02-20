@@ -53,11 +53,9 @@ def load_and_merge_data():
     merged_df = merged_df.drop_duplicates(subset=['Renner'])
     merged_df['Display'] = merged_df['Renner'] + " - " + (merged_df['Prijs'] / 1000000).astype(str) + "M"
     
-    # GECORRIGEERDE KOERSEN LIJST
     koersen = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'BDP', 'E3', 'GW', 'DDV', 'RVV', 'SP', 'PR', 'BP', 'AGR', 'WP', 'LBL']
     beschikbare_koersen = [k for k in koersen if k in merged_df.columns]
     
-    # NIEUWE MAPPING INCLUSIEF BDP EN GW
     koers_stat_map = {
         'OHN': 'COB', 'KBK': 'SPR', 'SB': 'HLL', 'PN': 'HLL', 'TA': 'HLL',
         'MSR': 'SPR', 'BDP': 'SPR', 'E3': 'COB', 'GW': 'SPR', 'DDV': 'COB',
@@ -78,15 +76,17 @@ def load_and_merge_data():
 try:
     df, race_cols, koers_mapping = load_and_merge_data()
 except Exception as e:
-    st.error(f"⚠️ Fout bij inladen data. Check of je kolomkoppen kloppen! Details: {e}")
+    st.error(f"⚠️ Fout bij inladen data. Details: {e}")
     st.stop()
 
 # --- AI SOLVER FUNCTIE ---
 def solve_knapsack(dataframe, total_budget, min_budget, max_riders, force_list, exclude_list):
     prob = pulp.LpProblem("Scorito_Klassieker_Team", pulp.LpMaximize)
+    
     rider_vars = pulp.LpVariable.dicts("Riders", dataframe['Renner'], cat='Binary')
     
     prob += pulp.lpSum([dataframe.loc[dataframe['Renner'] == r, 'Scorito_EV'].values[0] * rider_vars[r] for r in dataframe['Renner']])
+    
     prob += pulp.lpSum([rider_vars[r] for r in dataframe['Renner']]) == max_riders, "Max_Renners"
     prob += pulp.lpSum([dataframe.loc[dataframe['Renner'] == r, 'Prijs'].values[0] * rider_vars[r] for r in dataframe['Renner']]) <= total_budget, "Max_Budget"
     prob += pulp.lpSum([dataframe.loc[dataframe['Renner'] == r, 'Prijs'].values[0] * rider_vars[r] for r in dataframe['Renner']]) >= min_budget, "Min_Budget"
@@ -136,13 +136,13 @@ with col_ui1:
     excluded_riders = df[df['Display'].isin(exclude_display)]['Renner'].tolist()
 
     if st.button("🧠 Genereer Scorito Team", type="primary", use_container_width=True):
-        with st.spinner('Bezig met het berekenen...'):
+        with st.spinner('Bezig met het berekenen van verwachte kopman-punten...'):
             opt_team = solve_knapsack(df, max_budget, min_budget, max_renners, forced_riders, excluded_riders)
             if opt_team:
                 st.session_state.rider_multiselect = opt_team
                 st.rerun() 
             else:
-                st.error("Kon geen geldig team vinden.")
+                st.error("Kon geen geldig team vinden. Probeer het 'Min Budget' te verlagen of minder renners te forceren.")
 
 with col_ui2:
     st.header("1. Jouw Selectie")
@@ -167,6 +167,7 @@ if st.session_state.rider_multiselect:
     
     st.divider()
     st.header("2. Budget & Overzicht")
+    
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     col_m1.metric("Geselecteerd", f"{len(selected_df)} / {max_renners}")
     col_m2.metric("Uitgegeven", f"€ {spent:,.0f}".replace(",", "."))
@@ -178,9 +179,23 @@ if st.session_state.rider_multiselect:
         
     col_m4.metric("Team EV (Verwachte Pts)", f"{total_ev:.0f}")
 
+    # --- NIEUWE SECTIE: DE STARTLIJST MATRIX ---
     st.divider()
-    st.header("🔄 3. Finetune je Team")
-    st.write("Vink renners aan die je wilt VERVANGEN door de AI.")
+    st.header("3. Startlijst Matrix (Wie rijdt waar?)")
+    st.write("Overzicht van de koersen die jouw geselecteerde renners rijden.")
+    
+    # Maak een kopie van de geselecteerde data voor de weergave
+    matrix_df = selected_df[['Renner'] + race_cols].set_index('Renner').copy()
+    
+    # Vervang de 1 en 0 door vinkjes en streepjes
+    for col in race_cols:
+        matrix_df[col] = matrix_df[col].apply(lambda x: '✅' if x == 1 else '-')
+        
+    st.dataframe(matrix_df, use_container_width=True)
+
+    st.divider()
+    st.header("🔄 4. Finetune je Team (Vervang Renners)")
+    st.write("Ben je het niet eens met bepaalde keuzes van de AI? Vink hieronder renners aan die je uit het team wilt halen. Klik daarna op 'Vervang Geselecteerde Renners'.")
     
     edit_df = selected_df[['Renner', 'Display', 'Prijs', 'Scorito_EV']].copy()
     edit_df.insert(0, 'Vervang', False)
@@ -202,42 +217,52 @@ if st.session_state.rider_multiselect:
         riders_to_replace = edited_df[edited_df['Vervang'] == True]['Renner'].tolist()
         
         if len(riders_to_replace) == 0:
-            st.warning("Je hebt niemand aangevinkt.")
+            st.warning("Je hebt niemand aangevinkt om te vervangen.")
         else:
             with st.spinner('Nieuwe alternatieven berekenen...'):
                 combined_force = list(set(forced_riders + riders_to_keep))
                 combined_exclude = list(set(excluded_riders + riders_to_replace))
                 
                 new_team = solve_knapsack(df, max_budget, 0, max_renners, combined_force, combined_exclude)
+                
                 if new_team:
                     st.session_state.rider_multiselect = new_team
                     st.rerun()
                 else:
-                    st.error("Kon de renners niet vervangen zonder regels te breken.")
+                    st.error("Kon de renners niet vervangen zonder het budget te overschrijden of restricties te schenden.")
 
     st.divider()
-    st.header("4. Programma & Kopmannen Advies")
+    st.header("5. Programma & Kopmannen Advies")
+    st.write("De AI heeft voor elke koers de beste kopmannen uit jouw geselecteerde team gekozen, op basis van de specifieke statistiek (Kassei, Heuvel of Sprint).")
     
     kopman_data = []
+    
     for koers in race_cols:
         starters = selected_df[selected_df[koers] == 1]
+        
         if not starters.empty:
             stat_nodig = koers_mapping.get(koers, 'AVG')
             starters_sorted = starters.sort_values(by=[stat_nodig, 'AVG'], ascending=[False, False])
             namenlijst = starters_sorted['Renner'].tolist()
             
+            kopman_1 = namenlijst[0] if len(namenlijst) > 0 else "-"
+            kopman_2 = namenlijst[1] if len(namenlijst) > 1 else "-"
+            kopman_3 = namenlijst[2] if len(namenlijst) > 2 else "-"
+            overige_renners = ", ".join(namenlijst[3:]) if len(namenlijst) > 3 else "-"
+            
             kopman_data.append({
                 "Koers": koers,
                 "Type": stat_nodig,
                 "Aantal": len(namenlijst),
-                "Kopman 1 (3x)": namenlijst[0] if len(namenlijst) > 0 else "-",
-                "Kopman 2 (2.5x)": namenlijst[1] if len(namenlijst) > 1 else "-",
-                "Kopman 3 (2x)": namenlijst[2] if len(namenlijst) > 2 else "-",
-                "Overige Renners": ", ".join(namenlijst[3:]) if len(namenlijst) > 3 else "-"
+                "Kopman 1 (3x)": kopman_1,
+                "Kopman 2 (2.5x)": kopman_2,
+                "Kopman 3 (2x)": kopman_3,
+                "Overige Renners": overige_renners
             })
     
     if kopman_data:
-        st.dataframe(pd.DataFrame(kopman_data), use_container_width=True, hide_index=True)
+        df_kopmannen = pd.DataFrame(kopman_data)
+        st.dataframe(df_kopmannen, use_container_width=True, hide_index=True)
 
 else:
-    st.info("Kies minimaal 1 renner of klik op 'Genereer Scorito Team'.")
+    st.info("Kies minimaal 1 renner in de selectiebalk of klik op 'Genereer Scorito Team' om te beginnen.")
