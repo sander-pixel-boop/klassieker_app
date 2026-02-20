@@ -37,6 +37,7 @@ def load_and_merge_data():
 
     df_prog['Renner_Full'] = df_prog['Renner'].map(name_mapping)
     
+    # Forceer specifieke dubbele namen correct
     df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 1500000), 'Renner_Full'] = 'Florian Vermeersch'
     df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 750000), 'Renner_Full'] = 'Gianni Vermeersch'
     df_prog.loc[(df_prog['Renner'] == 'Pedersen') & (df_prog['Prijs'] == 4500000), 'Renner_Full'] = 'Mads Pedersen'
@@ -49,6 +50,9 @@ def load_and_merge_data():
     if 'Renner_x' in merged_df.columns:
         merged_df = merged_df.drop(columns=['Renner_x', 'Renner_y'])
     merged_df = merged_df.rename(columns={'Renner_Full': 'Renner'})
+    
+    # CRUCIALE FIX: Verwijder duplicaten zodat het algoritme geen namen dubbel telt
+    merged_df = merged_df.drop_duplicates(subset=['Renner'])
     
     merged_df['Display'] = merged_df['Renner'] + " - " + (merged_df['Prijs'] / 1000000).astype(str) + "M"
     
@@ -66,7 +70,7 @@ except Exception as e:
     st.error(f"⚠️ Fout bij inladen data. Details: {e}")
     st.stop()
 
-# --- AI SOLVER FUNCTIE (aangepast met forceren/uitsluiten) ---
+# --- AI SOLVER FUNCTIE ---
 def solve_knapsack(dataframe, total_budget, max_riders, force_list, exclude_list):
     prob = pulp.LpProblem("Klassieker_Team", pulp.LpMaximize)
     
@@ -92,7 +96,12 @@ def solve_knapsack(dataframe, total_budget, max_riders, force_list, exclude_list
     prob.solve()
     
     if pulp.LpStatus[prob.status] == 'Optimal':
-        optimal_display_names = [dataframe.loc[dataframe['Renner'] == r, 'Display'].values[0] for r in dataframe['Renner'] if rider_vars[r].varValue == 1]
+        # CRUCIALE FIX: varValue > 0.5 in plaats van == 1 om afrondingsfouten te voorkomen
+        optimal_display_names = [
+            dataframe.loc[dataframe['Renner'] == r, 'Display'].values[0] 
+            for r in dataframe['Renner'] 
+            if rider_vars[r].varValue is not None and rider_vars[r].varValue > 0.5
+        ]
         return optimal_display_names
     else:
         return []
@@ -111,11 +120,9 @@ with col_ui1:
     st.subheader("Sturing Algoritme")
     force_display = st.multiselect("🔒 Forceer deze renners (AI móét deze kiezen):", options=df['Display'].tolist())
     
-    # Filter de opties voor uitsluiten, je kan iemand niet forceren én uitsluiten
     exclude_options = [r for r in df['Display'].tolist() if r not in force_display]
     exclude_display = st.multiselect("❌ Sluit deze renners uit (AI mag deze niet kiezen):", options=exclude_options)
     
-    # Vertaal de display namen terug naar pure renner namen voor de solver
     forced_riders = df[df['Display'].isin(force_display)]['Renner'].tolist()
     excluded_riders = df[df['Display'].isin(exclude_display)]['Renner'].tolist()
 
