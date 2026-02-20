@@ -9,23 +9,16 @@ st.set_page_config(page_title="Klassiekers Solver 2026", layout="wide", page_ico
 # --- DATA LADEN & MERGEN ---
 @st.cache_data
 def load_and_merge_data():
-    # Lees bestanden in
-    # Let op: als je renners_stats.csv als komma-gescheiden hebt opgeslagen, verander sep='\t' naar sep=','
     df_prog = pd.read_csv("bron_startlijsten.csv")
     df_stats = pd.read_csv("renners_stats.csv", sep='\t') 
     
-    # Zorg dat de naamkolom in stats 'Renner' heet
     if 'Naam' in df_stats.columns:
         df_stats = df_stats.rename(columns={'Naam': 'Renner'})
     
-    # 1. Haal unieke namen op
     short_names = df_prog['Renner'].unique()
     full_names = df_stats['Renner'].unique()
-    
-    # 2. Maak een fuzzy mapping dictionary
     name_mapping = {}
     
-    # Handmatige overrides voor afkortingen of namen die fout kunnen gaan
     manual_overrides = {
         "Poel": "Mathieu van der Poel",
         "Aert": "Wout van Aert",
@@ -39,14 +32,11 @@ def load_and_merge_data():
         if short in manual_overrides:
             name_mapping[short] = manual_overrides[short]
         else:
-            # Fuzzy match op basis van token_set_ratio
             best_match, score = process.extractOne(short, full_names, scorer=fuzz.token_set_ratio)
             name_mapping[short] = best_match
 
-    # 3. Voer de mapping uit op de startlijst
     df_prog['Renner_Full'] = df_prog['Renner'].map(name_mapping)
     
-    # 4. Los dubbele namen op d.m.v. Prijs
     df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 1500000), 'Renner_Full'] = 'Florian Vermeersch'
     df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 750000), 'Renner_Full'] = 'Gianni Vermeersch'
     df_prog.loc[(df_prog['Renner'] == 'Pedersen') & (df_prog['Prijs'] == 4500000), 'Renner_Full'] = 'Mads Pedersen'
@@ -54,55 +44,54 @@ def load_and_merge_data():
     df_prog.loc[(df_prog['Renner'] == 'Martinez') & (df_prog['Prijs'] == 750000), 'Renner_Full'] = 'Lenny Martinez'
     df_prog.loc[(df_prog['Renner'] == 'Oliveira') & (df_prog['Prijs'] == 1000000), 'Renner_Full'] = 'Rui Oliveira'
 
-    # 5. Merge datasets op basis van de volledige naam
     merged_df = pd.merge(df_prog, df_stats, left_on='Renner_Full', right_on='Renner', how='inner')
     
-    # Opschonen van kolommen na merge
     if 'Renner_x' in merged_df.columns:
         merged_df = merged_df.drop(columns=['Renner_x', 'Renner_y'])
     merged_df = merged_df.rename(columns={'Renner_Full': 'Renner'})
     
-    # Maak Display kolom voor de Multiselect
     merged_df['Display'] = merged_df['Renner'] + " - " + (merged_df['Prijs'] / 1000000).astype(str) + "M"
     
-    # Haal de lijst met koersen op
     koersen = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'RvV', 'E3', 'IFF', 'DDV', 'RVV', 'SP', 'PR', 'BP', 'AGR', 'WP', 'LBL']
-    
-    # Zorg dat de kolommen bestaan voordat we ze optellen
     beschikbare_koersen = [k for k in koersen if k in merged_df.columns]
     
-    # Bereken totaal aantal gereden koersen en een basis Expected Value (EV)
     merged_df['Total_Races'] = merged_df[beschikbare_koersen].sum(axis=1)
     merged_df['EV'] = ((merged_df['AVG'] + merged_df['COB'] + merged_df['HLL'] + merged_df['SPR']) / 4) * merged_df['Total_Races']
     
     return merged_df, beschikbare_koersen
 
-# --- ERROR HANDLING DATA ---
 try:
     df, race_cols = load_and_merge_data()
 except Exception as e:
-    st.error(f"⚠️ Fout bij inladen data. Check of bestanden in dezelfde map staan. Details: {e}")
+    st.error(f"⚠️ Fout bij inladen data. Details: {e}")
     st.stop()
 
-# --- AI SOLVER FUNCTIE ---
-def solve_knapsack(dataframe, total_budget, max_riders):
+# --- AI SOLVER FUNCTIE (aangepast met forceren/uitsluiten) ---
+def solve_knapsack(dataframe, total_budget, max_riders, force_list, exclude_list):
     prob = pulp.LpProblem("Klassieker_Team", pulp.LpMaximize)
     
-    # Variabelen per renner (0 of 1)
     rider_vars = pulp.LpVariable.dicts("Riders", dataframe['Renner'], cat='Binary')
     
-    # DOELFUNCTIE: Maximaliseer de EV
+    # Doelfunctie
     prob += pulp.lpSum([dataframe.loc[dataframe['Renner'] == r, 'EV'].values[0] * rider_vars[r] for r in dataframe['Renner']])
     
-    # RESTRICTIES
+    # Basis restricties
     prob += pulp.lpSum([rider_vars[r] for r in dataframe['Renner']]) == max_riders, "Max_Renners"
     prob += pulp.lpSum([dataframe.loc[dataframe['Renner'] == r, 'Prijs'].values[0] * rider_vars[r] for r in dataframe['Renner']]) <= total_budget, "Max_Budget"
     
-    # LOS OP
+    # Forceer restricties (moet 1 zijn)
+    for r in force_list:
+        if r in rider_vars:
+            prob += rider_vars[r] == 1
+            
+    # Uitsluit restricties (moet 0 zijn)
+    for r in exclude_list:
+        if r in rider_vars:
+            prob += rider_vars[r] == 0
+    
     prob.solve()
     
     if pulp.LpStatus[prob.status] == 'Optimal':
-        # Retourneer de 'Display' namen zodat we die direct in de UI in de multiselect kunnen schieten
         optimal_display_names = [dataframe.loc[dataframe['Renner'] == r, 'Display'].values[0] for r in dataframe['Renner'] if rider_vars[r].varValue == 1]
         return optimal_display_names
     else:
@@ -118,27 +107,33 @@ with col_ui1:
     max_renners = st.number_input("Max Aantal Renners", value=20, min_value=1, max_value=25)
     budget = st.number_input("Totaal Budget", value=45000000, step=500000)
     
-    st.info("De AI selecteert het team op basis van een mix van gereden programma's en algemene statistieken (Kassei, Heuvel, Sprint, AVG).")
+    st.divider()
+    st.subheader("Sturing Algoritme")
+    force_display = st.multiselect("🔒 Forceer deze renners (AI móét deze kiezen):", options=df['Display'].tolist())
     
+    # Filter de opties voor uitsluiten, je kan iemand niet forceren én uitsluiten
+    exclude_options = [r for r in df['Display'].tolist() if r not in force_display]
+    exclude_display = st.multiselect("❌ Sluit deze renners uit (AI mag deze niet kiezen):", options=exclude_options)
+    
+    # Vertaal de display namen terug naar pure renner namen voor de solver
+    forced_riders = df[df['Display'].isin(force_display)]['Renner'].tolist()
+    excluded_riders = df[df['Display'].isin(exclude_display)]['Renner'].tolist()
+
     if st.button("🧠 Genereer Optimaal Team", type="primary", use_container_width=True):
         with st.spinner('Bezig met kraken van de code...'):
-            opt_team = solve_knapsack(df, budget, max_renners)
+            opt_team = solve_knapsack(df, budget, max_renners, forced_riders, excluded_riders)
             if opt_team:
-                # Update de specifieke widget key direct
                 st.session_state.rider_multiselect = opt_team
-                # Forceer een reload van de pagina zodat de balk direct vult
                 st.rerun() 
             else:
-                st.error("Kon geen optimaal team vinden met deze restricties. Verhoog je budget.")
+                st.error("Kon geen optimaal team vinden. Je hebt te dure renners geforceerd, of het budget is te laag.")
 
 with col_ui2:
     st.header("1. Jouw Selectie")
     
-    # Zorg dat de state van de balk bestaat voordat we hem renderen
     if "rider_multiselect" not in st.session_state:
         st.session_state.rider_multiselect = []
 
-    # De multiselect balk: gekoppeld aan de session_state via de 'key'
     selected_display = st.multiselect(
         "Zoek en selecteer je renners of laat de AI het doen:", 
         options=df['Display'].tolist(),
@@ -167,10 +162,8 @@ if st.session_state.rider_multiselect:
 
     st.subheader("Renners Data")
     
-    # Kies welke kolommen je wilt zien in het eindoverzicht
     display_cols = ['Renner', 'Prijs', 'Total_Races', 'EV', 'AVG', 'COB', 'HLL', 'SPR'] + race_cols
     
-    # Laat de tabel zien (netjes gesorteerd op prijs)
     st.dataframe(
         selected_df[display_cols].sort_values(by='Prijs', ascending=False).reset_index(drop=True), 
         use_container_width=True,
