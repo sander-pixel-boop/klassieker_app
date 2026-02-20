@@ -116,3 +116,84 @@ def solve_knapsack(dataframe, total_budget, max_riders, force_list, exclude_list
             for r in dataframe['Renner'] 
             if rider_vars[r].varValue is not None and rider_vars[r].varValue > 0.5
         ]
+        return optimal_display_names
+    else:
+        return []
+
+# --- UI OPBOUW ---
+st.title("🏆 Scorito Klassiekers 2026 - AI Solver")
+
+col_ui1, col_ui2 = st.columns([1, 2], gap="large")
+
+with col_ui1:
+    st.header("⚙️ Instellingen & AI")
+    max_renners = st.number_input("Aantal Renners", value=20, min_value=1, max_value=25)
+    budget = st.number_input("Budget", value=45000000, step=500000)
+    
+    st.divider()
+    st.subheader("Sturing Algoritme")
+    force_display = st.multiselect("🔒 Forceer renners (Verplicht in AI team):", options=df['Display'].tolist())
+    exclude_options = [r for r in df['Display'].tolist() if r not in force_display]
+    exclude_display = st.multiselect("❌ Sluit renners uit (Genegeerd door AI):", options=exclude_options)
+    
+    forced_riders = df[df['Display'].isin(force_display)]['Renner'].tolist()
+    excluded_riders = df[df['Display'].isin(exclude_display)]['Renner'].tolist()
+
+    if st.button("🧠 Genereer Scorito Team", type="primary", use_container_width=True):
+        with st.spinner('Bezig met het berekenen van verwachte kopman-punten...'):
+            opt_team = solve_knapsack(df, budget, max_renners, forced_riders, excluded_riders)
+            if opt_team:
+                st.session_state.rider_multiselect = opt_team
+                st.rerun() 
+            else:
+                st.error("Kon geen geldig team vinden. Check je budget of geforceerde renners.")
+
+with col_ui2:
+    st.header("1. Jouw Selectie")
+    
+    if "rider_multiselect" not in st.session_state:
+        st.session_state.rider_multiselect = []
+
+    selected_display = st.multiselect(
+        "Zoek en selecteer je renners of gebruik de AI knop:", 
+        options=df['Display'].tolist(),
+        max_selections=max_renners,
+        key="rider_multiselect"
+    )
+
+# --- RESULTATEN WEERGAVE ---
+if st.session_state.rider_multiselect:
+    selected_df = df[df['Display'].isin(st.session_state.rider_multiselect)].copy()
+    
+    spent = selected_df['Prijs'].sum()
+    remaining = budget - spent
+    total_ev = selected_df['Scorito_EV'].sum()
+    
+    st.divider()
+    st.header("📊 Team Overzicht")
+    
+    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    col_m1.metric("Geselecteerd", f"{len(selected_df)} / {max_renners}")
+    col_m2.metric("Uitgegeven", f"€ {spent:,.0f}".replace(",", "."))
+    
+    if remaining < 0:
+        col_m3.metric("Resterend", f"€ {remaining:,.0f}".replace(",", "."), delta="- Over budget", delta_color="inverse")
+    else:
+        col_m3.metric("Resterend", f"€ {remaining:,.0f}".replace(",", "."))
+        
+    col_m4.metric("Team EV (Verwachte Pts)", f"{total_ev:.0f}")
+
+    st.subheader("Renners & Verwachte Waarde")
+    
+    display_cols = ['Renner', 'Prijs', 'Scorito_EV', 'Total_Races', 'COB', 'HLL', 'SPR', 'AVG']
+    
+    st.dataframe(
+        selected_df[display_cols].sort_values(by='Scorito_EV', ascending=False).reset_index(drop=True).style.format({
+            "Scorito_EV": "{:.1f}",
+            "Prijs": "€ {:,.0f}"
+        }), 
+        use_container_width=True,
+        hide_index=True
+    )
+else:
+    st.info("Kies minimaal 1 renner in de selectiebalk of klik op 'Genereer Scorito Team' om te beginnen.")
