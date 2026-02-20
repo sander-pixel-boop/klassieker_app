@@ -37,7 +37,6 @@ def load_and_merge_data():
 
     df_prog['Renner_Full'] = df_prog['Renner'].map(name_mapping)
     
-    # Forceer specifieke dubbele namen correct
     df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 1500000), 'Renner_Full'] = 'Florian Vermeersch'
     df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 750000), 'Renner_Full'] = 'Gianni Vermeersch'
     df_prog.loc[(df_prog['Renner'] == 'Pedersen') & (df_prog['Prijs'] == 4500000), 'Renner_Full'] = 'Mads Pedersen'
@@ -57,7 +56,7 @@ def load_and_merge_data():
     koersen = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'RvV', 'E3', 'IFF', 'DDV', 'RVV', 'SP', 'PR', 'BP', 'AGR', 'WP', 'LBL']
     beschikbare_koersen = [k for k in koersen if k in merged_df.columns]
     
-    # --- SCORITO EV BEREKENING ---
+    # Koppel stat aan koers
     koers_stat_map = {
         'OHN': 'COB', 'KBK': 'SPR', 'SB': 'HLL', 'PN': 'HLL', 'TA': 'HLL',
         'MSR': 'SPR', 'RvV': 'COB', 'E3': 'COB', 'IFF': 'SPR', 'DDV': 'COB',
@@ -73,10 +72,10 @@ def load_and_merge_data():
         verwachte_koers_punten = (merged_df[stat_nodig] / 100)**4 * 100
         merged_df['Scorito_EV'] += merged_df[koers] * verwachte_koers_punten
     
-    return merged_df, beschikbare_koersen
+    return merged_df, beschikbare_koersen, koers_stat_map
 
 try:
-    df, race_cols = load_and_merge_data()
+    df, race_cols, koers_mapping = load_and_merge_data()
 except Exception as e:
     st.error(f"⚠️ Fout bij inladen data. Details: {e}")
     st.stop()
@@ -87,10 +86,8 @@ def solve_knapsack(dataframe, total_budget, min_budget, max_riders, force_list, 
     
     rider_vars = pulp.LpVariable.dicts("Riders", dataframe['Renner'], cat='Binary')
     
-    # Doelfunctie
     prob += pulp.lpSum([dataframe.loc[dataframe['Renner'] == r, 'Scorito_EV'].values[0] * rider_vars[r] for r in dataframe['Renner']])
     
-    # Basis restricties (Aantal renners & Max/Min budget)
     prob += pulp.lpSum([rider_vars[r] for r in dataframe['Renner']]) == max_riders, "Max_Renners"
     prob += pulp.lpSum([dataframe.loc[dataframe['Renner'] == r, 'Prijs'].values[0] * rider_vars[r] for r in dataframe['Renner']]) <= total_budget, "Max_Budget"
     prob += pulp.lpSum([dataframe.loc[dataframe['Renner'] == r, 'Prijs'].values[0] * rider_vars[r] for r in dataframe['Renner']]) >= min_budget, "Min_Budget"
@@ -128,7 +125,6 @@ with col_ui1:
     with col_b1:
         max_budget = st.number_input("Max Budget", value=45000000, step=500000)
     with col_b2:
-        # Nieuwe input: Dwing de AI om minimaal dit bedrag uit te geven
         min_budget = st.number_input("Min Budget", value=44500000, step=500000)
     
     st.divider()
@@ -171,7 +167,7 @@ if st.session_state.rider_multiselect:
     total_ev = selected_df['Scorito_EV'].sum()
     
     st.divider()
-    st.header("📊 Team Overzicht")
+    st.header("2. Budget & Overzicht")
     
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     col_m1.metric("Geselecteerd", f"{len(selected_df)} / {max_renners}")
@@ -184,8 +180,52 @@ if st.session_state.rider_multiselect:
         
     col_m4.metric("Team EV (Verwachte Pts)", f"{total_ev:.0f}")
 
-    st.subheader("Renners & Verwachte Waarde")
+    # --- NIEUW: HET KOPMAN & KOERS OVERZICHT ---
+    st.divider()
+    st.header("3. Programma & Kopmannen Advies")
+    st.write("De AI heeft voor elke koers de beste kopmannen uit jouw geselecteerde team gekozen, op basis van de specifieke statistiek (Kassei, Heuvel of Sprint) die voor die koers nodig is.")
     
+    kopman_data = []
+    
+    # Loop over alle beschikbare koersen
+    for koers in race_cols:
+        # Check of er in jouw team renners zijn die deze koers rijden
+        starters = selected_df[selected_df[koers] == 1]
+        
+        if not starters.empty:
+            # Bepaal welke stat bepalend is
+            stat_nodig = koers_mapping.get(koers, 'AVG')
+            
+            # Sorteer de starters op deze stat (hoogste eerst), bij gelijkstand op hoogste algemene gemiddelde
+            starters_sorted = starters.sort_values(by=[stat_nodig, 'AVG'], ascending=[False, False])
+            
+            namenlijst = starters_sorted['Renner'].tolist()
+            
+            # Vul de kopmannen in
+            kopman_1 = namenlijst[0] if len(namenlijst) > 0 else "-"
+            kopman_2 = namenlijst[1] if len(namenlijst) > 1 else "-"
+            kopman_3 = namenlijst[2] if len(namenlijst) > 2 else "-"
+            overige_renners = ", ".join(namenlijst[3:]) if len(namenlijst) > 3 else "-"
+            
+            kopman_data.append({
+                "Koers": koers,
+                "Type": stat_nodig,
+                "Aantal": len(namenlijst),
+                "Kopman 1 (3x)": kopman_1,
+                "Kopman 2 (2.5x)": kopman_2,
+                "Kopman 3 (2x)": kopman_3,
+                "Overige Renners": overige_renners
+            })
+    
+    if kopman_data:
+        df_kopmannen = pd.DataFrame(kopman_data)
+        st.dataframe(df_kopmannen, use_container_width=True, hide_index=True)
+    else:
+        st.warning("Je hebt momenteel geen renners die koersen rijden.")
+
+    # --- TABEL MET INDIVIDUELE STATS ---
+    st.divider()
+    st.header("4. Individuele Renners Data")
     display_cols = ['Renner', 'Prijs', 'Scorito_EV', 'Total_Races', 'COB', 'HLL', 'SPR', 'AVG']
     
     st.dataframe(
