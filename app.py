@@ -56,7 +56,6 @@ def load_and_merge_data():
     koersen = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'RvV', 'E3', 'IFF', 'DDV', 'RVV', 'SP', 'PR', 'BP', 'AGR', 'WP', 'LBL']
     beschikbare_koersen = [k for k in koersen if k in merged_df.columns]
     
-    # Koppel stat aan koers
     koers_stat_map = {
         'OHN': 'COB', 'KBK': 'SPR', 'SB': 'HLL', 'PN': 'HLL', 'TA': 'HLL',
         'MSR': 'SPR', 'RvV': 'COB', 'E3': 'COB', 'IFF': 'SPR', 'DDV': 'COB',
@@ -133,6 +132,7 @@ with col_ui1:
     exclude_options = [r for r in df['Display'].tolist() if r not in force_display]
     exclude_display = st.multiselect("❌ Sluit renners uit (Genegeerd door AI):", options=exclude_options)
     
+    # Bewaar de ruwe namen voor de solver
     forced_riders = df[df['Display'].isin(force_display)]['Renner'].tolist()
     excluded_riders = df[df['Display'].isin(exclude_display)]['Renner'].tolist()
 
@@ -180,28 +180,65 @@ if st.session_state.rider_multiselect:
         
     col_m4.metric("Team EV (Verwachte Pts)", f"{total_ev:.0f}")
 
-    # --- NIEUW: HET KOPMAN & KOERS OVERZICHT ---
+    # --- NIEUW: FINETUNE HET TEAM MET CHECKBOXES ---
     st.divider()
-    st.header("3. Programma & Kopmannen Advies")
-    st.write("De AI heeft voor elke koers de beste kopmannen uit jouw geselecteerde team gekozen, op basis van de specifieke statistiek (Kassei, Heuvel of Sprint) die voor die koers nodig is.")
+    st.header("🔄 3. Finetune je Team (Vervang Renners)")
+    st.write("Ben je het niet eens met bepaalde keuzes van de AI? Vink hieronder renners aan die je uit het team wilt halen. Klik daarna op 'Vervang Geselecteerde Renners'. De AI behoudt de niet-aangevinkte renners en zoekt de beste opvulling met je resterende budget.")
+    
+    # Maak een interactieve dataframe
+    edit_df = selected_df[['Renner', 'Display', 'Prijs', 'Scorito_EV']].copy()
+    edit_df.insert(0, 'Vervang', False) # Voeg een checkbox kolom toe
+    
+    edited_df = st.data_editor(
+        edit_df.sort_values(by='Prijs', ascending=False),
+        column_config={
+            "Vervang": st.column_config.CheckboxColumn("Vervang?", default=False),
+            "Prijs": st.column_config.NumberColumn(format="€ %d"),
+            "Scorito_EV": st.column_config.NumberColumn(format="%.1f")
+        },
+        disabled=["Renner", "Display", "Prijs", "Scorito_EV"],
+        hide_index=True,
+        use_container_width=True
+    )
+    
+    if st.button("🔄 Vervang Geselecteerde Renners", type="secondary"):
+        # Bepaal wie we houden en wie eruit moet
+        riders_to_keep = edited_df[edited_df['Vervang'] == False]['Renner'].tolist()
+        riders_to_replace = edited_df[edited_df['Vervang'] == True]['Renner'].tolist()
+        
+        if len(riders_to_replace) == 0:
+            st.warning("Je hebt niemand aangevinkt om te vervangen.")
+        else:
+            with st.spinner('Nieuwe alternatieven berekenen...'):
+                # Combineer de renners die we willen houden met eventuele harde 'forces' uit het zijmenu
+                combined_force = list(set(forced_riders + riders_to_keep))
+                # Combineer de te vervangen renners met de uitsluitingen uit het zijmenu
+                combined_exclude = list(set(excluded_riders + riders_to_replace))
+                
+                # We zetten min_budget op 0 tijdens het finetunen, anders loopt de AI soms vast bij specifieke vervangingen
+                new_team = solve_knapsack(df, max_budget, 0, max_renners, combined_force, combined_exclude)
+                
+                if new_team:
+                    st.session_state.rider_multiselect = new_team
+                    st.rerun()
+                else:
+                    st.error("Kon de renners niet vervangen zonder het budget te overschrijden of restricties te schenden.")
+
+    # --- KOPMAN & KOERS OVERZICHT ---
+    st.divider()
+    st.header("4. Programma & Kopmannen Advies")
+    st.write("Automatisch berekende kopmannen per koers op basis van de specifieke statistiek (Kassei, Heuvel of Sprint).")
     
     kopman_data = []
     
-    # Loop over alle beschikbare koersen
     for koers in race_cols:
-        # Check of er in jouw team renners zijn die deze koers rijden
         starters = selected_df[selected_df[koers] == 1]
         
         if not starters.empty:
-            # Bepaal welke stat bepalend is
             stat_nodig = koers_mapping.get(koers, 'AVG')
-            
-            # Sorteer de starters op deze stat (hoogste eerst), bij gelijkstand op hoogste algemene gemiddelde
             starters_sorted = starters.sort_values(by=[stat_nodig, 'AVG'], ascending=[False, False])
-            
             namenlijst = starters_sorted['Renner'].tolist()
             
-            # Vul de kopmannen in
             kopman_1 = namenlijst[0] if len(namenlijst) > 0 else "-"
             kopman_2 = namenlijst[1] if len(namenlijst) > 1 else "-"
             kopman_3 = namenlijst[2] if len(namenlijst) > 2 else "-"
@@ -220,21 +257,6 @@ if st.session_state.rider_multiselect:
     if kopman_data:
         df_kopmannen = pd.DataFrame(kopman_data)
         st.dataframe(df_kopmannen, use_container_width=True, hide_index=True)
-    else:
-        st.warning("Je hebt momenteel geen renners die koersen rijden.")
 
-    # --- TABEL MET INDIVIDUELE STATS ---
-    st.divider()
-    st.header("4. Individuele Renners Data")
-    display_cols = ['Renner', 'Prijs', 'Scorito_EV', 'Total_Races', 'COB', 'HLL', 'SPR', 'AVG']
-    
-    st.dataframe(
-        selected_df[display_cols].sort_values(by='Scorito_EV', ascending=False).reset_index(drop=True).style.format({
-            "Scorito_EV": "{:.1f}",
-            "Prijs": "€ {:,.0f}"
-        }), 
-        use_container_width=True,
-        hide_index=True
-    )
 else:
     st.info("Kies minimaal 1 renner in de selectiebalk of klik op 'Genereer Scorito Team' om te beginnen.")
