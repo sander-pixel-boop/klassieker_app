@@ -55,6 +55,9 @@ def load_and_merge_data():
         race_cols = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'BDP', 'E3', 'GW', 'DDV', 'RVV', 'SP', 'PR', 'BP', 'AGR', 'WP', 'LBL']
         available_races = [k for k in race_cols if k in merged_df.columns]
         
+        # FIX: Bereken expliciet het totaal aantal koersen per renner
+        merged_df['Total_Races'] = merged_df[available_races].sum(axis=1).astype(int)
+        
         koers_stat_map = {
             'OHN': 'COB', 'KBK': 'SPR', 'SB': 'HLL', 
             'PN': 'HLL', 'TA': 'SPR', 'MSR': 'AVG', 
@@ -131,7 +134,7 @@ with col_settings:
             st.session_state.rider_multiselect = result
             st.rerun()
         else:
-            st.error("Geen oplossing mogelijk. Probeer de eisen te versoepelen.")
+            st.error("Geen oplossing mogelijk. Versoepel de eisen.")
 
 with col_selection:
     st.header("1. Jouw Team")
@@ -188,5 +191,9 @@ if st.session_state.rider_multiselect:
 
     # SECTIE 5: SCORES OVERZICHT
     st.header("📊 5. Team Statistieken")
-    stats_overzicht = current_df[['Renner', 'COB', 'HLL', 'SPR', 'AVG', 'Total_Races', 'Prijs', 'Scorito_EV']]
+    # Veiligheidslijst van kolommen
+    cols_to_show = ['Renner', 'COB', 'HLL', 'SPR', 'AVG', 'Total_Races', 'Prijs', 'Scorito_EV']
+    existing_cols = [c for c in cols_to_show if c in current_df.columns]
+    
+    stats_overzicht = current_df[existing_cols]
     st.dataframe(stats_overzicht.sort_values(by='Scorito_EV', ascending=False), hide_index=True, use_container_width=True)
