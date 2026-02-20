@@ -11,7 +11,6 @@ st.set_page_config(page_title="Scorito Klassiekers Solver 2026", layout="wide", 
 def load_and_merge_data():
     try:
         df_prog = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', on_bad_lines='skip')
-        # Gebruikersregel: 0.8M is 750000
         df_prog.loc[df_prog['Prijs'] == 800000, 'Prijs'] = 750000
         
         df_stats = pd.read_csv("renners_stats.csv", sep='\t') 
@@ -40,7 +39,6 @@ def load_and_merge_data():
 
         df_prog['Renner_Full'] = df_prog['Renner'].map(name_mapping)
         
-        # Specifieke correcties voor dubbele namen
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 1500000), 'Renner_Full'] = 'Florian Vermeersch'
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 750000), 'Renner_Full'] = 'Gianni Vermeersch'
         df_prog.loc[(df_prog['Renner'] == 'Pedersen') & (df_prog['Prijs'] == 4500000), 'Renner_Full'] = 'Mads Pedersen'
@@ -55,7 +53,6 @@ def load_and_merge_data():
         race_cols = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'BDP', 'E3', 'GW', 'DDV', 'RVV', 'SP', 'PR', 'BP', 'AGR', 'WP', 'LBL']
         available_races = [k for k in race_cols if k in merged_df.columns]
         
-        # Bereken het totaal aantal koersen per renner
         merged_df['Total_Races'] = merged_df[available_races].sum(axis=1).astype(int)
         
         koers_stat_map = {
@@ -95,10 +92,7 @@ def solve_knapsack(dataframe, total_budget, min_budget, max_riders, min_per_race
     prob = pulp.LpProblem("Scorito_Solver", pulp.LpMaximize)
     rider_vars = pulp.LpVariable.dicts("Riders", dataframe.index, cat='Binary')
     
-    # Doel
     prob += pulp.lpSum([dataframe.loc[i, 'Scorito_EV'] * rider_vars[i] for i in dataframe.index])
-    
-    # Harde restricties
     prob += pulp.lpSum([rider_vars[i] for i in dataframe.index]) == max_riders
     prob += pulp.lpSum([dataframe.loc[i, 'Prijs'] * rider_vars[i] for i in dataframe.index]) <= total_budget
     prob += pulp.lpSum([dataframe.loc[i, 'Prijs'] * rider_vars[i] for i in dataframe.index]) >= min_budget
@@ -110,12 +104,14 @@ def solve_knapsack(dataframe, total_budget, min_budget, max_riders, min_per_race
         if dataframe.loc[i, 'Renner'] in force_list: prob += rider_vars[i] == 1
         if dataframe.loc[i, 'Renner'] in exclude_list: prob += rider_vars[i] == 0
     
-    # Gebruik msg=0 en een kortere timeLimit om 'hangen' te voorkomen
-    prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=10))
+    prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=15))
     
-    if pulp.LpStatus[prob.status] == 'Optimal':
-        # Alleen renners pakken die echt geselecteerd zijn (> 0.9)
-        return [dataframe.loc[i, 'Renner'] for i in dataframe.index if rider_vars[i].varValue is not None and rider_vars[i].varValue > 0.9]
+    if pulp.LpStatus[prob.status] in ['Optimal', 'Infeasible']:
+        # Filter en sorteer op hoogste variabel-waarde, pak daarna max_riders
+        selected_indices = [i for i in dataframe.index if rider_vars[i].varValue is not None and rider_vars[i].varValue > 0.8]
+        # Sorteer geselecteerde renners op EV om de beste te behouden als de solver 'te veel' kiest
+        results = dataframe.loc[selected_indices].sort_values(by='Scorito_EV', ascending=False).head(max_riders)
+        return results['Renner'].tolist()
     return None
 
 # --- UI ---
@@ -128,7 +124,8 @@ with col_settings:
     max_renners = st.number_input("Totaal aantal renners", value=20)
     max_budget = st.number_input("Max Budget", value=45000000, step=500000)
     min_budget = st.number_input("Min Budget", value=43000000, step=500000)
-    min_per_race = st.slider("Min. renners per koers", 0, 15, 8)
+    # STANDAARD OP 3
+    min_per_race = st.slider("Min. renners per koers", 0, 15, 3)
     
     st.divider()
     force_list = st.multiselect("🔒 Forceer renners:", options=df['Renner'].tolist())
@@ -140,7 +137,7 @@ with col_settings:
             st.session_state.rider_multiselect = result
             st.rerun()
         else:
-            st.error("Geen oplossing mogelijk. Versoepel de eisen (bijv. minder renners per koers).")
+            st.error("Geen oplossing mogelijk.")
 
 with col_selection:
     st.header("1. Jouw Team")
@@ -165,7 +162,7 @@ if st.session_state.rider_multiselect:
     if st.button("🔄 Vervang geselecteerde renners"):
         to_keep = edited[edited['Vervang'] == False]['Renner'].tolist()
         to_replace = edited[edited['Vervang'] == True]['Renner'].tolist()
-        new_team = solve_knapsack(df, max_budget, 0, max_renners, min_per_race, 
+        new_team = solve_knapsack(df, max_budget, min_budget, max_renners, min_per_race, 
                                   list(set(force_list + to_keep)), 
                                   list(set(exclude_list + to_replace)), 
                                   race_cols)
