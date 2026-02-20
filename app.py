@@ -4,7 +4,7 @@ import pulp
 from thefuzz import process, fuzz
 
 # --- CONFIGURATIE ---
-st.set_page_config(page_title="Scorito Klassiekers Solver 2026", layout="wide", page_icon="🚴‍♂️")
+st.set_page_config(page_title="Scorito Klassiekers Solver 2026", layout="wide", page_icon="走")
 
 # --- DATA LADEN & MERGEN ---
 @st.cache_data
@@ -72,15 +72,12 @@ def load_and_merge_data():
         merged_df['Scorito_EV'] = 0.0
         for koers in available_races:
             stat_nodig = koers_stat_map.get(koers, 'AVG')
-            # Veiligheid: zorg dat de stat een getal is, vervang NaN door 0
             merged_df[stat_nodig] = pd.to_numeric(merged_df[stat_nodig], errors='coerce').fillna(0)
             merged_df[koers] = pd.to_numeric(merged_df[koers], errors='coerce').fillna(0)
-            
             merged_df['Scorito_EV'] += merged_df[koers] * ((merged_df[stat_nodig] / 100)**4 * 100)
 
-        # Laatste check: verwijder elke rij waar Scorito_EV nog steeds NaN is
         merged_df = merged_df.dropna(subset=['Scorito_EV', 'Prijs'])
-        merged_df['Display'] = merged_df['Renner'] + " - " + (merged_df['Prijs'] / 1000000).astype(str) + "M"
+        merged_df['Scorito_EV'] = merged_df['Scorito_EV'].round(0).astype(int)
         
         return merged_df, available_races, koers_stat_map
 
@@ -92,35 +89,35 @@ def load_and_merge_data():
 df, race_cols, koers_mapping = load_and_merge_data()
 
 if df.empty:
-    st.warning("De database is leeg. Controleer je CSV-bestanden op GitHub.")
     st.stop()
 
 if "rider_multiselect" not in st.session_state:
     st.session_state.rider_multiselect = []
 
 # --- SOLVER FUNCTIE ---
-def solve_knapsack(dataframe, total_budget, min_budget, max_riders, force_list, exclude_list):
-    # Filter eventuele NaN prijzen of EV's voor de zekerheid
-    clean_df = dataframe.dropna(subset=['Scorito_EV', 'Prijs']).copy()
-    
+def solve_knapsack(dataframe, total_budget, min_budget, max_riders, min_per_race, force_list, exclude_list, available_races):
     prob = pulp.LpProblem("Scorito_Solver", pulp.LpMaximize)
-    rider_vars = pulp.LpVariable.dicts("Riders", clean_df.index, cat='Binary')
+    rider_vars = pulp.LpVariable.dicts("Riders", dataframe.index, cat='Binary')
     
-    # Doel
-    prob += pulp.lpSum([clean_df.loc[i, 'Scorito_EV'] * rider_vars[i] for i in clean_df.index])
+    # Doel: maximaliseer EV
+    prob += pulp.lpSum([dataframe.loc[i, 'Scorito_EV'] * rider_vars[i] for i in dataframe.index])
     
     # Restricties
-    prob += pulp.lpSum([rider_vars[i] for i in clean_df.index]) == max_riders
-    prob += pulp.lpSum([clean_df.loc[i, 'Prijs'] * rider_vars[i] for i in clean_df.index]) <= total_budget
-    prob += pulp.lpSum([clean_df.loc[i, 'Prijs'] * rider_vars[i] for i in clean_df.index]) >= min_budget
+    prob += pulp.lpSum([rider_vars[i] for i in dataframe.index]) == max_riders
+    prob += pulp.lpSum([dataframe.loc[i, 'Prijs'] * rider_vars[i] for i in dataframe.index]) <= total_budget
+    prob += pulp.lpSum([dataframe.loc[i, 'Prijs'] * rider_vars[i] for i in dataframe.index]) >= min_budget
     
-    for i in clean_df.index:
-        if clean_df.loc[i, 'Renner'] in force_list: prob += rider_vars[i] == 1
-        if clean_df.loc[i, 'Renner'] in exclude_list: prob += rider_vars[i] == 0
+    # NIEUW: Minimaal aantal renners per koers
+    for koers in available_races:
+        prob += pulp.lpSum([dataframe.loc[i, koers] * rider_vars[i] for i in dataframe.index]) >= min_per_race
+    
+    for i in dataframe.index:
+        if dataframe.loc[i, 'Renner'] in force_list: prob += rider_vars[i] == 1
+        if dataframe.loc[i, 'Renner'] in exclude_list: prob += rider_vars[i] == 0
     
     prob.solve(pulp.PULP_CBC_CMD(msg=0))
     if pulp.LpStatus[prob.status] == 'Optimal':
-        return [clean_df.loc[i, 'Display'] for i in clean_df.index if rider_vars[i].varValue > 0.5]
+        return [dataframe.loc[i, 'Renner'] for i in dataframe.index if rider_vars[i].varValue > 0.5]
     return None
 
 # --- UI ---
@@ -130,60 +127,42 @@ col_settings, col_selection = st.columns([1, 2], gap="large")
 
 with col_settings:
     st.header("⚙️ Instellingen")
-    max_renners = st.number_input("Aantal Renners", value=20)
+    max_renners = st.number_input("Totaal aantal renners", value=20)
     max_budget = st.number_input("Max Budget", value=45000000, step=500000)
     min_budget = st.number_input("Min Budget", value=43000000, step=500000)
+    min_per_race = st.slider("Min. renners per koers", 0, 15, 8)
     
     st.divider()
-    force_display = st.multiselect("🔒 Forceer:", options=df['Display'].tolist())
-    exclude_display = st.multiselect("❌ Sluit uit:", options=[r for r in df['Display'].tolist() if r not in force_display])
-    
-    forced_riders = df[df['Display'].isin(force_display)]['Renner'].tolist()
-    excluded_riders = df[df['Display'].isin(exclude_display)]['Renner'].tolist()
+    force_list = st.multiselect("🔒 Forceer renners:", options=df['Renner'].tolist())
+    exclude_list = st.multiselect("❌ Sluit renners uit:", options=[r for r in df['Renner'].tolist() if r not in force_list])
 
-    if st.button("🚀 Bereken Team", type="primary", use_container_width=True):
-        result = solve_knapsack(df, max_budget, min_budget, max_renners, forced_riders, excluded_riders)
+    if st.button("🚀 Bereken Optimaal Team", type="primary", use_container_width=True):
+        result = solve_knapsack(df, max_budget, min_budget, max_renners, min_per_race, force_list, exclude_list, race_cols)
         if result:
             st.session_state.rider_multiselect = result
             st.rerun()
         else:
-            st.error("Geen oplossing. Probeer het 'Min Budget' te verlagen.")
+            st.error("Geen oplossing mogelijk. Verlaag 'Min Budget' of 'Min. renners per koers'.")
 
 with col_selection:
-    st.header("1. Jouw Selectie")
-    st.multiselect("Geselecteerd team:", options=df['Display'].tolist(), key="rider_multiselect")
+    st.header("1. Jouw Team")
+    st.multiselect("Selectie:", options=df['Renner'].tolist(), key="rider_multiselect")
 
 # --- DASHBOARD ---
 if st.session_state.rider_multiselect:
-    current_df = df[df['Display'].isin(st.session_state.rider_multiselect)].copy()
+    current_df = df[df['Renner'].isin(st.session_state.rider_multiselect)].copy()
     
     st.divider()
     m1, m2, m3 = st.columns(3)
-    m1.metric("Resterend Budget", f"€ {max_budget - current_df['Prijs'].sum():,.0f}")
-    m2.metric("Aantal", f"{len(current_df)} / {max_renners}")
-    m3.metric("Verwachte Punten", f"{current_df['Scorito_EV'].sum():.0f}")
+    m1.metric("Budget over", f"€ {max_budget - current_df['Prijs'].sum():,.0f}")
+    m2.metric("Renners", f"{len(current_df)} / {max_renners}")
+    m3.metric("Team EV", f"{current_df['Scorito_EV'].sum():.0f}")
 
-    # Matrix
     st.header("🗓️ Startlijst Matrix")
     matrix = current_df[['Renner'] + race_cols].set_index('Renner')
     matrix = matrix.applymap(lambda x: '✅' if x == 1 else '-')
     st.dataframe(matrix, use_container_width=True)
 
-    # Finetuner
-    st.header("🔄 Finetuner")
-    edit_df = current_df[['Renner', 'Display', 'Prijs', 'Scorito_EV']].copy()
-    edit_df.insert(0, 'Vervang', False)
-    edited = st.data_editor(edit_df, hide_index=True, use_container_width=True, disabled=["Renner", "Display", "Prijs", "Scorito_EV"])
-    
-    if st.button("🔄 Vervang geselecteerden"):
-        to_keep = edited[edited['Vervang'] == False]['Renner'].tolist()
-        to_replace = edited[edited['Vervang'] == True]['Renner'].tolist()
-        new_team = solve_knapsack(df, max_budget, 0, max_renners, list(set(forced_riders + to_keep)), list(set(excluded_riders + to_replace)))
-        if new_team:
-            st.session_state.rider_multiselect = new_team
-            st.rerun()
-
-    # Kopman advies
     st.header("🥇 Kopman Advies")
     kopman_lijst = []
     for koers in race_cols:
@@ -193,8 +172,9 @@ if st.session_state.rider_multiselect:
             top = starters.sort_values(by=[stat, 'AVG'], ascending=False)['Renner'].tolist()
             kopman_lijst.append({
                 "Koers": koers, "Type": stat, 
+                "Aantal": len(starters),
                 "K1 (3x)": top[0] if len(top)>0 else "-", 
                 "K2 (2.5x)": top[1] if len(top)>1 else "-", 
                 "K3 (2x)": top[2] if len(top)>2 else "-"
             })
-    st.table(pd.DataFrame(kopman_lijst))
+    st.dataframe(pd.DataFrame(kopman_lijst), hide_index=True, use_container_width=True)
