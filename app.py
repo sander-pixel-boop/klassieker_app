@@ -11,6 +11,7 @@ st.set_page_config(page_title="Scorito Klassiekers Solver 2026", layout="wide", 
 def load_and_merge_data():
     try:
         df_prog = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', on_bad_lines='skip')
+        # Gebruikersregel: 0.8M is 750000
         df_prog.loc[df_prog['Prijs'] == 800000, 'Prijs'] = 750000
         
         df_stats = pd.read_csv("renners_stats.csv", sep='\t') 
@@ -39,6 +40,7 @@ def load_and_merge_data():
 
         df_prog['Renner_Full'] = df_prog['Renner'].map(name_mapping)
         
+        # Specifieke correcties voor dubbele namen
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 1500000), 'Renner_Full'] = 'Florian Vermeersch'
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 750000), 'Renner_Full'] = 'Gianni Vermeersch'
         df_prog.loc[(df_prog['Renner'] == 'Pedersen') & (df_prog['Prijs'] == 4500000), 'Renner_Full'] = 'Mads Pedersen'
@@ -129,7 +131,7 @@ with col_settings:
             st.session_state.rider_multiselect = result
             st.rerun()
         else:
-            st.error("Geen oplossing mogelijk.")
+            st.error("Geen oplossing mogelijk. Probeer de eisen te versoepelen.")
 
 with col_selection:
     st.header("1. Jouw Team")
@@ -145,7 +147,7 @@ if st.session_state.rider_multiselect:
     m2.metric("Renners", f"{len(current_df)} / {max_renners}")
     m3.metric("Team EV", f"{current_df['Scorito_EV'].sum():.0f}")
 
-    # --- SECTIE 2: FINETUNER ---
+    # SECTIE 2: FINETUNER
     st.header("🔄 2. Finetuner")
     edit_df = current_df[['Renner', 'Prijs', 'Scorito_EV']].copy()
     edit_df.insert(0, 'Vervang', False)
@@ -162,13 +164,13 @@ if st.session_state.rider_multiselect:
             st.session_state.rider_multiselect = new_team
             st.rerun()
 
-    # --- SECTIE 3: MATRIX ---
+    # SECTIE 3: MATRIX
     st.header("🗓️ 3. Startlijst Matrix")
     matrix = current_df[['Renner'] + race_cols].set_index('Renner')
     matrix = matrix.applymap(lambda x: '✅' if x == 1 else '-')
     st.dataframe(matrix, use_container_width=True)
 
-    # --- SECTIE 4: KOPMAN ADVIES ---
+    # SECTIE 4: KOPMAN ADVIES
     st.header("🥇 4. Kopman Advies")
     kopman_lijst = []
     for koers in race_cols:
@@ -184,5 +186,7 @@ if st.session_state.rider_multiselect:
             })
     st.dataframe(pd.DataFrame(kopman_lijst), hide_index=True, use_container_width=True)
 
-    # --- SECTIE 5: SCORES OVERZICHT ---
-    st.header("
+    # SECTIE 5: SCORES OVERZICHT
+    st.header("📊 5. Team Statistieken")
+    stats_overzicht = current_df[['Renner', 'COB', 'HLL', 'SPR', 'AVG', 'Total_Races', 'Prijs', 'Scorito_EV']]
+    st.dataframe(stats_overzicht.sort_values(by='Scorito_EV', ascending=False), hide_index=True, use_container_width=True)
