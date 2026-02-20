@@ -58,7 +58,6 @@ def load_and_merge_data():
     beschikbare_koersen = [k for k in koersen if k in merged_df.columns]
     
     # --- SCORITO EV BEREKENING ---
-    # Koppel elke koers aan de stat die het belangrijkst is om daar te winnen
     koers_stat_map = {
         'OHN': 'COB', 'KBK': 'SPR', 'SB': 'HLL', 'PN': 'HLL', 'TA': 'HLL',
         'MSR': 'SPR', 'RvV': 'COB', 'E3': 'COB', 'IFF': 'SPR', 'DDV': 'COB',
@@ -70,14 +69,8 @@ def load_and_merge_data():
     merged_df['Total_Races'] = merged_df[beschikbare_koersen].sum(axis=1)
 
     for koers in beschikbare_koersen:
-        stat_nodig = koers_stat_map.get(koers, 'AVG') # Pak AVG als koers onbekend is
-        
-        # Exponentiële formule: (Stat/100)^4 * 100. 
-        # Voorbeeld: Stat 98 -> 92 punten. Stat 85 -> 52 punten. Stat 75 -> 31 punten.
-        # Dit simuleert de "Top 5 + Kopman" multiplier. Winnaars zijn cruciaal.
+        stat_nodig = koers_stat_map.get(koers, 'AVG') 
         verwachte_koers_punten = (merged_df[stat_nodig] / 100)**4 * 100
-        
-        # Voeg de punten toe als de renner start (1 * punten = punten, 0 * punten = 0)
         merged_df['Scorito_EV'] += merged_df[koers] * verwachte_koers_punten
     
     return merged_df, beschikbare_koersen
@@ -89,16 +82,18 @@ except Exception as e:
     st.stop()
 
 # --- AI SOLVER FUNCTIE ---
-def solve_knapsack(dataframe, total_budget, max_riders, force_list, exclude_list):
+def solve_knapsack(dataframe, total_budget, min_budget, max_riders, force_list, exclude_list):
     prob = pulp.LpProblem("Scorito_Klassieker_Team", pulp.LpMaximize)
     
     rider_vars = pulp.LpVariable.dicts("Riders", dataframe['Renner'], cat='Binary')
     
-    # Doelfunctie: Nu gebaseerd op de geavanceerde Scorito_EV
+    # Doelfunctie
     prob += pulp.lpSum([dataframe.loc[dataframe['Renner'] == r, 'Scorito_EV'].values[0] * rider_vars[r] for r in dataframe['Renner']])
     
+    # Basis restricties (Aantal renners & Max/Min budget)
     prob += pulp.lpSum([rider_vars[r] for r in dataframe['Renner']]) == max_riders, "Max_Renners"
     prob += pulp.lpSum([dataframe.loc[dataframe['Renner'] == r, 'Prijs'].values[0] * rider_vars[r] for r in dataframe['Renner']]) <= total_budget, "Max_Budget"
+    prob += pulp.lpSum([dataframe.loc[dataframe['Renner'] == r, 'Prijs'].values[0] * rider_vars[r] for r in dataframe['Renner']]) >= min_budget, "Min_Budget"
     
     for r in force_list:
         if r in rider_vars:
@@ -128,7 +123,13 @@ col_ui1, col_ui2 = st.columns([1, 2], gap="large")
 with col_ui1:
     st.header("⚙️ Instellingen & AI")
     max_renners = st.number_input("Aantal Renners", value=20, min_value=1, max_value=25)
-    budget = st.number_input("Budget", value=45000000, step=500000)
+    
+    col_b1, col_b2 = st.columns(2)
+    with col_b1:
+        max_budget = st.number_input("Max Budget", value=45000000, step=500000)
+    with col_b2:
+        # Nieuwe input: Dwing de AI om minimaal dit bedrag uit te geven
+        min_budget = st.number_input("Min Budget", value=44500000, step=500000)
     
     st.divider()
     st.subheader("Sturing Algoritme")
@@ -141,12 +142,12 @@ with col_ui1:
 
     if st.button("🧠 Genereer Scorito Team", type="primary", use_container_width=True):
         with st.spinner('Bezig met het berekenen van verwachte kopman-punten...'):
-            opt_team = solve_knapsack(df, budget, max_renners, forced_riders, excluded_riders)
+            opt_team = solve_knapsack(df, max_budget, min_budget, max_renners, forced_riders, excluded_riders)
             if opt_team:
                 st.session_state.rider_multiselect = opt_team
                 st.rerun() 
             else:
-                st.error("Kon geen geldig team vinden. Check je budget of geforceerde renners.")
+                st.error("Kon geen geldig team vinden. Probeer het 'Min Budget' te verlagen of minder renners te forceren.")
 
 with col_ui2:
     st.header("1. Jouw Selectie")
@@ -166,7 +167,7 @@ if st.session_state.rider_multiselect:
     selected_df = df[df['Display'].isin(st.session_state.rider_multiselect)].copy()
     
     spent = selected_df['Prijs'].sum()
-    remaining = budget - spent
+    remaining = max_budget - spent
     total_ev = selected_df['Scorito_EV'].sum()
     
     st.divider()
