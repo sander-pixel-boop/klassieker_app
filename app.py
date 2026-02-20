@@ -55,7 +55,7 @@ def load_and_merge_data():
         race_cols = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'BDP', 'E3', 'GW', 'DDV', 'RVV', 'SP', 'PR', 'BP', 'AGR', 'WP', 'LBL']
         available_races = [k for k in race_cols if k in merged_df.columns]
         
-        # FIX: Bereken expliciet het totaal aantal koersen per renner
+        # Bereken het totaal aantal koersen per renner
         merged_df['Total_Races'] = merged_df[available_races].sum(axis=1).astype(int)
         
         koers_stat_map = {
@@ -95,7 +95,10 @@ def solve_knapsack(dataframe, total_budget, min_budget, max_riders, min_per_race
     prob = pulp.LpProblem("Scorito_Solver", pulp.LpMaximize)
     rider_vars = pulp.LpVariable.dicts("Riders", dataframe.index, cat='Binary')
     
+    # Doel
     prob += pulp.lpSum([dataframe.loc[i, 'Scorito_EV'] * rider_vars[i] for i in dataframe.index])
+    
+    # Harde restricties
     prob += pulp.lpSum([rider_vars[i] for i in dataframe.index]) == max_riders
     prob += pulp.lpSum([dataframe.loc[i, 'Prijs'] * rider_vars[i] for i in dataframe.index]) <= total_budget
     prob += pulp.lpSum([dataframe.loc[i, 'Prijs'] * rider_vars[i] for i in dataframe.index]) >= min_budget
@@ -107,9 +110,12 @@ def solve_knapsack(dataframe, total_budget, min_budget, max_riders, min_per_race
         if dataframe.loc[i, 'Renner'] in force_list: prob += rider_vars[i] == 1
         if dataframe.loc[i, 'Renner'] in exclude_list: prob += rider_vars[i] == 0
     
-    prob.solve(pulp.PULP_CBC_CMD(msg=0))
+    # Gebruik msg=0 en een kortere timeLimit om 'hangen' te voorkomen
+    prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=10))
+    
     if pulp.LpStatus[prob.status] == 'Optimal':
-        return [dataframe.loc[i, 'Renner'] for i in dataframe.index if rider_vars[i].varValue > 0.5]
+        # Alleen renners pakken die echt geselecteerd zijn (> 0.9)
+        return [dataframe.loc[i, 'Renner'] for i in dataframe.index if rider_vars[i].varValue is not None and rider_vars[i].varValue > 0.9]
     return None
 
 # --- UI ---
@@ -134,7 +140,7 @@ with col_settings:
             st.session_state.rider_multiselect = result
             st.rerun()
         else:
-            st.error("Geen oplossing mogelijk. Versoepel de eisen.")
+            st.error("Geen oplossing mogelijk. Versoepel de eisen (bijv. minder renners per koers).")
 
 with col_selection:
     st.header("1. Jouw Team")
@@ -191,9 +197,5 @@ if st.session_state.rider_multiselect:
 
     # SECTIE 5: SCORES OVERZICHT
     st.header("📊 5. Team Statistieken")
-    # Veiligheidslijst van kolommen
-    cols_to_show = ['Renner', 'COB', 'HLL', 'SPR', 'AVG', 'Total_Races', 'Prijs', 'Scorito_EV']
-    existing_cols = [c for c in cols_to_show if c in current_df.columns]
-    
-    stats_overzicht = current_df[existing_cols]
+    stats_overzicht = current_df[['Renner', 'COB', 'HLL', 'SPR', 'AVG', 'Total_Races', 'Prijs', 'Scorito_EV']]
     st.dataframe(stats_overzicht.sort_values(by='Scorito_EV', ascending=False), hide_index=True, use_container_width=True)
