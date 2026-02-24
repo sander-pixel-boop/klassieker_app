@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import pulp
 import json
+import google.generativeai as genai
 from thefuzz import process, fuzz
 
 # --- CONFIGURATIE ---
@@ -108,8 +109,8 @@ if "transfer_plan" not in st.session_state:
     st.session_state.transfer_plan = None
 if "last_finetune" not in st.session_state:
     st.session_state.last_finetune = None
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = [{"role": "assistant", "content": "Hoi! Ik ben de Ploegleider AI. Vraag me bijvoorbeeld:\n- *Wie rijdt de meeste koersen?*\n- *Beste kopman voor RVV?*\n- *Beste renners onder 1 miljoen?*"}]
+if "gemini_history" not in st.session_state:
+    st.session_state.gemini_history = [{"role": "assistant", "content": "Hoi! Plak je API-sleutel hierboven en vraag me alles over je Scorito-team."}]
 
 # --- SOLVER MET WISSELS ---
 def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_riders, min_per_race, force_list, exclude_list, early_races, late_races, use_transfers):
@@ -174,7 +175,7 @@ def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_rider
 # --- UI TABS ---
 st.title("🏆 Klassiekers Team")
 
-tab1, tab2, tab3, tab4 = st.tabs(["🚀 Team Builder", "📋 Alle Renners", "💬 AI Vraagbaak", "ℹ️ Uitleg & Credits"])
+tab1, tab2, tab3, tab4 = st.tabs(["🚀 Team Builder", "📋 Alle Renners", "💬 Gemini Vraagbaak", "ℹ️ Uitleg & Credits"])
 
 with tab1:
     col_settings, col_selection = st.columns([1, 2], gap="large")
@@ -477,61 +478,45 @@ with tab2:
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 with tab3:
-    st.header("💬 AI Vraagbaak")
-    st.markdown("Stel simpele vragen over de dataset. Voorbeelden:\n- *Wie rijdt de meeste koersen?*\n- *Beste kopman voor RVV?*\n- *Beste renners onder 1.000.000?*")
+    st.header("💬 Gemini Vraagbaak")
+    st.markdown("Koppel deze app aan Gemini om complexe vragen over je renners te stellen. Haal een gratis API-sleutel op via [Google AI Studio](https://aistudio.google.com/).")
     
-    for msg in st.session_state.chat_history:
+    api_key = st.text_input("🔑 Gemini API Key:", type="password")
+    
+    for msg in st.session_state.gemini_history:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    if prompt := st.chat_input("Stel je vraag over renners of koersen..."):
-        st.session_state.chat_history.append({"role": "user", "content": prompt})
+    if prompt := st.chat_input("Vraag Gemini iets over de renners..."):
+        st.session_state.gemini_history.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        p_lower = prompt.lower()
-        response = ""
-
-        # Bot logica op basis van zoekwoorden in de eigen data (Geen externe API nodig!)
-        if "meeste koersen" in p_lower or "vaakst" in p_lower:
-            top = df.sort_values(by='Total_Races', ascending=False).head(5)
-            response = "**Deze renners rijden de meeste koersen:**\n" + "\n".join([f"- {r['Renner']} ({r['Total_Races']} koersen, €{int(r['Prijs']):,})" for _, r in top.iterrows()])
-            
-        elif "kopman" in p_lower:
-            found_race = None
-            for r in race_cols:
-                if r.lower() in p_lower:
-                    found_race = r
-                    break
-            if found_race:
-                stat = koers_mapping.get(found_race, 'AVG')
-                top = df[df[found_race] == 1].sort_values(by=[stat, 'AVG'], ascending=False).head(5)
-                response = f"**De top 5 beste kopmannen voor {found_race}** (Gebaseerd op hun **{stat}** statistiek):\n" + "\n".join([f"{i+1}. {row['Renner']} (Stat: {int(row[stat])})" for i, row in top.reset_index().iterrows()])
-            else:
-                response = "Voor welke koers zoek je een kopman? Noem even de afkorting (bijv. 'Wie is de beste kopman voor PR?')."
-                
-        elif "onder" in p_lower and ("miljoen" in p_lower or "1m" in p_lower or "1.000.000" in p_lower or "1000000" in p_lower):
-            top = df[df['Prijs'] <= 1000000].sort_values(by='Scorito_EV', ascending=False).head(5)
-            response = "**Dit zijn statistisch gezien de beste renners van maximaal €1.000.000:**\n" + "\n".join([f"- {r['Renner']} (€{int(r['Prijs']):,}) - Verwachte Waarde: {int(r['Scorito_EV'])}" for _, r in top.iterrows()])
-            
-        elif "onder 750" in p_lower or "goedkoop" in p_lower or "budget" in p_lower:
-            top = df[df['Prijs'] <= 750000].sort_values(by='Scorito_EV', ascending=False).head(5)
-            response = "**Dit zijn de 5 beste budget-picks (max €750.000):**\n" + "\n".join([f"- {r['Renner']} (€{int(r['Prijs']):,}) - Verwachte Waarde: {int(r['Scorito_EV'])}" for _, r in top.iterrows()])
-            
-        elif "duurste" in p_lower:
-            top = df.sort_values(by='Prijs', ascending=False).head(5)
-            response = "**Dit zijn de duurste renners in het spel:**\n" + "\n".join([f"- {r['Renner']} (€{int(r['Prijs']):,})" for _, r in top.iterrows()])
-            
+        if not api_key:
+            response = "Vul eerst je API-sleutel in bovenaan deze pagina."
+            with st.chat_message("assistant"):
+                st.markdown(response)
+            st.session_state.gemini_history.append({"role": "assistant", "content": response})
         else:
-            response = "Ik ben een simpele data-bot gekoppeld aan jouw Scorito dataframe. Ik herken specifieke vragen, zoals:\n- *Wie rijdt de meeste koersen?*\n- *Beste kopman voor LBL?*\n- *Geef me renners onder 1 miljoen.*"
+            try:
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                
+                # Exporteer compacte dataset als context
+                context_cols = ['Renner', 'Prijs', 'Scorito_EV', 'COB', 'HLL', 'SPR', 'AVG'] + race_cols
+                data_context = df[context_cols].to_csv(index=False)
+                
+                full_prompt = f"Je bent een ploegleider assistent voor het Scorito Klassiekerspel. Geef korte, directe antwoorden. Gebruik de volgende data:\n\n{data_context}\n\nVraag van gebruiker: {prompt}"
+                
+                ai_response = model.generate_content(full_prompt)
+                response = ai_response.text
 
-        with st.chat_message("assistant"):
-            st.markdown(response)
-        st.session_state.chat_history.append({"role": "assistant", "content": response})
-        
-        if st.button("Schoon chat op"):
-            st.session_state.chat_history = [{"role": "assistant", "content": "Chat opgeschoond! Wat wil je weten?"}]
-            st.rerun()
+                with st.chat_message("assistant"):
+                    st.markdown(response)
+                st.session_state.gemini_history.append({"role": "assistant", "content": response})
+                
+            except Exception as e:
+                st.error(f"Fout met de Gemini API: {e}")
 
 with tab4:
     st.header("ℹ️ Hoe werkt deze Solver?")
