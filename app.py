@@ -278,16 +278,19 @@ with tab1:
         st.header("🗓️ 2. Startlijst Matrix (Seizoensoverzicht)")
         matrix_df = current_df[['Renner', 'Rol'] + race_cols].set_index('Renner')
         
+        # Bereken de totalen (alleen voor ACTIEVE renners op dat moment)
+        active_matrix = matrix_df.copy()
         if st.session_state.transfer_plan:
             for r in early_races:
-                matrix_df.loc[matrix_df['Rol'] == 'Kopen na PR', r] = 0
+                active_matrix.loc[active_matrix['Rol'] == 'Kopen na PR', r] = 0
             for r in late_races:
-                matrix_df.loc[matrix_df['Rol'] == 'Verkopen na PR', r] = 0
+                active_matrix.loc[active_matrix['Rol'] == 'Verkopen na PR', r] = 0
 
-        totals = matrix_df[race_cols].sum().astype(int).astype(str)
-        totals_row = pd.DataFrame([totals], index=['🏆 TOTAAL AAN DE START'])
+        totals = active_matrix[race_cols].sum().astype(int).astype(str)
+        totals_row = pd.DataFrame([totals], index=['🏆 TOTAAL AAN DE START (Actief)'])
         st.dataframe(totals_row, use_container_width=True)
 
+        # Weergave met ALLE vinkjes van het daadwerkelijke programma
         display_matrix = matrix_df[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
         display_matrix.insert(0, 'Rol', matrix_df['Rol'])
         
@@ -298,7 +301,8 @@ with tab1:
         st.header("🥇 3. Kopman Advies (Actieve renners)")
         kop_res = []
         for c in race_cols:
-            starters = matrix_df[matrix_df[c] == 1]
+            # We gebruiken hier 'active_matrix' zodat verkochte renners geen kopman meer kunnen worden!
+            starters = active_matrix[active_matrix[c] == 1]
             if not starters.empty:
                 stat = koers_mapping.get(c, 'AVG')
                 starters_stats = current_df[current_df['Renner'].isin(starters.index)]
