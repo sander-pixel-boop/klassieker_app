@@ -108,6 +108,8 @@ if "transfer_plan" not in st.session_state:
     st.session_state.transfer_plan = None
 if "last_finetune" not in st.session_state:
     st.session_state.last_finetune = None
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = [{"role": "assistant", "content": "Hoi! Ik ben de Ploegleider AI. Vraag me bijvoorbeeld:\n- *Wie rijdt de meeste koersen?*\n- *Beste kopman voor RVV?*\n- *Beste renners onder 1 miljoen?*"}]
 
 # --- SOLVER MET WISSELS ---
 def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_riders, min_per_race, force_list, exclude_list, early_races, late_races, use_transfers):
@@ -172,7 +174,7 @@ def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_rider
 # --- UI TABS ---
 st.title("🏆 Klassiekers Team")
 
-tab1, tab2, tab3 = st.tabs(["🚀 Team Builder", "📋 Alle Renners", "ℹ️ Uitleg & Credits"])
+tab1, tab2, tab3, tab4 = st.tabs(["🚀 Team Builder", "📋 Alle Renners", "💬 AI Vraagbaak", "ℹ️ Uitleg & Credits"])
 
 with tab1:
     col_settings, col_selection = st.columns([1, 2], gap="large")
@@ -411,7 +413,6 @@ with tab2:
     st.header("📋 Alle Renners & Programma's")
     st.markdown("Zoek door de volledige database van renners, filter op budget of zoek een renner voor een specifiek gat in je programma.")
     
-    # --- LEGENDA KOERSEN ---
     with st.expander("📅 Legenda Koersen (Overzicht)"):
         koersen_info = [
             {"Afkorting": "OHN", "Koers": "Omloop Het Nieuwsblad", "Type": "Kassei (COB)"},
@@ -434,7 +435,6 @@ with tab2:
         ]
         st.dataframe(pd.DataFrame(koersen_info), hide_index=True, use_container_width=True)
     
-    # --- FILTERS VOOR ALLE RENNERS ---
     col_f1, col_f2, col_f3 = st.columns(3)
     
     with col_f1:
@@ -476,8 +476,64 @@ with tab2:
         
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-
 with tab3:
+    st.header("💬 AI Vraagbaak")
+    st.markdown("Stel simpele vragen over de dataset. Voorbeelden:\n- *Wie rijdt de meeste koersen?*\n- *Beste kopman voor RVV?*\n- *Beste renners onder 1.000.000?*")
+    
+    for msg in st.session_state.chat_history:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    if prompt := st.chat_input("Stel je vraag over renners of koersen..."):
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        p_lower = prompt.lower()
+        response = ""
+
+        # Bot logica op basis van zoekwoorden in de eigen data (Geen externe API nodig!)
+        if "meeste koersen" in p_lower or "vaakst" in p_lower:
+            top = df.sort_values(by='Total_Races', ascending=False).head(5)
+            response = "**Deze renners rijden de meeste koersen:**\n" + "\n".join([f"- {r['Renner']} ({r['Total_Races']} koersen, €{int(r['Prijs']):,})" for _, r in top.iterrows()])
+            
+        elif "kopman" in p_lower:
+            found_race = None
+            for r in race_cols:
+                if r.lower() in p_lower:
+                    found_race = r
+                    break
+            if found_race:
+                stat = koers_mapping.get(found_race, 'AVG')
+                top = df[df[found_race] == 1].sort_values(by=[stat, 'AVG'], ascending=False).head(5)
+                response = f"**De top 5 beste kopmannen voor {found_race}** (Gebaseerd op hun **{stat}** statistiek):\n" + "\n".join([f"{i+1}. {row['Renner']} (Stat: {int(row[stat])})" for i, row in top.reset_index().iterrows()])
+            else:
+                response = "Voor welke koers zoek je een kopman? Noem even de afkorting (bijv. 'Wie is de beste kopman voor PR?')."
+                
+        elif "onder" in p_lower and ("miljoen" in p_lower or "1m" in p_lower or "1.000.000" in p_lower or "1000000" in p_lower):
+            top = df[df['Prijs'] <= 1000000].sort_values(by='Scorito_EV', ascending=False).head(5)
+            response = "**Dit zijn statistisch gezien de beste renners van maximaal €1.000.000:**\n" + "\n".join([f"- {r['Renner']} (€{int(r['Prijs']):,}) - Verwachte Waarde: {int(r['Scorito_EV'])}" for _, r in top.iterrows()])
+            
+        elif "onder 750" in p_lower or "goedkoop" in p_lower or "budget" in p_lower:
+            top = df[df['Prijs'] <= 750000].sort_values(by='Scorito_EV', ascending=False).head(5)
+            response = "**Dit zijn de 5 beste budget-picks (max €750.000):**\n" + "\n".join([f"- {r['Renner']} (€{int(r['Prijs']):,}) - Verwachte Waarde: {int(r['Scorito_EV'])}" for _, r in top.iterrows()])
+            
+        elif "duurste" in p_lower:
+            top = df.sort_values(by='Prijs', ascending=False).head(5)
+            response = "**Dit zijn de duurste renners in het spel:**\n" + "\n".join([f"- {r['Renner']} (€{int(r['Prijs']):,})" for _, r in top.iterrows()])
+            
+        else:
+            response = "Ik ben een simpele data-bot gekoppeld aan jouw Scorito dataframe. Ik herken specifieke vragen, zoals:\n- *Wie rijdt de meeste koersen?*\n- *Beste kopman voor LBL?*\n- *Geef me renners onder 1 miljoen.*"
+
+        with st.chat_message("assistant"):
+            st.markdown(response)
+        st.session_state.chat_history.append({"role": "assistant", "content": response})
+        
+        if st.button("Schoon chat op"):
+            st.session_state.chat_history = [{"role": "assistant", "content": "Chat opgeschoond! Wat wil je weten?"}]
+            st.rerun()
+
+with tab4:
     st.header("ℹ️ Hoe werkt deze Solver?")
     st.markdown("""
     Deze applicatie berekent wiskundig het meest optimale Scorito-team voor het Voorjaarsklassiekers-spel.
