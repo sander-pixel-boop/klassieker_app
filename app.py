@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import pulp
 import json
-import google.generativeai as genai
 from thefuzz import process, fuzz
 
 # --- CONFIGURATIE ---
@@ -109,11 +108,9 @@ if "transfer_plan" not in st.session_state:
     st.session_state.transfer_plan = None
 if "last_finetune" not in st.session_state:
     st.session_state.last_finetune = None
-if "gemini_history" not in st.session_state:
-    st.session_state.gemini_history = [{"role": "assistant", "content": "Hoi! Plak je API-sleutel hierboven en vraag me alles over je Scorito-team."}]
 
-# --- SOLVER MET WISSELS ---
-def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_riders, min_per_race, force_list, exclude_list, early_races, late_races, use_transfers):
+# --- SOLVER MET WISSELS EN FORCEREN ---
+def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_riders, min_per_race, force_start, force_in, force_out, force_base, exclude_list, early_races, late_races, use_transfers):
     prob = pulp.LpProblem("Scorito_Solver", pulp.LpMaximize)
     
     if use_transfers:
@@ -124,11 +121,15 @@ def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_rider
         prob += pulp.lpSum([x[i] * dataframe.loc[i, 'Scorito_EV'] + y[i] * dataframe.loc[i, 'EV_early'] + z[i] * dataframe.loc[i, 'EV_late'] for i in dataframe.index])
         
         for i in dataframe.index:
+            renner = dataframe.loc[i, 'Renner']
             prob += x[i] + y[i] + z[i] <= 1
-            if dataframe.loc[i, 'Renner'] in force_list:
-                prob += x[i] + y[i] + z[i] == 1
-            if dataframe.loc[i, 'Renner'] in exclude_list:
-                prob += x[i] + y[i] + z[i] == 0
+            
+            # Nieuwe specifieke forceer-opties
+            if renner in force_start: prob += x[i] + y[i] == 1
+            if renner in force_in: prob += z[i] == 1
+            if renner in force_out: prob += y[i] == 1
+            if renner in force_base: prob += x[i] == 1
+            if renner in exclude_list: prob += x[i] + y[i] + z[i] == 0
 
         prob += pulp.lpSum([x[i] for i in dataframe.index]) == max_riders - 3
         prob += pulp.lpSum([y[i] for i in dataframe.index]) == 3
@@ -162,8 +163,9 @@ def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_rider
             prob += pulp.lpSum([dataframe.loc[i, koers] * rider_vars[i] for i in dataframe.index]) >= min_per_race
         
         for i in dataframe.index:
-            if dataframe.loc[i, 'Renner'] in force_list: prob += rider_vars[i] == 1
-            if dataframe.loc[i, 'Renner'] in exclude_list: prob += rider_vars[i] == 0
+            renner = dataframe.loc[i, 'Renner']
+            if renner in force_start: prob += rider_vars[i] == 1
+            if renner in exclude_list: prob += rider_vars[i] == 0
         
         prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=15))
         if pulp.LpStatus[prob.status] == 'Optimal':
@@ -175,7 +177,7 @@ def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_rider
 # --- UI TABS ---
 st.title("🏆 Klassiekers Team")
 
-tab1, tab2, tab3, tab4 = st.tabs(["🚀 Team Builder", "📋 Alle Renners", "💬 Gemini Vraagbaak", "ℹ️ Uitleg & Credits"])
+tab1, tab2, tab3 = st.tabs(["🚀 Team Builder", "📋 Alle Renners", "ℹ️ Uitleg & Credits"])
 
 with tab1:
     col_settings, col_selection = st.columns([1, 2], gap="large")
@@ -189,18 +191,31 @@ with tab1:
         min_per_koers = st.slider("Min. renners per koers", 0, 15, 3)
         
         st.divider()
-        force_list = st.multiselect("🔒 Forceer:", options=df['Renner'].tolist())
-        exclude_list = st.multiselect("❌ Sluit uit:", options=[r for r in df['Renner'].tolist() if r not in force_list])
+        st.write("**Renners Forceren / Uitsluiten**")
+        
+        force_start = st.multiselect("🔒 Forceer in Start-Team (voor PR):", options=df['Renner'].tolist())
+        
+        if use_transfers:
+            force_out = st.multiselect("❌ Forceer UIT (Verkopen na PR):", options=[r for r in df['Renner'].tolist() if r not in force_start])
+            force_in = st.multiselect("📥 Forceer IN (Kopen na PR):", options=[r for r in df['Renner'].tolist() if r not in force_start and r not in force_out])
+        else:
+            force_out = []
+            force_in = []
+
+        exclude_list = st.multiselect("🚫 Sluit uit (Gehele spel):", options=[r for r in df['Renner'].tolist() if r not in force_start + force_out + force_in])
 
         if st.button("🚀 Bereken Optimaal Team", type="primary", use_container_width=True):
             st.session_state.last_finetune = None
-            res, transfer_plan = solve_knapsack_with_transfers(df, max_bud, min_bud, max_ren, min_per_koers, force_list, exclude_list, early_races, late_races, use_transfers)
+            res, transfer_plan = solve_knapsack_with_transfers(
+                df, max_bud, min_bud, max_ren, min_per_koers, 
+                force_start, force_in, force_out, [], exclude_list, early_races, late_races, use_transfers
+            )
             if res:
                 st.session_state.selected_riders = res
                 st.session_state.transfer_plan = transfer_plan
                 st.rerun()
             else:
-                st.error("Geen oplossing mogelijk. Probeer de eisen te versoepelen.")
+                st.error("Geen oplossing mogelijk. Je hebt waarschijnlijk te veel dure renners geforceerd, of instellingen tegengesteld aan elkaar gemaakt.")
                 
         # --- OPSLAAN / LADEN BLOK ---
         st.divider()
@@ -317,14 +332,22 @@ with tab1:
                     st.warning("Kies eerst een renner.")
                 else:
                     old_team = set(all_display_riders)
-                    
                     to_keep = [r for r in all_display_riders if r not in to_replace]
-                    new_force = list(set(force_list + to_keep))
+                    
+                    # Forceer overgebleven renners in EXACT dezelfde rol
+                    to_keep_start = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] in ['Basis', 'Verkopen na PR']]
+                    to_keep_in = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Kopen na PR']
+                    to_keep_out = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Verkopen na PR']
+                    to_keep_base = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Basis']
+                    
+                    new_force_start = list(set(force_start + to_keep_start))
+                    new_force_in = list(set(force_in + to_keep_in))
+                    new_force_out = list(set(force_out + to_keep_out))
                     new_exclude = list(set(exclude_list + to_replace))
                     
                     new_res, new_plan = solve_knapsack_with_transfers(
                         df, max_bud, min_bud, max_ren, min_per_koers, 
-                        new_force, new_exclude, early_races, late_races, use_transfers
+                        new_force_start, new_force_in, new_force_out, to_keep_base, new_exclude, early_races, late_races, use_transfers
                     )
                     
                     if new_res:
@@ -478,46 +501,6 @@ with tab2:
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 with tab3:
-    st.header("💬 Gemini Vraagbaak")
-    st.markdown("Koppel deze app aan Gemini om complexe vragen over je renners te stellen. Haal een gratis API-sleutel op via [Google AI Studio](https://aistudio.google.com/).")
-    
-    api_key = st.text_input("🔑 Gemini API Key:", type="password")
-    
-    for msg in st.session_state.gemini_history:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-    if prompt := st.chat_input("Vraag Gemini iets over de renners..."):
-        st.session_state.gemini_history.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        if not api_key:
-            response = "Vul eerst je API-sleutel in bovenaan deze pagina."
-            with st.chat_message("assistant"):
-                st.markdown(response)
-            st.session_state.gemini_history.append({"role": "assistant", "content": response})
-        else:
-            try:
-                genai.configure(api_key=api_key)
-                model = genai.GenerativeModel('gemini-pro')
-                
-                context_cols = ['Renner', 'Prijs', 'Scorito_EV', 'COB', 'HLL', 'SPR', 'AVG'] + race_cols
-                data_context = df[context_cols].to_csv(index=False)
-                
-                full_prompt = f"Je bent een ploegleider assistent voor het Scorito Klassiekerspel. Geef korte, directe antwoorden. Gebruik de volgende data:\n\n{data_context}\n\nVraag van gebruiker: {prompt}"
-                
-                ai_response = model.generate_content(full_prompt)
-                response = ai_response.text
-
-                with st.chat_message("assistant"):
-                    st.markdown(response)
-                st.session_state.gemini_history.append({"role": "assistant", "content": response})
-                
-            except Exception as e:
-                st.error(f"Fout met de Gemini API: {e}")
-
-with tab4:
     st.header("ℹ️ Hoe werkt deze Solver?")
     st.markdown("""
     Deze applicatie berekent wiskundig het meest optimale Scorito-team voor het Voorjaarsklassiekers-spel.
