@@ -192,7 +192,6 @@ with tab1:
         # --- OPSLAAN / LADEN BLOK ---
         st.divider()
         with st.expander("💾 Team Opslaan / Inladen"):
-            # Opslaan
             if st.session_state.selected_riders:
                 save_data = {
                     "selected_riders": st.session_state.selected_riders,
@@ -207,7 +206,6 @@ with tab1:
                     use_container_width=True
                 )
             
-            # Inladen
             uploaded_file = st.file_uploader("📂 Upload een bewaard team (.json)", type="json")
             if uploaded_file is not None:
                 if st.button("Laad Team in", use_container_width=True):
@@ -267,6 +265,39 @@ with tab1:
         else:
             m3.metric("Team EV", f"{start_team_df['Scorito_EV'].sum():.0f}")
 
+        # --- FINETUNER BLOK ---
+        st.divider()
+        st.header("🔄 2. Team Finetunen")
+        st.markdown("Is de AI met een renner gekomen die je er eigenlijk niet in wil hebben? Kies hem hieronder en laat de AI direct de beste vervanger zoeken binnen je restbudget.")
+        
+        c_fine1, c_fine2 = st.columns([3, 1], gap="small")
+        with c_fine1:
+            to_replace = st.multiselect("Gooi deze renner(s) eruit:", options=all_display_riders)
+        with c_fine2:
+            st.write("") # uitlijning met de multiselect
+            st.write("")
+            if st.button("Zoek vervanger(s)", use_container_width=True):
+                if not to_replace:
+                    st.warning("Kies eerst een renner.")
+                else:
+                    # Bevries alle overige renners
+                    to_keep = [r for r in all_display_riders if r not in to_replace]
+                    
+                    new_force = list(set(force_list + to_keep))
+                    new_exclude = list(set(exclude_list + to_replace))
+                    
+                    new_res, new_plan = solve_knapsack_with_transfers(
+                        df, max_bud, min_bud, max_ren, min_per_koers, 
+                        new_force, new_exclude, early_races, late_races, use_transfers
+                    )
+                    
+                    if new_res:
+                        st.session_state.selected_riders = new_res
+                        st.session_state.transfer_plan = new_plan
+                        st.rerun()
+                    else:
+                        st.error("Geen mogelijke vervanger gevonden! Check of je Minimum Budget instelling niet te hoog staat in de linkerbalk.")
+
         def color_rows(row):
             if row['Rol'] == 'Verkopen na PR':
                 return ['background-color: rgba(255, 99, 71, 0.2)'] * len(row)
@@ -274,11 +305,10 @@ with tab1:
                 return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
             return [''] * len(row)
 
-        # 1. MATRIX
-        st.header("🗓️ 2. Startlijst Matrix (Seizoensoverzicht)")
+        # 3. MATRIX
+        st.header("🗓️ 3. Startlijst Matrix (Seizoensoverzicht)")
         matrix_df = current_df[['Renner', 'Rol'] + race_cols].set_index('Renner')
         
-        # Bereken de totalen (alleen voor ACTIEVE renners op dat moment)
         active_matrix = matrix_df.copy()
         if st.session_state.transfer_plan:
             for r in early_races:
@@ -290,18 +320,16 @@ with tab1:
         totals_row = pd.DataFrame([totals], index=['🏆 TOTAAL AAN DE START (Actief)'])
         st.dataframe(totals_row, use_container_width=True)
 
-        # Weergave met ALLE vinkjes van het daadwerkelijke programma
         display_matrix = matrix_df[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
         display_matrix.insert(0, 'Rol', matrix_df['Rol'])
         
         styled_matrix = display_matrix.style.apply(color_rows, axis=1)
         st.dataframe(styled_matrix, use_container_width=True)
 
-        # 2. KOPMAN
-        st.header("🥇 3. Kopman Advies (Actieve renners)")
+        # 4. KOPMAN
+        st.header("🥇 4. Kopman Advies (Actieve renners)")
         kop_res = []
         for c in race_cols:
-            # We gebruiken hier 'active_matrix' zodat verkochte renners geen kopman meer kunnen worden!
             starters = active_matrix[active_matrix[c] == 1]
             if not starters.empty:
                 stat = koers_mapping.get(c, 'AVG')
@@ -310,8 +338,8 @@ with tab1:
                 kop_res.append({"Koers": c, "K1": top[0] if len(top)>0 else "-", "K2": top[1] if len(top)>1 else "-", "K3": top[2] if len(top)>2 else "-"})
         st.dataframe(pd.DataFrame(kop_res), hide_index=True, use_container_width=True)
 
-        # 3. STATS
-        st.header("📊 4. Team Statistieken")
+        # 5. STATS
+        st.header("📊 5. Team Statistieken")
         stats_overzicht = current_df[['Renner', 'Rol', 'COB', 'HLL', 'SPR', 'AVG', 'Prijs', 'EV_early', 'EV_late', 'Scorito_EV']]
         styled_stats = stats_overzicht.sort_values(by=['Rol', 'Scorito_EV'], ascending=[True, False]).style.apply(color_rows, axis=1)
         st.dataframe(styled_stats, hide_index=True, use_container_width=True)
