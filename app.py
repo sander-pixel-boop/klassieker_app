@@ -27,7 +27,8 @@ def load_and_merge_data():
         manual_overrides = {
             "Poel": "Mathieu van der Poel", "Aert": "Wout van Aert", "Lie": "Arnaud De Lie",
             "Gils": "Maxim Van Gils", "Berg": "Marijn van den Berg", "Broek": "Frank van den Broek",
-            "Magnier": "Paul Magnier"
+            "Magnier": "Paul Magnier", "Pogacar": "Tadej Pogačar", "Skujins": "Toms Skujiņš",
+            "Kooij": "Olav Kooij"
         }
         
         for short in short_names:
@@ -41,7 +42,11 @@ def load_and_merge_data():
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 1500000), 'Renner_Full'] = 'Florian Vermeersch'
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 750000), 'Renner_Full'] = 'Gianni Vermeersch'
         
-        merged_df = pd.merge(df_prog, df_stats, left_on='Renner_Full', right_on='Renner', how='inner')
+        merged_df = pd.merge(df_prog, df_stats, left_on='Renner_Full', right_on='Renner', how='left')
+        
+        if 'Renner_x' in merged_df.columns:
+            merged_df = merged_df.drop(columns=['Renner_x', 'Renner_y'], errors='ignore')
+            
         merged_df = merged_df.rename(columns={'Renner_Full': 'Renner'}).drop_duplicates(subset=['Renner', 'Prijs'])
         
         counts = {}
@@ -63,6 +68,8 @@ def load_and_merge_data():
         available_races = available_early + available_late
         
         for col in available_races + ['COB', 'HLL', 'SPR', 'AVG', 'Prijs']:
+            if col not in merged_df.columns:
+                merged_df[col] = 0
             merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0)
         
         merged_df['Total_Races'] = merged_df[available_races].sum(axis=1).astype(int)
@@ -274,15 +281,13 @@ with tab1:
         with c_fine1:
             to_replace = st.multiselect("Gooi deze renner(s) eruit:", options=all_display_riders)
         with c_fine2:
-            st.write("") # uitlijning met de multiselect
+            st.write("") # uitlijning
             st.write("")
             if st.button("Zoek vervanger(s)", use_container_width=True):
                 if not to_replace:
                     st.warning("Kies eerst een renner.")
                 else:
-                    # Bevries alle overige renners
                     to_keep = [r for r in all_display_riders if r not in to_replace]
-                    
                     new_force = list(set(force_list + to_keep))
                     new_exclude = list(set(exclude_list + to_replace))
                     
@@ -296,7 +301,7 @@ with tab1:
                         st.session_state.transfer_plan = new_plan
                         st.rerun()
                     else:
-                        st.error("Geen mogelijke vervanger gevonden! Check of je Minimum Budget instelling niet te hoog staat in de linkerbalk.")
+                        st.error("Geen mogelijke vervanger gevonden! Check of je Minimum Budget niet te hoog staat in de linkerbalk.")
 
         def color_rows(row):
             if row['Rol'] == 'Verkopen na PR':
@@ -352,7 +357,7 @@ with tab2:
     1. **Data:** De app matcht de startlijsten, renner-statistieken (zoals sprint-, kassei- en heuvelkwaliteiten) en de Scorito-prijzen.
     2. **Expected Value (EV):** Elke renner krijgt een berekende 'Expected Value' per koers, afhankelijk van het type parcours en zijn specifieke stats.
     3. **Optimalisatie:** Met behulp van een zogeheten *Knapsack Algorithm* berekent de AI exact welke 20 renners binnen jouw budget de hoogst mogelijke EV opleveren. 
-    4. **Wisselstrategie:** Als je de wissel-optie aanzet, verdeelt het algoritme de EV over de periode *tot* Parijs-Roubaix en *vanaf* de Brabantse Pijl, om zo de ultieme 3 in- en uitgaande transfers te berekenen.
+    4. **Wisselstrategie:** Als je de wissel-optie aanzet, verdeelt het algoritme de EV over de periode *tot* Parijs-Roubaix en *vanaf* de Brabantse Pijl, om zo de ultieme 3 in- en uitgaande transfers te bereken.
     
     *Je kunt zelf renners uitsluiten of juist forceren om het model richting jouw persoonlijke voorkeur te sturen.*
     """)
