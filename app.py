@@ -10,27 +10,20 @@ st.set_page_config(page_title="Scorito Klassiekers Solver 2026", layout="wide", 
 @st.cache_data
 def load_and_merge_data():
     try:
-        # 1. Startlijsten inladen
         df_prog = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', on_bad_lines='skip')
         df_prog.loc[df_prog['Prijs'] == 800000, 'Prijs'] = 750000
         
-        # 2. Stats inladen
         df_stats = pd.read_csv("renners_stats.csv", sep='\t') 
         if 'Naam' in df_stats.columns:
             df_stats = df_stats.rename(columns={'Naam': 'Renner'})
         
-        # 3. Fuzzy Matching voor namen
         short_names = df_prog['Renner'].unique()
         full_names = df_stats['Renner'].unique()
         name_mapping = {}
         
         manual_overrides = {
-            "Poel": "Mathieu van der Poel",
-            "Aert": "Wout van Aert",
-            "Lie": "Arnaud De Lie",
-            "Gils": "Maxim Van Gils",
-            "Berg": "Marijn van den Berg",
-            "Broek": "Frank van den Broek"
+            "Poel": "Mathieu van der Poel", "Aert": "Wout van Aert", "Lie": "Arnaud De Lie",
+            "Gils": "Maxim Van Gils", "Berg": "Marijn van den Berg", "Broek": "Frank van den Broek"
         }
         
         for short in short_names:
@@ -41,26 +34,17 @@ def load_and_merge_data():
                 name_mapping[short] = match_res[0] if match_res else short
 
         df_prog['Renner_Full'] = df_prog['Renner'].map(name_mapping)
-        
-        # Correcties voor specifieke dubbele namen
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 1500000), 'Renner_Full'] = 'Florian Vermeersch'
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 750000), 'Renner_Full'] = 'Gianni Vermeersch'
         df_prog.loc[(df_prog['Renner'] == 'Pedersen') & (df_prog['Prijs'] == 4500000), 'Renner_Full'] = 'Mads Pedersen'
 
-        # 4. Samenvoegen
         merged_df = pd.merge(df_prog, df_stats, left_on='Renner_Full', right_on='Renner', how='inner')
-        if 'Renner_x' in merged_df.columns:
-            merged_df = merged_df.drop(columns=['Renner_x', 'Renner_y'])
-        merged_df = merged_df.rename(columns={'Renner_Full': 'Renner'})
-        merged_df = merged_df.drop_duplicates(subset=['Renner', 'Prijs'])
+        merged_df = merged_df.rename(columns={'Renner_Full': 'Renner'}).drop_duplicates(subset=['Renner', 'Prijs'])
         
-        # 5. Numerieke kolommen opschonen
         race_cols = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'BDP', 'E3', 'GW', 'DDV', 'RVV', 'SP', 'PR', 'BP', 'AGR', 'WP', 'LBL']
         stat_cols = ['COB', 'HLL', 'SPR', 'AVG']
-        
         available_races = [k for k in race_cols if k in merged_df.columns]
         
-        # Forceer numeriek en vul NaN met 0
         for col in available_races + stat_cols + ['Prijs']:
             merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0)
         
@@ -73,28 +57,19 @@ def load_and_merge_data():
             'WP': 'HLL', 'LBL': 'HLL'
         }
 
-        # 6. EV Berekening
         merged_df['Scorito_EV'] = 0.0
         for koers in available_races:
             stat_nodig = koers_stat_map.get(koers, 'AVG')
-            # De berekening
             merged_df['Scorito_EV'] += merged_df[koers] * ((merged_df[stat_nodig] / 100)**4 * 100)
 
-        # Rond EV pas af na alle berekeningen en verwijder eventuele rest-NaNs
         merged_df['Scorito_EV'] = merged_df['Scorito_EV'].fillna(0).round(0).astype(int)
-        
         return merged_df, available_races, koers_stat_map
     except Exception as e:
-        st.error(f"Fout tijdens inladen: {e}")
+        st.error(f"Fout: {e}")
         return pd.DataFrame(), [], {}
 
 # --- INITIALISATIE ---
 df, race_cols, koers_mapping = load_and_merge_data()
-
-if df.empty:
-    st.warning("⚠️ Geen bruikbare data gevonden. Controleer de bestanden op GitHub.")
-    st.stop()
-
 if "selected_riders" not in st.session_state:
     st.session_state.selected_riders = []
 
@@ -103,10 +78,7 @@ def solve_knapsack(dataframe, total_budget, min_budget, max_riders, min_per_race
     prob = pulp.LpProblem("Scorito_Solver", pulp.LpMaximize)
     rider_vars = pulp.LpVariable.dicts("Riders", dataframe.index, cat='Binary')
     
-    # Doelstelling
     prob += pulp.lpSum([dataframe.loc[i, 'Scorito_EV'] * rider_vars[i] for i in dataframe.index])
-    
-    # Restricties
     prob += pulp.lpSum([rider_vars[i] for i in dataframe.index]) == max_riders
     prob += pulp.lpSum([dataframe.loc[i, 'Prijs'] * rider_vars[i] for i in dataframe.index]) <= total_budget
     prob += pulp.lpSum([dataframe.loc[i, 'Prijs'] * rider_vars[i] for i in dataframe.index]) >= min_budget
@@ -118,8 +90,9 @@ def solve_knapsack(dataframe, total_budget, min_budget, max_riders, min_per_race
         if dataframe.loc[i, 'Renner'] in force_list: prob += rider_vars[i] == 1
         if dataframe.loc[i, 'Renner'] in exclude_list: prob += rider_vars[i] == 0
     
-    prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=20))
+    prob.solve(pulp.PULP_CBC_CMD(msg=0))
     if pulp.LpStatus[prob.status] == 'Optimal':
+        # Harde filter op geselecteerde variabelen en limiet op aantal
         selected = [dataframe.loc[i, 'Renner'] for i in dataframe.index if rider_vars[i].varValue > 0.5]
         return selected[:max_riders]
     return None
@@ -143,8 +116,6 @@ with col_settings:
         if res:
             st.session_state.selected_riders = res
             st.rerun()
-        else:
-            st.error("Geen oplossing gevonden binnen deze budget- en startlijstrestricties.")
 
 with col_selection:
     st.header("1. Jouw Team")
@@ -160,7 +131,6 @@ if st.session_state.selected_riders:
     m2.metric("Renners", f"{len(current_df)} / {max_ren}")
     m3.metric("Team EV", f"{current_df['Scorito_EV'].sum():.0f}")
 
-    # 2. FINETUNER
     st.header("🔄 2. Finetuner")
     edit_df = current_df[['Renner', 'Prijs', 'Scorito_EV']].copy()
     edit_df.insert(0, 'Vervang', False)
@@ -169,17 +139,16 @@ if st.session_state.selected_riders:
     if st.button("🔄 Vervang geselecteerde renners"):
         to_keep = edited[edited['Vervang'] == False]['Renner'].tolist()
         to_replace = edited[edited['Vervang'] == True]['Renner'].tolist()
+        # FIX: Gebruik hier ook de min_bud restrictie om te voorkomen dat de solver teveel goedkope renners pakt
         new_team = solve_knapsack(df, max_bud, min_bud, max_ren, min_per_koers, list(set(force_list + to_keep)), list(set(exclude_list + to_replace)), race_cols)
         if new_team:
             st.session_state.selected_riders = new_team
             st.rerun()
 
-    # 3. MATRIX
     st.header("🗓️ 3. Startlijst Matrix")
     matrix = current_df[['Renner'] + race_cols].set_index('Renner')
     st.dataframe(matrix.applymap(lambda x: '✅' if x == 1 else '-'), use_container_width=True)
 
-    # 4. KOPMAN
     st.header("🥇 4. Kopman Advies")
     kop_res = []
     for c in race_cols:
@@ -190,6 +159,5 @@ if st.session_state.selected_riders:
             kop_res.append({"Koers": c, "K1": top[0] if len(top)>0 else "-", "K2": top[1] if len(top)>1 else "-", "K3": top[2] if len(top)>2 else "-"})
     st.dataframe(pd.DataFrame(kop_res), hide_index=True, use_container_width=True)
 
-    # 5. STATS
     st.header("📊 5. Team Statistieken")
     st.dataframe(current_df[['Renner', 'COB', 'HLL', 'SPR', 'AVG', 'Total_Races', 'Prijs', 'Scorito_EV']].sort_values(by='Scorito_EV', ascending=False), hide_index=True, use_container_width=True)
