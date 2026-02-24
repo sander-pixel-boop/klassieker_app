@@ -1,6 +1,5 @@
 streamlit
 pandas
 pulp
-requests
-beautifulsoup4
 thefuzz
+google-generativeai
