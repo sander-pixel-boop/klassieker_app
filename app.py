@@ -159,120 +159,147 @@ def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_rider
             
     return None, None
 
-# --- UI ---
+# --- UI TABS ---
 st.title("🏆 Scorito Klassiekers 2026 AI Solver")
-col_settings, col_selection = st.columns([1, 2], gap="large")
 
-with col_settings:
-    st.header("⚙️ Instellingen")
-    use_transfers = st.checkbox("🔁 Bereken met 3 wissels na Parijs-Roubaix", value=True)
-    max_ren = st.number_input("Totaal aantal renners (Start)", value=20)
-    max_bud = st.number_input("Max Budget", value=45000000, step=500000)
-    min_bud = st.number_input("Min Budget", value=43000000, step=500000)
-    min_per_koers = st.slider("Min. renners per koers", 0, 15, 3)
-    
-    st.divider()
-    force_list = st.multiselect("🔒 Forceer:", options=df['Renner'].tolist())
-    exclude_list = st.multiselect("❌ Sluit uit:", options=[r for r in df['Renner'].tolist() if r not in force_list])
+tab1, tab2 = st.tabs(["🚀 Team Builder", "ℹ️ Uitleg & Credits"])
 
-    if st.button("🚀 Bereken Optimaal Team", type="primary", use_container_width=True):
-        res, transfer_plan = solve_knapsack_with_transfers(df, max_bud, min_bud, max_ren, min_per_koers, force_list, exclude_list, early_races, late_races, use_transfers)
-        if res:
-            st.session_state.selected_riders = res
-            st.session_state.transfer_plan = transfer_plan
-            st.rerun()
-        else:
-            st.error("Geen oplossing mogelijk. Probeer de eisen te versoepelen.")
+with tab1:
+    col_settings, col_selection = st.columns([1, 2], gap="large")
 
-with col_selection:
-    st.header("1. Jouw Start-Team (voor de wissels)")
-    st.session_state.selected_riders = st.multiselect(
-        "Selectie:", 
-        options=df['Renner'].tolist(), 
-        default=st.session_state.selected_riders
-    )
-    
-    if st.session_state.transfer_plan:
-        st.success("✅ **Wissel-Strategie na Parijs-Roubaix:**")
-        c_uit, c_in = st.columns(2)
-        with c_uit:
-            st.error(f"❌ **Verkopen (3):**\n" + "\n".join([f"- {r}" for r in st.session_state.transfer_plan['uit']]))
-        with c_in:
-            st.info(f"📥 **Inkopen (3):**\n" + "\n".join([f"- {r}" for r in st.session_state.transfer_plan['in']]))
-
-# --- RESULTATEN ---
-if st.session_state.selected_riders:
-    if st.session_state.transfer_plan:
-        all_display_riders = st.session_state.selected_riders + st.session_state.transfer_plan['in']
-    else:
-        all_display_riders = st.session_state.selected_riders
-
-    current_df = df[df['Renner'].isin(all_display_riders)].copy()
-    
-    def bepaal_rol(naam):
-        if st.session_state.transfer_plan:
-            if naam in st.session_state.transfer_plan['uit']: return 'Verkopen na PR'
-            if naam in st.session_state.transfer_plan['in']: return 'Kopen na PR'
-        return 'Basis'
+    with col_settings:
+        st.header("⚙️ Instellingen")
+        use_transfers = st.checkbox("🔁 Bereken met 3 wissels na Parijs-Roubaix", value=True)
+        max_ren = st.number_input("Totaal aantal renners (Start)", value=20)
+        max_bud = st.number_input("Max Budget", value=45000000, step=500000)
+        min_bud = st.number_input("Min Budget", value=43000000, step=500000)
+        min_per_koers = st.slider("Min. renners per koers", 0, 15, 3)
         
-    current_df['Rol'] = current_df['Renner'].apply(bepaal_rol)
+        st.divider()
+        force_list = st.multiselect("🔒 Forceer:", options=df['Renner'].tolist())
+        exclude_list = st.multiselect("❌ Sluit uit:", options=[r for r in df['Renner'].tolist() if r not in force_list])
 
-    start_team_df = current_df[current_df['Rol'] != 'Kopen na PR']
+        if st.button("🚀 Bereken Optimaal Team", type="primary", use_container_width=True):
+            res, transfer_plan = solve_knapsack_with_transfers(df, max_bud, min_bud, max_ren, min_per_koers, force_list, exclude_list, early_races, late_races, use_transfers)
+            if res:
+                st.session_state.selected_riders = res
+                st.session_state.transfer_plan = transfer_plan
+                st.rerun()
+            else:
+                st.error("Geen oplossing mogelijk. Probeer de eisen te versoepelen.")
+
+    with col_selection:
+        st.header("1. Jouw Start-Team (voor de wissels)")
+        st.session_state.selected_riders = st.multiselect(
+            "Selectie:", 
+            options=df['Renner'].tolist(), 
+            default=st.session_state.selected_riders
+        )
+        
+        if st.session_state.transfer_plan:
+            st.success("✅ **Wissel-Strategie na Parijs-Roubaix:**")
+            c_uit, c_in = st.columns(2)
+            with c_uit:
+                st.error(f"❌ **Verkopen (3):**\n" + "\n".join([f"- {r}" for r in st.session_state.transfer_plan['uit']]))
+            with c_in:
+                st.info(f"📥 **Inkopen (3):**\n" + "\n".join([f"- {r}" for r in st.session_state.transfer_plan['in']]))
+
+    # --- RESULTATEN ---
+    if st.session_state.selected_riders:
+        if st.session_state.transfer_plan:
+            all_display_riders = st.session_state.selected_riders + st.session_state.transfer_plan['in']
+        else:
+            all_display_riders = st.session_state.selected_riders
+
+        current_df = df[df['Renner'].isin(all_display_riders)].copy()
+        
+        def bepaal_rol(naam):
+            if st.session_state.transfer_plan:
+                if naam in st.session_state.transfer_plan['uit']: return 'Verkopen na PR'
+                if naam in st.session_state.transfer_plan['in']: return 'Kopen na PR'
+            return 'Basis'
+            
+        current_df['Rol'] = current_df['Renner'].apply(bepaal_rol)
+
+        start_team_df = current_df[current_df['Rol'] != 'Kopen na PR']
+        
+        st.divider()
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Budget over (Start)", f"€ {max_bud - start_team_df['Prijs'].sum():,.0f}")
+        m2.metric("Renners (Start)", f"{len(start_team_df)} / {max_ren}")
+        
+        if st.session_state.transfer_plan:
+            ev_start = start_team_df['EV_early'].sum()
+            in_riders_ev = current_df[current_df['Rol'] == 'Kopen na PR']['EV_late'].sum()
+            base_riders_late_ev = current_df[current_df['Rol'] == 'Basis']['EV_late'].sum()
+            m3.metric("Team EV (Incl. wissels)", f"{ev_start + base_riders_late_ev + in_riders_ev:.0f}")
+        else:
+            m3.metric("Team EV", f"{start_team_df['Scorito_EV'].sum():.0f}")
+
+        def color_rows(row):
+            if row['Rol'] == 'Verkopen na PR':
+                return ['background-color: rgba(255, 99, 71, 0.2)'] * len(row)
+            elif row['Rol'] == 'Kopen na PR':
+                return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
+            return [''] * len(row)
+
+        # 1. MATRIX
+        st.header("🗓️ 2. Startlijst Matrix (Seizoensoverzicht)")
+        matrix_df = current_df[['Renner', 'Rol'] + race_cols].set_index('Renner')
+        
+        if st.session_state.transfer_plan:
+            for r in early_races:
+                matrix_df.loc[matrix_df['Rol'] == 'Kopen na PR', r] = 0
+            for r in late_races:
+                matrix_df.loc[matrix_df['Rol'] == 'Verkopen na PR', r] = 0
+
+        totals = matrix_df[race_cols].sum().astype(int).astype(str)
+        totals_row = pd.DataFrame([totals], index=['🏆 TOTAAL AAN DE START'])
+        st.dataframe(totals_row, use_container_width=True)
+
+        display_matrix = matrix_df[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
+        display_matrix.insert(0, 'Rol', matrix_df['Rol'])
+        
+        styled_matrix = display_matrix.style.apply(color_rows, axis=1)
+        st.dataframe(styled_matrix, use_container_width=True)
+
+        # 2. KOPMAN
+        st.header("🥇 3. Kopman Advies (Actieve renners)")
+        kop_res = []
+        for c in race_cols:
+            starters = matrix_df[matrix_df[c] == 1]
+            if not starters.empty:
+                stat = koers_mapping.get(c, 'AVG')
+                starters_stats = current_df[current_df['Renner'].isin(starters.index)]
+                top = starters_stats.sort_values(by=[stat, 'AVG'], ascending=False)['Renner'].tolist()
+                kop_res.append({"Koers": c, "K1": top[0] if len(top)>0 else "-", "K2": top[1] if len(top)>1 else "-", "K3": top[2] if len(top)>2 else "-"})
+        st.dataframe(pd.DataFrame(kop_res), hide_index=True, use_container_width=True)
+
+        # 3. STATS
+        st.header("📊 4. Team Statistieken")
+        stats_overzicht = current_df[['Renner', 'Rol', 'COB', 'HLL', 'SPR', 'AVG', 'Prijs', 'EV_early', 'EV_late', 'Scorito_EV']]
+        styled_stats = stats_overzicht.sort_values(by=['Rol', 'Scorito_EV'], ascending=[True, False]).style.apply(color_rows, axis=1)
+        st.dataframe(styled_stats, hide_index=True, use_container_width=True)
+
+with tab2:
+    st.header("ℹ️ Hoe werkt deze Solver?")
+    st.markdown("""
+    Deze applicatie berekent wiskundig het meest optimale Scorito-team voor het Voorjaarsklassiekers-spel.
+    
+    1. **Data:** De app matcht de startlijsten, renner-statistieken (zoals sprint-, kassei- en heuvelkwaliteiten) en de Scorito-prijzen.
+    2. **Expected Value (EV):** Elke renner krijgt een berekende 'Expected Value' per koers, afhankelijk van het type parcours en zijn specifieke stats.
+    3. **Optimalisatie:** Met behulp van een zogeheten *Knapsack Algorithm* berekent de AI exact welke 20 renners binnen jouw budget de hoogst mogelijke EV opleveren. 
+    4. **Wisselstrategie:** Als je de wissel-optie aanzet, verdeelt het algoritme de EV over de periode *tot* Parijs-Roubaix en *vanaf* de Brabantse Pijl, om zo de ultieme 3 in- en uitgaande transfers te berekenen.
+    
+    *Je kunt zelf renners uitsluiten of juist forceren om het model richting jouw persoonlijke voorkeur te sturen.*
+    """)
     
     st.divider()
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Budget over (Start)", f"€ {max_bud - start_team_df['Prijs'].sum():,.0f}")
-    m2.metric("Renners (Start)", f"{len(start_team_df)} / {max_ren}")
     
-    if st.session_state.transfer_plan:
-        ev_start = start_team_df['EV_early'].sum()
-        in_riders_ev = current_df[current_df['Rol'] == 'Kopen na PR']['EV_late'].sum()
-        base_riders_late_ev = current_df[current_df['Rol'] == 'Basis']['EV_late'].sum()
-        m3.metric("Team EV (Incl. wissels)", f"{ev_start + base_riders_late_ev + in_riders_ev:.0f}")
-    else:
-        m3.metric("Team EV", f"{start_team_df['Scorito_EV'].sum():.0f}")
-
-    def color_rows(row):
-        if row['Rol'] == 'Verkopen na PR':
-            return ['background-color: rgba(255, 99, 71, 0.2)'] * len(row)
-        elif row['Rol'] == 'Kopen na PR':
-            return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
-        return [''] * len(row)
-
-    # 1. MATRIX
-    st.header("🗓️ 2. Startlijst Matrix (Seizoensoverzicht)")
-    matrix_df = current_df[['Renner', 'Rol'] + race_cols].set_index('Renner')
+    st.header("🙏 Shout-outs & Credits")
+    st.markdown("""
+    Zonder de data uit de community was deze tool niet mogelijk geweest. Veel dank aan:
     
-    if st.session_state.transfer_plan:
-        for r in early_races:
-            matrix_df.loc[matrix_df['Rol'] == 'Kopen na PR', r] = 0
-        for r in late_races:
-            matrix_df.loc[matrix_df['Rol'] == 'Verkopen na PR', r] = 0
-
-    totals = matrix_df[race_cols].sum().astype(int).astype(str)
-    totals_row = pd.DataFrame([totals], index=['🏆 TOTAAL AAN DE START'])
-    st.dataframe(totals_row, use_container_width=True)
-
-    display_matrix = matrix_df[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
-    display_matrix.insert(0, 'Rol', matrix_df['Rol'])
-    
-    styled_matrix = display_matrix.style.apply(color_rows, axis=1)
-    st.dataframe(styled_matrix, use_container_width=True)
-
-    # 2. KOPMAN
-    st.header("🥇 3. Kopman Advies (Actieve renners)")
-    kop_res = []
-    for c in race_cols:
-        starters = matrix_df[matrix_df[c] == 1]
-        if not starters.empty:
-            stat = koers_mapping.get(c, 'AVG')
-            starters_stats = current_df[current_df['Renner'].isin(starters.index)]
-            top = starters_stats.sort_values(by=[stat, 'AVG'], ascending=False)['Renner'].tolist()
-            kop_res.append({"Koers": c, "K1": top[0] if len(top)>0 else "-", "K2": top[1] if len(top)>1 else "-", "K3": top[2] if len(top)>2 else "-"})
-    st.dataframe(pd.DataFrame(kop_res), hide_index=True, use_container_width=True)
-
-    # 3. STATS
-    st.header("📊 4. Team Statistieken")
-    stats_overzicht = current_df[['Renner', 'Rol', 'COB', 'HLL', 'SPR', 'AVG', 'Prijs', 'EV_early', 'EV_late', 'Scorito_EV']]
-    styled_stats = stats_overzicht.sort_values(by=['Rol', 'Scorito_EV'], ascending=[True, False]).style.apply(color_rows, axis=1)
-    st.dataframe(styled_stats, hide_index=True, use_container_width=True)
+    - **📊 Statistieken:** [Wielerorakel](https://www.cyclingoracle.com/) voor de uitgebreide en super accurate stats per renner.
+    - **🗓️ Programma's & Prijzen:** [Kopman Puzzel](https://kopmanpuzzel.up.railway.app/) voor het verzamelen en overzichtelijk maken van de startlijsten en Scorito-prijzen.
+    """)
