@@ -5,7 +5,7 @@ import json
 from thefuzz import process, fuzz
 
 # --- CONFIGURATIE ---
-st.set_page_config(page_title="Scorito Klassiekers Solver 2026", layout="wide", page_icon="🚴‍♂️")
+st.set_page_config(page_title="Klassiekers Team", layout="wide", page_icon="🚴‍♂️")
 
 # --- DATA LADEN ---
 @st.cache_data
@@ -168,9 +168,9 @@ def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_rider
     return None, None
 
 # --- UI TABS ---
-st.title("🏆 Scorito Klassiekers 2026 AI Solver")
+st.title("🏆 Klassiekers Team")
 
-tab1, tab2 = st.tabs(["🚀 Team Builder", "ℹ️ Uitleg & Credits"])
+tab1, tab2, tab3 = st.tabs(["🚀 Team Builder", "📋 Alle Renners", "ℹ️ Uitleg & Credits"])
 
 with tab1:
     col_settings, col_selection = st.columns([1, 2], gap="large")
@@ -281,7 +281,7 @@ with tab1:
         with c_fine1:
             to_replace = st.multiselect("Gooi deze renner(s) eruit:", options=all_display_riders)
         with c_fine2:
-            st.write("") # uitlijning
+            st.write("") 
             st.write("")
             if st.button("Zoek vervanger(s)", use_container_width=True):
                 if not to_replace:
@@ -345,11 +345,74 @@ with tab1:
 
         # 5. STATS
         st.header("📊 5. Team Statistieken")
-        stats_overzicht = current_df[['Renner', 'Rol', 'COB', 'HLL', 'SPR', 'AVG', 'Prijs', 'EV_early', 'EV_late', 'Scorito_EV']]
-        styled_stats = stats_overzicht.sort_values(by=['Rol', 'Scorito_EV'], ascending=[True, False]).style.apply(color_rows, axis=1)
+        stats_overzicht = current_df[['Renner', 'Rol', 'COB', 'HLL', 'SPR', 'AVG', 'Prijs', 'EV_early', 'EV_late', 'Scorito_EV']].copy()
+        
+        # Kolommen hernoemen (geen underscores)
+        stats_overzicht = stats_overzicht.rename(columns={
+            'EV_early': 'EV Early', 
+            'EV_late': 'EV Late', 
+            'Scorito_EV': 'Scorito EV'
+        })
+        
+        # Waardes omzetten naar integers (geen .000)
+        for col in ['Prijs', 'EV Early', 'EV Late', 'Scorito EV']:
+            stats_overzicht[col] = stats_overzicht[col].astype(int)
+
+        styled_stats = stats_overzicht.sort_values(by=['Rol', 'Scorito EV'], ascending=[True, False]).style.apply(color_rows, axis=1)
         st.dataframe(styled_stats, hide_index=True, use_container_width=True)
 
 with tab2:
+    st.header("📋 Alle Renners & Programma's")
+    st.markdown("Zoek door de volledige database van renners, filter op budget of zoek een renner voor een specifiek gat in je programma.")
+    
+    # --- FILTERS VOOR ALLE RENNERS ---
+    col_f1, col_f2, col_f3 = st.columns(3)
+    
+    with col_f1:
+        search_name = st.text_input("🔍 Zoek op naam:")
+    
+    with col_f2:
+        min_p = int(df['Prijs'].min())
+        max_p = int(df['Prijs'].max())
+        price_filter = st.slider("💰 Prijs range", min_value=min_p, max_value=max_p, value=(min_p, max_p), step=250000)
+        
+    with col_f3:
+        race_filter = st.multiselect("🏁 Rijdt ALLE geselecteerde koersen:", options=race_cols)
+
+    # DataFrame filteren
+    filtered_df = df.copy()
+    
+    if search_name:
+        filtered_df = filtered_df[filtered_df['Renner'].str.contains(search_name, case=False, na=False)]
+        
+    filtered_df = filtered_df[(filtered_df['Prijs'] >= price_filter[0]) & (filtered_df['Prijs'] <= price_filter[1])]
+    
+    if race_filter:
+        filtered_df = filtered_df[filtered_df[race_filter].sum(axis=1) == len(race_filter)]
+
+    # Resultaten opmaken voor weergave
+    display_cols = ['Renner', 'Prijs', 'Total_Races', 'Scorito_EV'] + race_cols
+    display_df = filtered_df[display_cols].copy()
+    
+    # Kolommen hernoemen (geen underscores)
+    display_df = display_df.rename(columns={
+        'Total_Races': 'Total Races', 
+        'Scorito_EV': 'Scorito EV'
+    })
+    
+    # Afronden naar hele getallen
+    display_df['Prijs'] = display_df['Prijs'].astype(int)
+    display_df['Scorito EV'] = display_df['Scorito EV'].astype(int)
+    
+    display_df = display_df.sort_values(by='Scorito EV', ascending=False)
+    
+    # Vinkjes toevoegen
+    display_df[race_cols] = display_df[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
+    
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+
+with tab3:
     st.header("ℹ️ Hoe werkt deze Solver?")
     st.markdown("""
     Deze applicatie berekent wiskundig het meest optimale Scorito-team voor het Voorjaarsklassiekers-spel.
