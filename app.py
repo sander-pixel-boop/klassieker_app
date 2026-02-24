@@ -411,6 +411,30 @@ with tab2:
     st.header("📋 Alle Renners & Programma's")
     st.markdown("Zoek door de volledige database van renners, filter op budget of zoek een renner voor een specifiek gat in je programma.")
     
+    # --- LEGENDA KOERSEN ---
+    with st.expander("📅 Legenda Koersen (Overzicht)"):
+        koersen_info = [
+            {"Afkorting": "OHN", "Koers": "Omloop Het Nieuwsblad", "Type": "Kassei (COB)"},
+            {"Afkorting": "KBK", "Koers": "Kuurne-Brussel-Kuurne", "Type": "Sprint (SPR)"},
+            {"Afkorting": "SB", "Koers": "Strade Bianche", "Type": "Heuvel (HLL)"},
+            {"Afkorting": "PN", "Koers": "Parijs-Nice (Etappe 7)", "Type": "Heuvel (HLL)"},
+            {"Afkorting": "TA", "Koers": "Tirreno-Adriatico (Etappe 7)", "Type": "Sprint (SPR)"},
+            {"Afkorting": "MSR", "Koers": "Milaan-San Remo", "Type": "Allround (AVG)"},
+            {"Afkorting": "BDP", "Koers": "Classic Brugge-De Panne", "Type": "Sprint (SPR)"},
+            {"Afkorting": "E3", "Koers": "E3 Saxo Classic", "Type": "Kassei (COB)"},
+            {"Afkorting": "GW", "Koers": "Gent-Wevelgem", "Type": "Sprint (SPR)"},
+            {"Afkorting": "DDV", "Koers": "Dwars door Vlaanderen", "Type": "Kassei (COB)"},
+            {"Afkorting": "RVV", "Koers": "Ronde van Vlaanderen", "Type": "Kassei (COB)"},
+            {"Afkorting": "SP", "Koers": "Scheldeprijs", "Type": "Sprint (SPR)"},
+            {"Afkorting": "PR", "Koers": "Parijs-Roubaix", "Type": "Kassei (COB)"},
+            {"Afkorting": "BP", "Koers": "Brabantse Pijl", "Type": "Heuvel (HLL)"},
+            {"Afkorting": "AGR", "Koers": "Amstel Gold Race", "Type": "Heuvel (HLL)"},
+            {"Afkorting": "WP", "Koers": "Waalse Pijl", "Type": "Heuvel (HLL)"},
+            {"Afkorting": "LBL", "Koers": "Luik-Bastenaken-Luik", "Type": "Heuvel (HLL)"}
+        ]
+        st.dataframe(pd.DataFrame(koersen_info), hide_index=True, use_container_width=True)
+    
+    # --- FILTERS VOOR ALLE RENNERS ---
     col_f1, col_f2, col_f3 = st.columns(3)
     
     with col_f1:
