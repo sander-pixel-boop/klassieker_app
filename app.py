@@ -500,9 +500,8 @@ with tab3:
         else:
             try:
                 genai.configure(api_key=api_key)
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                model = genai.GenerativeModel('gemini-pro')
                 
-                # Exporteer compacte dataset als context
                 context_cols = ['Renner', 'Prijs', 'Scorito_EV', 'COB', 'HLL', 'SPR', 'AVG'] + race_cols
                 data_context = df[context_cols].to_csv(index=False)
                 
