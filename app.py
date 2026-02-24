@@ -35,14 +35,12 @@ def load_and_merge_data():
 
         df_prog['Renner_Full'] = df_prog['Renner'].map(name_mapping)
         
-        # Oude handmatige correcties
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 1500000), 'Renner_Full'] = 'Florian Vermeersch'
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 750000), 'Renner_Full'] = 'Gianni Vermeersch'
         
         merged_df = pd.merge(df_prog, df_stats, left_on='Renner_Full', right_on='Renner', how='inner')
         merged_df = merged_df.rename(columns={'Renner_Full': 'Renner'}).drop_duplicates(subset=['Renner', 'Prijs'])
         
-        # DE CRUCIALE FIX: Forceer 100% unieke namen
         counts = {}
         unique_renners = []
         for r in merged_df['Renner']:
@@ -102,9 +100,7 @@ def solve_knapsack(dataframe, total_budget, min_budget, max_riders, min_per_race
     
     prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=15))
     if pulp.LpStatus[prob.status] == 'Optimal':
-        # Haal exact de renners op die op 1 staan
         selected = [dataframe.loc[i, 'Renner'] for i in dataframe.index if rider_vars[i].varValue > 0.5]
-        # Harde cutoff om afrondingsfouten uit te sluiten
         return selected[:max_riders]
     return None
 
@@ -132,7 +128,6 @@ with col_settings:
 
 with col_selection:
     st.header("1. Jouw Team")
-    # Zorgt dat handmatige toevoegingen en solver elkaar niet overschrijven
     st.session_state.selected_riders = st.multiselect(
         "Selectie:", 
         options=df['Renner'].tolist(), 
@@ -166,7 +161,17 @@ if st.session_state.selected_riders:
     # 3. MATRIX
     st.header("🗓️ 3. Startlijst Matrix")
     matrix = current_df[['Renner'] + race_cols].set_index('Renner')
-    st.dataframe(matrix.applymap(lambda x: '✅' if x == 1 else '-'), use_container_width=True)
+    
+    # Bereken de totalen per koers en voeg deze toe als eerste rij
+    totals = matrix.sum().astype(int).astype(str)
+    totals_row = pd.DataFrame([totals], index=['🏆 TOTAAL RENNERS'])
+    
+    # Verander enen en nullen in vinkjes en streepjes
+    matrix = matrix.applymap(lambda x: '✅' if x == 1 else '-')
+    
+    # Koppel het totaal bovenaan
+    display_matrix = pd.concat([totals_row, matrix])
+    st.dataframe(display_matrix, use_container_width=True)
 
     # 4. KOPMAN
     st.header("🥇 4. Kopman Advies")
