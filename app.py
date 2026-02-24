@@ -67,10 +67,11 @@ def load_and_merge_data():
         available_late = [k for k in late_races if k in merged_df.columns]
         available_races = available_early + available_late
         
+        # ALLES direct afronden naar hele getallen (int) zodat je nergens decimalen krijgt
         for col in available_races + ['COB', 'HLL', 'SPR', 'AVG', 'Prijs']:
             if col not in merged_df.columns:
                 merged_df[col] = 0
-            merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0)
+            merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0).astype(int)
         
         merged_df['Total_Races'] = merged_df[available_races].sum(axis=1).astype(int)
         
@@ -190,7 +191,7 @@ with tab1:
         exclude_list = st.multiselect("❌ Sluit uit:", options=[r for r in df['Renner'].tolist() if r not in force_list])
 
         if st.button("🚀 Bereken Optimaal Team", type="primary", use_container_width=True):
-            st.session_state.last_finetune = None # Reset melding bij hele nieuwe berekening
+            st.session_state.last_finetune = None
             res, transfer_plan = solve_knapsack_with_transfers(df, max_bud, min_bud, max_ren, min_per_koers, force_list, exclude_list, early_races, late_races, use_transfers)
             if res:
                 st.session_state.selected_riders = res
@@ -281,10 +282,9 @@ with tab1:
         st.header("🔄 2. Team Finetunen")
         st.markdown("Is de AI met een renner gekomen die je er eigenlijk niet in wil hebben? Kies hem hieronder en laat de AI direct de beste vervanger zoeken binnen je restbudget.")
         
-        # Succesmelding na finetunen
         if st.session_state.last_finetune:
             st.success(f"✅ **Wissel succesvol doorgevoerd!**\n\n❌ Eruit: {', '.join(st.session_state.last_finetune['uit'])}\n\n📥 Erin: {', '.join(st.session_state.last_finetune['in'])}")
-            st.session_state.last_finetune = None # Reset zodat hij na een volgende actie weer verdwijnt
+            st.session_state.last_finetune = None 
         
         c_fine1, c_fine2 = st.columns([3, 1], gap="small")
         with c_fine1:
@@ -296,7 +296,6 @@ with tab1:
                 if not to_replace:
                     st.warning("Kies eerst een renner.")
                 else:
-                    # Oude team opslaan voor vergelijking
                     old_team = set(all_display_riders)
                     
                     to_keep = [r for r in all_display_riders if r not in to_replace]
@@ -313,7 +312,6 @@ with tab1:
                         if new_plan:
                             new_team.update(new_plan['in'])
                         
-                        # Verschil berekenen
                         out_riders = list(old_team - new_team)
                         in_riders = list(new_team - old_team)
                         st.session_state.last_finetune = {"uit": out_riders, "in": in_riders}
@@ -349,7 +347,11 @@ with tab1:
         display_matrix = matrix_df[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
         display_matrix.insert(0, 'Rol', matrix_df['Rol'])
         
+        # Dikkere lijn na PR via st.dataframe styling
         styled_matrix = display_matrix.style.apply(color_rows, axis=1)
+        if 'PR' in display_matrix.columns:
+            styled_matrix = styled_matrix.set_properties(subset=['PR'], **{'border-right': '3px solid #888888'})
+        
         st.dataframe(styled_matrix, use_container_width=True)
 
         # 4. KOPMAN
@@ -368,17 +370,12 @@ with tab1:
         st.header("📊 5. Team Statistieken")
         stats_overzicht = current_df[['Renner', 'Rol', 'COB', 'HLL', 'SPR', 'AVG', 'Prijs', 'EV_early', 'EV_late', 'Scorito_EV']].copy()
         
-        # Kolommen hernoemen (geen underscores)
         stats_overzicht = stats_overzicht.rename(columns={
             'EV_early': 'EV Early', 
             'EV_late': 'EV Late', 
             'Scorito_EV': 'Scorito EV'
         })
         
-        # Waardes omzetten naar integers (geen .000)
-        for col in ['Prijs', 'EV Early', 'EV Late', 'Scorito EV']:
-            stats_overzicht[col] = stats_overzicht[col].astype(int)
-
         styled_stats = stats_overzicht.sort_values(by=['Rol', 'Scorito EV'], ascending=[True, False]).style.apply(color_rows, axis=1)
         st.dataframe(styled_stats, hide_index=True, use_container_width=True)
 
@@ -386,7 +383,6 @@ with tab2:
     st.header("📋 Alle Renners & Programma's")
     st.markdown("Zoek door de volledige database van renners, filter op budget of zoek een renner voor een specifiek gat in je programma.")
     
-    # --- FILTERS VOOR ALLE RENNERS ---
     col_f1, col_f2, col_f3 = st.columns(3)
     
     with col_f1:
@@ -400,7 +396,6 @@ with tab2:
     with col_f3:
         race_filter = st.multiselect("🏁 Rijdt ALLE geselecteerde koersen:", options=race_cols)
 
-    # DataFrame filteren
     filtered_df = df.copy()
     
     if search_name:
@@ -411,26 +406,23 @@ with tab2:
     if race_filter:
         filtered_df = filtered_df[filtered_df[race_filter].sum(axis=1) == len(race_filter)]
 
-    # Resultaten opmaken voor weergave
     display_cols = ['Renner', 'Prijs', 'Total_Races', 'Scorito_EV'] + race_cols
     display_df = filtered_df[display_cols].copy()
     
-    # Kolommen hernoemen (geen underscores)
     display_df = display_df.rename(columns={
         'Total_Races': 'Total Races', 
         'Scorito_EV': 'Scorito EV'
     })
     
-    # Afronden naar hele getallen
-    display_df['Prijs'] = display_df['Prijs'].astype(int)
-    display_df['Scorito EV'] = display_df['Scorito EV'].astype(int)
-    
     display_df = display_df.sort_values(by='Scorito EV', ascending=False)
     
-    # Vinkjes toevoegen
     display_df[race_cols] = display_df[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
     
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    styled_display = display_df.style
+    if 'PR' in display_df.columns:
+        styled_display = styled_display.set_properties(subset=['PR'], **{'border-right': '3px solid #888888'})
+        
+    st.dataframe(styled_display, use_container_width=True, hide_index=True)
 
 
 with tab3:
@@ -441,7 +433,7 @@ with tab3:
     1. **Data:** De app matcht de startlijsten, renner-statistieken (zoals sprint-, kassei- en heuvelkwaliteiten) en de Scorito-prijzen.
     2. **Expected Value (EV):** Elke renner krijgt een berekende 'Expected Value' per koers, afhankelijk van het type parcours en zijn specifieke stats.
     3. **Optimalisatie:** Met behulp van een zogeheten *Knapsack Algorithm* berekent de AI exact welke 20 renners binnen jouw budget de hoogst mogelijke EV opleveren. 
-    4. **Wisselstrategie:** Als je de wissel-optie aanzet, verdeelt het algoritme de EV over de periode *tot* Parijs-Roubaix en *vanaf* de Brabantse Pijl, om zo de ultieme 3 in- en uitgaande transfers te berekenen.
+    4. **Wisselstrategie:** Als je de wissel-optie aanzet, verdeelt het algoritme de EV over de periode *tot* Parijs-Roubaix en *vanaf* de Brabantse Pijl, om zo de ultieme 3 in- en uitgaande transfers te bereken.
     
     *Je kunt zelf renners uitsluiten of juist forceren om het model richting jouw persoonlijke voorkeur te sturen.*
     """)
