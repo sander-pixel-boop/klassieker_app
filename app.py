@@ -110,7 +110,7 @@ if "last_finetune" not in st.session_state:
     st.session_state.last_finetune = None
 
 # --- SOLVER MET WISSELS EN FORCEREN ---
-def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_riders, min_per_race, force_start, force_in, force_out, force_base, exclude_list, early_races, late_races, use_transfers):
+def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_riders, min_per_race, force_early, ban_early, exclude_list, frozen_x, frozen_y, frozen_z, early_races, late_races, use_transfers):
     prob = pulp.LpProblem("Scorito_Solver", pulp.LpMaximize)
     
     if use_transfers:
@@ -124,12 +124,15 @@ def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_rider
             renner = dataframe.loc[i, 'Renner']
             prob += x[i] + y[i] + z[i] <= 1
             
-            # Nieuwe specifieke forceer-opties
-            if renner in force_start: prob += x[i] + y[i] == 1
-            if renner in force_in: prob += z[i] == 1
-            if renner in force_out: prob += y[i] == 1
-            if renner in force_base: prob += x[i] == 1
+            # Formulier opties
+            if renner in force_early: prob += x[i] + y[i] == 1
+            if renner in ban_early: prob += x[i] + y[i] == 0
             if renner in exclude_list: prob += x[i] + y[i] + z[i] == 0
+            
+            # Finetuner bevriezing
+            if renner in frozen_x: prob += x[i] == 1
+            if renner in frozen_y: prob += y[i] == 1
+            if renner in frozen_z: prob += z[i] == 1
 
         prob += pulp.lpSum([x[i] for i in dataframe.index]) == max_riders - 3
         prob += pulp.lpSum([y[i] for i in dataframe.index]) == 3
@@ -164,8 +167,10 @@ def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_rider
         
         for i in dataframe.index:
             renner = dataframe.loc[i, 'Renner']
-            if renner in force_start: prob += rider_vars[i] == 1
+            if renner in force_early: prob += rider_vars[i] == 1
+            if renner in ban_early: prob += rider_vars[i] == 0
             if renner in exclude_list: prob += rider_vars[i] == 0
+            if renner in frozen_x: prob += rider_vars[i] == 1
         
         prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=15))
         if pulp.LpStatus[prob.status] == 'Optimal':
@@ -193,29 +198,29 @@ with tab1:
         st.divider()
         st.write("**Renners Forceren / Uitsluiten**")
         
-        force_start = st.multiselect("🔒 Forceer in Start-Team (voor PR):", options=df['Renner'].tolist())
+        force_early = st.multiselect("🟢 WEL in team voor de wissel (Start-team):", options=df['Renner'].tolist())
         
         if use_transfers:
-            force_out = st.multiselect("❌ Forceer UIT (Verkopen na PR):", options=[r for r in df['Renner'].tolist() if r not in force_start])
-            force_in = st.multiselect("📥 Forceer IN (Kopen na PR):", options=[r for r in df['Renner'].tolist() if r not in force_start and r not in force_out])
+            ban_early = st.multiselect("🔴 NIET in team voor de wissel (Mag wél later gekocht worden):", options=[r for r in df['Renner'].tolist() if r not in force_early])
         else:
-            force_out = []
-            force_in = []
+            ban_early = []
 
-        exclude_list = st.multiselect("🚫 Sluit uit (Gehele spel):", options=[r for r in df['Renner'].tolist() if r not in force_start + force_out + force_in])
+        exclude_list = st.multiselect("🚫 Sluit compleet uit (Hele spel):", options=[r for r in df['Renner'].tolist() if r not in force_early + ban_early])
 
         if st.button("🚀 Bereken Optimaal Team", type="primary", use_container_width=True):
             st.session_state.last_finetune = None
             res, transfer_plan = solve_knapsack_with_transfers(
                 df, max_bud, min_bud, max_ren, min_per_koers, 
-                force_start, force_in, force_out, [], exclude_list, early_races, late_races, use_transfers
+                force_early, ban_early, exclude_list, 
+                [], [], [], 
+                early_races, late_races, use_transfers
             )
             if res:
                 st.session_state.selected_riders = res
                 st.session_state.transfer_plan = transfer_plan
                 st.rerun()
             else:
-                st.error("Geen oplossing mogelijk. Je hebt waarschijnlijk te veel dure renners geforceerd, of instellingen tegengesteld aan elkaar gemaakt.")
+                st.error("Geen oplossing mogelijk. Probeer de eisen te versoepelen (bijv. minder duren renners tegelijk forceren).")
                 
         # --- OPSLAAN / LADEN BLOK ---
         st.divider()
@@ -334,20 +339,16 @@ with tab1:
                     old_team = set(all_display_riders)
                     to_keep = [r for r in all_display_riders if r not in to_replace]
                     
-                    # Forceer overgebleven renners in EXACT dezelfde rol
-                    to_keep_start = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] in ['Basis', 'Verkopen na PR']]
-                    to_keep_in = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Kopen na PR']
-                    to_keep_out = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Verkopen na PR']
-                    to_keep_base = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Basis']
-                    
-                    new_force_start = list(set(force_start + to_keep_start))
-                    new_force_in = list(set(force_in + to_keep_in))
-                    new_force_out = list(set(force_out + to_keep_out))
-                    new_exclude = list(set(exclude_list + to_replace))
+                    # Exacte bevriezing van de overgebleven renners in hun huidige rol
+                    frozen_x = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Basis']
+                    frozen_y = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Verkopen na PR']
+                    frozen_z = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Kopen na PR']
                     
                     new_res, new_plan = solve_knapsack_with_transfers(
                         df, max_bud, min_bud, max_ren, min_per_koers, 
-                        new_force_start, new_force_in, new_force_out, to_keep_base, new_exclude, early_races, late_races, use_transfers
+                        force_early, ban_early, list(set(exclude_list + to_replace)), 
+                        frozen_x, frozen_y, frozen_z, 
+                        early_races, late_races, use_transfers
                     )
                     
                     if new_res:
@@ -363,7 +364,7 @@ with tab1:
                         st.session_state.transfer_plan = new_plan
                         st.rerun()
                     else:
-                        st.error("Geen mogelijke vervanger gevonden! Check of je Minimum Budget niet te hoog staat in de linkerbalk.")
+                        st.error("Geen mogelijke vervanger gevonden! Check of je Minimum Budget niet te hoog staat.")
 
         def color_rows(row):
             if row['Rol'] == 'Verkopen na PR':
