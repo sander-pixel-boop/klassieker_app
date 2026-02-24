@@ -21,13 +21,38 @@ def load_and_merge_data():
         full_names = df_stats['Renner'].unique()
         name_mapping = {}
         
+        manual_overrides = {
+            "Poel": "Mathieu van der Poel", "Aert": "Wout van Aert", "Lie": "Arnaud De Lie",
+            "Gils": "Maxim Van Gils", "Berg": "Marijn van den Berg", "Broek": "Frank van den Broek"
+        }
+        
         for short in short_names:
-            match_res = process.extractOne(short, full_names, scorer=fuzz.token_set_ratio)
-            name_mapping[short] = match_res[0] if match_res else short
+            if short in manual_overrides:
+                name_mapping[short] = manual_overrides[short]
+            else:
+                match_res = process.extractOne(short, full_names, scorer=fuzz.token_set_ratio)
+                name_mapping[short] = match_res[0] if match_res else short
 
         df_prog['Renner_Full'] = df_prog['Renner'].map(name_mapping)
+        
+        # Oude handmatige correcties
+        df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 1500000), 'Renner_Full'] = 'Florian Vermeersch'
+        df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 750000), 'Renner_Full'] = 'Gianni Vermeersch'
+        
         merged_df = pd.merge(df_prog, df_stats, left_on='Renner_Full', right_on='Renner', how='inner')
         merged_df = merged_df.rename(columns={'Renner_Full': 'Renner'}).drop_duplicates(subset=['Renner', 'Prijs'])
+        
+        # DE CRUCIALE FIX: Forceer 100% unieke namen
+        counts = {}
+        unique_renners = []
+        for r in merged_df['Renner']:
+            if r in counts:
+                counts[r] += 1
+                unique_renners.append(f"{r} ({counts[r]})")
+            else:
+                counts[r] = 0
+                unique_renners.append(r)
+        merged_df['Renner'] = unique_renners
         
         race_cols = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'BDP', 'E3', 'GW', 'DDV', 'RVV', 'SP', 'PR', 'BP', 'AGR', 'WP', 'LBL']
         available_races = [k for k in race_cols if k in merged_df.columns]
@@ -46,12 +71,15 @@ def load_and_merge_data():
         merged_df['Scorito_EV'] = merged_df['Scorito_EV'].fillna(0).round(0).astype(int)
         return merged_df, available_races, koers_stat_map
     except Exception as e:
-        st.error(f"Fout: {e}")
+        st.error(f"Fout in dataverwerking: {e}")
         return pd.DataFrame(), [], {}
 
 df, race_cols, koers_mapping = load_and_merge_data()
 
-# --- SESSION STATE INITIALISATIE ---
+if df.empty:
+    st.warning("Data is leeg of kon niet worden geladen.")
+    st.stop()
+
 if "selected_riders" not in st.session_state:
     st.session_state.selected_riders = []
 
@@ -72,13 +100,12 @@ def solve_knapsack(dataframe, total_budget, min_budget, max_riders, min_per_race
         if dataframe.loc[i, 'Renner'] in force_list: prob += rider_vars[i] == 1
         if dataframe.loc[i, 'Renner'] in exclude_list: prob += rider_vars[i] == 0
     
-    prob.solve(pulp.PULP_CBC_CMD(msg=0))
+    prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=15))
     if pulp.LpStatus[prob.status] == 'Optimal':
-        # Pak ALLEEN de renners die de solver op 1 heeft gezet
+        # Haal exact de renners op die op 1 staan
         selected = [dataframe.loc[i, 'Renner'] for i in dataframe.index if rider_vars[i].varValue > 0.5]
-        # FORCEER EXACT 20 (pak de 20 met hoogste EV mocht er een afrondingsfout zijn)
-        final_selection = dataframe[dataframe['Renner'].isin(selected)].sort_values(by='Scorito_EV', ascending=False).head(max_riders)
-        return final_selection['Renner'].tolist()
+        # Harde cutoff om afrondingsfouten uit te sluiten
+        return selected[:max_riders]
     return None
 
 # --- UI ---
@@ -98,25 +125,23 @@ with col_settings:
     if st.button("🚀 Bereken Optimaal Team", type="primary", use_container_width=True):
         res = solve_knapsack(df, max_bud, min_bud, max_ren, min_per_koers, force_list, exclude_list, race_cols)
         if res:
-            # HARD RESET van de session state
             st.session_state.selected_riders = res
             st.rerun()
+        else:
+            st.error("Geen oplossing mogelijk. Probeer de eisen te versoepelen (bijv. lager min budget of minder renners per koers).")
 
 with col_selection:
     st.header("1. Jouw Team")
-    # Door de key en de session_state koppeling dwingen we de lijst naar exact 20
+    # Zorgt dat handmatige toevoegingen en solver elkaar niet overschrijven
     st.session_state.selected_riders = st.multiselect(
         "Selectie:", 
         options=df['Renner'].tolist(), 
-        default=st.session_state.selected_riders,
-        key="team_select"
+        default=st.session_state.selected_riders
     )
-    # Beveiliging: als de gebruiker handmatig meer toevoegt, kappen we het hier af voor de dashboards
-    display_riders = st.session_state.selected_riders[:max_ren]
 
 # --- RESULTATEN ---
-if display_riders:
-    current_df = df[df['Renner'].isin(display_riders)].copy()
+if st.session_state.selected_riders:
+    current_df = df[df['Renner'].isin(st.session_state.selected_riders)].copy()
     
     st.divider()
     m1, m2, m3 = st.columns(3)
@@ -124,7 +149,7 @@ if display_riders:
     m2.metric("Renners", f"{len(current_df)} / {max_ren}")
     m3.metric("Team EV", f"{current_df['Scorito_EV'].sum():.0f}")
 
-    # SECTIE 2: FINETUNER
+    # 2. FINETUNER
     st.header("🔄 2. Finetuner")
     edit_df = current_df[['Renner', 'Prijs', 'Scorito_EV']].copy()
     edit_df.insert(0, 'Vervang', False)
@@ -138,11 +163,12 @@ if display_riders:
             st.session_state.selected_riders = new_team
             st.rerun()
 
-    # SECTIE 3, 4, 5
+    # 3. MATRIX
     st.header("🗓️ 3. Startlijst Matrix")
     matrix = current_df[['Renner'] + race_cols].set_index('Renner')
     st.dataframe(matrix.applymap(lambda x: '✅' if x == 1 else '-'), use_container_width=True)
 
+    # 4. KOPMAN
     st.header("🥇 4. Kopman Advies")
     kop_res = []
     for c in race_cols:
@@ -153,5 +179,6 @@ if display_riders:
             kop_res.append({"Koers": c, "K1": top[0] if len(top)>0 else "-", "K2": top[1] if len(top)>1 else "-", "K3": top[2] if len(top)>2 else "-"})
     st.dataframe(pd.DataFrame(kop_res), hide_index=True, use_container_width=True)
 
+    # 5. STATS
     st.header("📊 5. Team Statistieken")
     st.dataframe(current_df[['Renner', 'COB', 'HLL', 'SPR', 'AVG', 'Total_Races', 'Prijs', 'Scorito_EV']].sort_values(by='Scorito_EV', ascending=False), hide_index=True, use_container_width=True)
