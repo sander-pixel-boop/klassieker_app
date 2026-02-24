@@ -67,7 +67,6 @@ def load_and_merge_data():
         available_late = [k for k in late_races if k in merged_df.columns]
         available_races = available_early + available_late
         
-        # ALLES direct afronden naar hele getallen (int) zodat je nergens decimalen krijgt
         for col in available_races + ['COB', 'HLL', 'SPR', 'AVG', 'Prijs']:
             if col not in merged_df.columns:
                 merged_df[col] = 0
@@ -341,17 +340,30 @@ with tab1:
                 active_matrix.loc[active_matrix['Rol'] == 'Verkopen na PR', r] = 0
 
         totals = active_matrix[race_cols].sum().astype(int).astype(str)
-        totals_row = pd.DataFrame([totals], index=['🏆 TOTAAL AAN DE START (Actief)'])
+        totals_dict = totals.to_dict()
+        
+        # Scheidingskolom invoegen bij totals
+        if 'PR' in race_cols:
+            new_totals = {}
+            for k, v in totals_dict.items():
+                new_totals[k] = v
+                if k == 'PR':
+                    new_totals['🔁'] = ''
+            totals_row = pd.DataFrame([new_totals], index=['🏆 TOTAAL AAN DE START (Actief)'])
+        else:
+            totals_row = pd.DataFrame([totals_dict], index=['🏆 TOTAAL AAN DE START (Actief)'])
+            
         st.dataframe(totals_row, use_container_width=True)
 
         display_matrix = matrix_df[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
         display_matrix.insert(0, 'Rol', matrix_df['Rol'])
         
-        # Dikkere lijn na PR via st.dataframe styling
-        styled_matrix = display_matrix.style.apply(color_rows, axis=1)
+        # Scheidingskolom invoegen in matrix
         if 'PR' in display_matrix.columns:
-            styled_matrix = styled_matrix.set_properties(subset=['PR'], **{'border-right': '3px solid #888888'})
+            pr_idx = display_matrix.columns.get_loc('PR')
+            display_matrix.insert(pr_idx + 1, '🔁', '|')
         
+        styled_matrix = display_matrix.style.apply(color_rows, axis=1)
         st.dataframe(styled_matrix, use_container_width=True)
 
         # 4. KOPMAN
@@ -418,11 +430,12 @@ with tab2:
     
     display_df[race_cols] = display_df[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
     
-    styled_display = display_df.style
+    # Scheidingskolom invoegen in Alle Renners tabel
     if 'PR' in display_df.columns:
-        styled_display = styled_display.set_properties(subset=['PR'], **{'border-right': '3px solid #888888'})
+        pr_idx = display_df.columns.get_loc('PR')
+        display_df.insert(pr_idx + 1, '🔁', '|')
         
-    st.dataframe(styled_display, use_container_width=True, hide_index=True)
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 
 with tab3:
