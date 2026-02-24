@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import pulp
+import json
 from thefuzz import process, fuzz
 
 # --- CONFIGURATIE ---
@@ -187,6 +188,36 @@ with tab1:
                 st.rerun()
             else:
                 st.error("Geen oplossing mogelijk. Probeer de eisen te versoepelen.")
+                
+        # --- OPSLAAN / LADEN BLOK ---
+        st.divider()
+        with st.expander("💾 Team Opslaan / Inladen"):
+            # Opslaan
+            if st.session_state.selected_riders:
+                save_data = {
+                    "selected_riders": st.session_state.selected_riders,
+                    "transfer_plan": st.session_state.transfer_plan
+                }
+                json_str = json.dumps(save_data)
+                st.download_button(
+                    label="📥 Download huidig team",
+                    data=json_str,
+                    file_name="scorito_team.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+            
+            # Inladen
+            uploaded_file = st.file_uploader("📂 Upload een bewaard team (.json)", type="json")
+            if uploaded_file is not None:
+                if st.button("Laad Team in", use_container_width=True):
+                    try:
+                        loaded_data = json.load(uploaded_file)
+                        st.session_state.selected_riders = loaded_data.get("selected_riders", [])
+                        st.session_state.transfer_plan = loaded_data.get("transfer_plan", None)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Fout bij inladen: {e}")
 
     with col_selection:
         st.header("1. Jouw Start-Team (voor de wissels)")
