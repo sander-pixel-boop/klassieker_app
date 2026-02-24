@@ -106,6 +106,8 @@ if "selected_riders" not in st.session_state:
     st.session_state.selected_riders = []
 if "transfer_plan" not in st.session_state:
     st.session_state.transfer_plan = None
+if "last_finetune" not in st.session_state:
+    st.session_state.last_finetune = None
 
 # --- SOLVER MET WISSELS ---
 def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_riders, min_per_race, force_list, exclude_list, early_races, late_races, use_transfers):
@@ -188,6 +190,7 @@ with tab1:
         exclude_list = st.multiselect("❌ Sluit uit:", options=[r for r in df['Renner'].tolist() if r not in force_list])
 
         if st.button("🚀 Bereken Optimaal Team", type="primary", use_container_width=True):
+            st.session_state.last_finetune = None # Reset melding bij hele nieuwe berekening
             res, transfer_plan = solve_knapsack_with_transfers(df, max_bud, min_bud, max_ren, min_per_koers, force_list, exclude_list, early_races, late_races, use_transfers)
             if res:
                 st.session_state.selected_riders = res
@@ -220,6 +223,7 @@ with tab1:
                         loaded_data = json.load(uploaded_file)
                         st.session_state.selected_riders = loaded_data.get("selected_riders", [])
                         st.session_state.transfer_plan = loaded_data.get("transfer_plan", None)
+                        st.session_state.last_finetune = None
                         st.rerun()
                     except Exception as e:
                         st.error(f"Fout bij inladen: {e}")
@@ -277,6 +281,11 @@ with tab1:
         st.header("🔄 2. Team Finetunen")
         st.markdown("Is de AI met een renner gekomen die je er eigenlijk niet in wil hebben? Kies hem hieronder en laat de AI direct de beste vervanger zoeken binnen je restbudget.")
         
+        # Succesmelding na finetunen
+        if st.session_state.last_finetune:
+            st.success(f"✅ **Wissel succesvol doorgevoerd!**\n\n❌ Eruit: {', '.join(st.session_state.last_finetune['uit'])}\n\n📥 Erin: {', '.join(st.session_state.last_finetune['in'])}")
+            st.session_state.last_finetune = None # Reset zodat hij na een volgende actie weer verdwijnt
+        
         c_fine1, c_fine2 = st.columns([3, 1], gap="small")
         with c_fine1:
             to_replace = st.multiselect("Gooi deze renner(s) eruit:", options=all_display_riders)
@@ -287,6 +296,9 @@ with tab1:
                 if not to_replace:
                     st.warning("Kies eerst een renner.")
                 else:
+                    # Oude team opslaan voor vergelijking
+                    old_team = set(all_display_riders)
+                    
                     to_keep = [r for r in all_display_riders if r not in to_replace]
                     new_force = list(set(force_list + to_keep))
                     new_exclude = list(set(exclude_list + to_replace))
@@ -297,6 +309,15 @@ with tab1:
                     )
                     
                     if new_res:
+                        new_team = set(new_res)
+                        if new_plan:
+                            new_team.update(new_plan['in'])
+                        
+                        # Verschil berekenen
+                        out_riders = list(old_team - new_team)
+                        in_riders = list(new_team - old_team)
+                        st.session_state.last_finetune = {"uit": out_riders, "in": in_riders}
+                        
                         st.session_state.selected_riders = new_res
                         st.session_state.transfer_plan = new_plan
                         st.rerun()
@@ -420,7 +441,7 @@ with tab3:
     1. **Data:** De app matcht de startlijsten, renner-statistieken (zoals sprint-, kassei- en heuvelkwaliteiten) en de Scorito-prijzen.
     2. **Expected Value (EV):** Elke renner krijgt een berekende 'Expected Value' per koers, afhankelijk van het type parcours en zijn specifieke stats.
     3. **Optimalisatie:** Met behulp van een zogeheten *Knapsack Algorithm* berekent de AI exact welke 20 renners binnen jouw budget de hoogst mogelijke EV opleveren. 
-    4. **Wisselstrategie:** Als je de wissel-optie aanzet, verdeelt het algoritme de EV over de periode *tot* Parijs-Roubaix en *vanaf* de Brabantse Pijl, om zo de ultieme 3 in- en uitgaande transfers te bereken.
+    4. **Wisselstrategie:** Als je de wissel-optie aanzet, verdeelt het algoritme de EV over de periode *tot* Parijs-Roubaix en *vanaf* de Brabantse Pijl, om zo de ultieme 3 in- en uitgaande transfers te berekenen.
     
     *Je kunt zelf renners uitsluiten of juist forceren om het model richting jouw persoonlijke voorkeur te sturen.*
     """)
