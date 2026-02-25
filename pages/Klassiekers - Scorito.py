@@ -328,47 +328,69 @@ with tab1:
             st.success(f"✅ **Wissel succesvol doorgevoerd!**\n\n❌ Eruit: {', '.join(st.session_state.last_finetune['uit'])}\n\n📥 Erin: {', '.join(st.session_state.last_finetune['in'])}")
             st.session_state.last_finetune = None 
         
-        c_fine1, c_fine2, c_fine3 = st.columns([2, 2, 1], gap="small")
+        c_fine1, c_fine2 = st.columns(2, gap="small")
         with c_fine1:
-            to_replace = st.multiselect("Gooi eruit:", options=all_display_riders)
+            to_replace = st.multiselect("❌ Gooi eruit:", options=all_display_riders)
         with c_fine2:
             available_replacements = [r for r in df['Renner'].tolist() if r not in all_display_riders]
-            to_add = st.multiselect("Kies specifieke vervanger (optioneel):", options=available_replacements)
-        with c_fine3:
-            st.write("") 
-            st.write("")
-            if st.button("Voer wissel door", use_container_width=True):
-                if not to_replace and not to_add:
-                    st.warning("Kies minimaal een renner om te wisselen.")
+            to_add = st.multiselect("📥 Kies specifieke vervanger (optioneel):", options=available_replacements)
+        
+        if to_replace or to_add:
+            st.markdown("**📊 Vergelijking geselecteerde renners:**")
+            compare_riders = to_replace + to_add
+            compare_df = df[df['Renner'].isin(compare_riders)].copy()
+            
+            compare_cols = ['Renner', 'Prijs', 'Scorito_EV', 'COB', 'HLL', 'SPR', 'AVG'] + race_cols
+            comp_display = compare_df[compare_cols].copy()
+            
+            def mark_status(renner):
+                if renner in to_replace: return '❌ Eruit'
+                if renner in to_add: return '📥 Erin'
+                return ''
+                
+            comp_display.insert(1, 'Actie', comp_display['Renner'].apply(mark_status))
+            comp_display[race_cols] = comp_display[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
+            
+            def style_compare(row):
+                if row['Actie'] == '❌ Eruit':
+                    return ['background-color: rgba(255, 99, 71, 0.2)'] * len(row)
+                return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
+                
+            st.dataframe(comp_display.style.apply(style_compare, axis=1), hide_index=True, use_container_width=True)
+
+        st.write("") 
+        if st.button("🚀 Voer wissel door en bereken", use_container_width=True):
+            if not to_replace and not to_add:
+                st.warning("Kies minimaal een renner om te wisselen.")
+            else:
+                old_team = set(all_display_riders)
+                to_keep = [r for r in all_display_riders if r not in to_replace]
+                
+                frozen_x = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Basis']
+                frozen_y = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Verkopen na PR']
+                frozen_z = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Kopen na PR']
+                
+                new_res, new_plan = solve_knapsack_with_transfers(
+                    df, max_bud, min_bud, max_ren, min_per_koers, 
+                    force_early, ban_early, list(set(exclude_list + to_replace)), 
+                    frozen_x, frozen_y, frozen_z, to_add,
+                    early_races, late_races, use_transfers
+                )
+                
+                if new_res:
+                    new_team = set(new_res)
+                    if new_plan:
+                        new_team.update(new_plan['in'])
+                    
+                    out_riders = list(old_team - new_team)
+                    in_riders = list(new_team - old_team)
+                    st.session_state.last_finetune = {"uit": out_riders, "in": in_riders}
+                    
+                    st.session_state.selected_riders = new_res
+                    st.session_state.transfer_plan = new_plan
+                    st.rerun()
                 else:
-                    old_team = set(all_display_riders)
-                    to_keep = [r for r in all_display_riders if r not in to_replace]
-                    
-                    frozen_x = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Basis']
-                    frozen_y = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Verkopen na PR']
-                    frozen_z = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Kopen na PR']
-                    
-                    new_res, new_plan = solve_knapsack_with_transfers(
-                        df, max_bud, min_bud, max_ren, min_per_koers, 
-                        force_early, ban_early, list(set(exclude_list + to_replace)), 
-                        frozen_x, frozen_y, frozen_z, to_add,
-                        early_races, late_races, use_transfers
-                    )
-                    
-                    if new_res:
-                        new_team = set(new_res)
-                        if new_plan:
-                            new_team.update(new_plan['in'])
-                        
-                        out_riders = list(old_team - new_team)
-                        in_riders = list(new_team - old_team)
-                        st.session_state.last_finetune = {"uit": out_riders, "in": in_riders}
-                        
-                        st.session_state.selected_riders = new_res
-                        st.session_state.transfer_plan = new_plan
-                        st.rerun()
-                    else:
-                        st.error("Geen mogelijke vervanger gevonden! Check of je budget toereikend is voor de gekozen renner(s).")
+                    st.error("Geen mogelijke vervanger gevonden! Check of je budget toereikend is voor de gekozen renner(s).")
 
         def color_rows(row):
             if row['Rol'] == 'Verkopen na PR':
