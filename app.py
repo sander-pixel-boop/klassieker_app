@@ -165,10 +165,16 @@ def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_rider
 
 # --- SIDEBAR NAVIGATIE ---
 st.sidebar.title("🚲 Navigatie")
-app_mode = st.sidebar.radio("Kies je spel:", ["Scorito: Voorjaarsklassiekers", "Scorito: Grote Ronden", "Sporza Wielermanager"])
+st.sidebar.markdown("### Voorjaarsklassiekers")
+app_mode = st.sidebar.radio("Kies je spel:", [
+    "Voorjaarsklassiekers: Scorito", 
+    "Voorjaarsklassiekers: Sporza", 
+    "Grote Ronden: Scorito",
+    "Grote Ronden: Sporza"
+])
 
-# --- PAGINA: VOORJAARSKLASSIEKERS ---
-if app_mode == "Scorito: Voorjaarsklassiekers":
+# --- PAGINA: VOORJAARSKLASSIEKERS SCORITO ---
+if app_mode == "Voorjaarsklassiekers: Scorito":
     
     df, early_races, late_races, koers_mapping = load_and_merge_data()
     
@@ -185,7 +191,7 @@ if app_mode == "Scorito: Voorjaarsklassiekers":
     if "last_finetune" not in st.session_state:
         st.session_state.last_finetune = None
 
-    st.title("🏆 Scorito: Klassiekers Team")
+    st.title("🏆 Voorjaarsklassiekers: Scorito")
 
     tab1, tab2, tab3 = st.tabs(["🚀 Team Builder", "📋 Alle Renners", "ℹ️ Uitleg & Credits"])
 
@@ -508,49 +514,73 @@ if app_mode == "Scorito: Voorjaarsklassiekers":
     with tab3:
         st.header("ℹ️ Hoe werkt deze Solver?")
         st.markdown("""
-        Deze applicatie berekent wiskundig het meest optimale Scorito-team voor het Voorjaarsklassiekers-spel.
+        Deze applicatie berekent wiskundig het meest optimale Scorito-team voor het Voorjaarsklassiekers-spel. Het haalt de emotie uit het spel en kijkt puur naar statistieken en wedstrijdprogramma's.
         
-        1. **Data:** De app matcht de startlijsten, renner-statistieken (zoals sprint-, kassei- en heuvelkwaliteiten) en de Scorito-prijzen.
-        2. **Expected Value (EV):** Elke renner krijgt een berekende 'Expected Value' per koers, afhankelijk van het type parcours en zijn specifieke stats.
-        3. **Optimalisatie:** Met behulp van een zogeheten *Knapsack Algorithm* berekent de AI exact welke 20 renners binnen jouw budget de hoogst mogelijke EV opleveren. 
-        4. **Wisselstrategie:** Als je de wissel-optie aanzet, verdeelt het algoritme de EV over de periode *tot* Parijs-Roubaix en *vanaf* de Brabantse Pijl, om zo de ultieme 3 in- en uitgaande transfers te bereken.
+        ### 1. Expected Value (EV) Berekening
+        Elke renner krijgt per koers een verwachte puntenwaarde (EV). Dit doen we door te kijken naar de specifieke vaardigheden van de renner (Sprint, Kassei, Heuvel of Allround).
         
-        *Je kunt zelf renners uitsluiten of juist forceren om het model richting jouw persoonlijke voorkeur te sturen.*
+        Elke koers is gekoppeld aan de belangrijkste statistiek voor dat parcours. Omloop Het Nieuwsblad is gekoppeld aan Kassei (COB), de Amstel Gold Race aan Heuvel (HLL) en de Scheldeprijs aan Sprint (SPR).
+        
+        De basisformule voor de punten per koers is een machtsformule om topspecialisten zwaarder te belonen dan allrounders:
+        **EV = Deelname (1 of 0) × ((Specifieke Stat / 100)⁴ × 100)**
+        
+        ### 2. Het Algoritme (Knapsack Problem)
+        Om van al deze individuele waarden tot het beste team van 20 renners te komen, gebruiken we een wiskundig principe genaamd het **Knapsack Problem** (krukzakprobleem). 
+        
+        Je kunt dit zien als een rugzak (het budget van €45.000.000) die je wilt vullen met items (renners). Je wilt de rugzak zo vullen dat de totale waarde (EV) zo hoog mogelijk is, zonder dat de rugzak scheurt (over budget gaat) en waarbij precies 20 items in de tas passen. De Python-module *Pulp* rekent razendsnel alle miljoenen mogelijke combinaties door en geeft de wiskundig perfecte uitkomst.
+        """)
+        
+        st.markdown("""
+        ### 3. Wisselstrategie (Transfers)
+        Als je de wissel-optie aanzet, verdeelt het algoritme de agenda in twee periodes:
+        * **Early:** Alle koersen t/m Parijs-Roubaix.
+        * **Late:** Alle koersen vanaf de Brabantse Pijl (de heuvelklassiekers).
+        
+        Het algoritme kiest in dit geval geen 20, maar in totaal 23 renners. Het zoekt naar de optimale combinatie van 17 'vaste' renners die de hele periode blijven, 3 'tijdelijke' renners die veel EV opleveren in het begin, en 3 'vervangers' die de pieken pakken in de Ardennen.
         """)
         
         st.divider()
         
-        st.header("🙏 Shout-outs & Credits")
+        st.header("🙏 Databronnen & Credits")
         st.markdown("""
         Zonder de data uit de community was deze tool niet mogelijk geweest. Veel dank aan:
         
-        - **📊 Statistieken:** [Wielerorakel](https://www.cyclingoracle.com/) voor de uitgebreide en super accurate stats per renner.
-        - **🗓️ Programma's & Prijzen:** [Kopman Puzzel](https://kopmanpuzzel.up.railway.app/) voor het verzamelen en overzichtelijk maken van de startlijsten en Scorito-prijzen.
+        - **📊 Statistieken:** [Wielerorakel](https://www.cyclingoracle.com/) levert de onmisbare, actuele skill-scores (COB, HLL, SPR, AVG) per renner.
+        - **🗓️ Programma's & Prijzen:** [Kopman Puzzel](https://kopmanpuzzel.up.railway.app/) verzamelt en structureert de voorlopige startlijsten en Scorito-prijzen.
         """)
 
-# --- PAGINA: GROTE RONDEN ---
-elif app_mode == "Scorito: Grote Ronden":
-    st.title("🏔️ Grote Ronden Solver (Giro, Tour, Vuelta)")
-    st.info("Deze pagina is gereserveerd voor de Grand Tours in Scorito!")
-    st.markdown("""
-    Hier bouwen we later het algoritme voor het verdelen van de Scorito-categorieën over 21 etappes.
-    
-    Tegen de tijd dat het relevant is (zoals voor de Giro d'Italia in mei), breiden we deze sectie uit met:
-    * Een module voor het balanceren van **Klassementsrenners, Klimmers, Sprinters en Aanvallers**.
-    * Rekening houden met **dagopstellingen** (de beruchte 9 starters per dag).
-    * Bepalen van de perfecte **teampunten-balans** voor teamgenoten van de grote kopmannen.
-    """)
-
-# --- PAGINA: SPORZA WIELERMANAGER ---
-elif app_mode == "Sporza Wielermanager":
-    st.title("🦁 Sporza Wielermanager")
-    st.info("Hier komt de solver voor de Sporza Wielermanager!")
+# --- PAGINA: VOORJAARSKLASSIEKERS SPORZA ---
+elif app_mode == "Voorjaarsklassiekers: Sporza":
+    st.title("🦁 Voorjaarsklassiekers: Sporza Wielermanager")
+    st.info("Hier komt de specifieke solver voor de Sporza Wielermanager!")
     st.markdown("""
     Sporza werkt met een heel andere dynamiek dan Scorito:
     
     * Een budget van **€100 miljoen**.
-    * Maximaal **16 renners**.
-    * Transferbeleid tijdens het voorjaar en minicompetities.
+    * Maximaal **16 renners** aan de start.
+    * Een eigen unieke transferstructuur (minicompetities en tussentijdse wissels).
+    * De mogelijkheid om budget vrij te maken.
     
-    Zodra we de specifieke data voor Sporza hebben (prijzen en aangepaste startlijsten), bouwen we hier het Knapsack-algoritme gericht op de Sporza-reglementen in.
+    Zodra we de specifieke data voor Sporza (actuele prijzen en de Sporza-puntenstructuur) hebben verzameld, wordt het Knapsack-algoritme hier exact afgestemd op de Sporza-reglementen.
+    """)
+
+# --- PAGINA: GROTE RONDEN SCORITO ---
+elif app_mode == "Grote Ronden: Scorito":
+    st.title("🏔️ Grote Ronden Solver: Scorito")
+    st.info("Deze pagina is gereserveerd voor de Grand Tours (Giro, Tour, Vuelta) in Scorito!")
+    st.markdown("""
+    Hier bouwen we het algoritme voor het verdelen van het Scorito-budget over 21 etappes.
+    
+    In mei (voor de Giro d'Italia) wordt deze sectie uitgerold met functionaliteit voor:
+    * Het balanceren van **Klassementsrenners, Klimmers, Sprinters en Aanvallers**.
+    * Algoritmes die rekening houden met de befaamde **dagopstellingen** (9 renners per etappe).
+    * Wiskundige integratie van de **teampunten**.
+    """)
+
+# --- PAGINA: GROTE RONDEN SPORZA ---
+elif app_mode == "Grote Ronden: Sporza":
+    st.title("🏔️ Grote Ronden Solver: Sporza (Tourmanager)")
+    st.info("Hier komt de module voor de Sporza Tourmanager.")
+    st.markdown("""
+    De Tourmanager van Sporza hanteert andere regels voor punten, transfers en budgetten tijdens een grote ronde. Dit gedeelte wordt rond juni uitgebouwd.
     """)
