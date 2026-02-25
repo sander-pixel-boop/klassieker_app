@@ -5,7 +5,7 @@ import json
 from thefuzz import process, fuzz
 
 # --- CONFIGURATIE ---
-st.set_page_config(page_title="Scorito Solver", layout="wide", page_icon="🚴‍♂️")
+st.set_page_config(page_title="Wieler Spellen Solver", layout="wide", page_icon="🚴‍♂️")
 
 # --- DATA LADEN (KLASSIEKERS) ---
 @st.cache_data
@@ -165,10 +165,10 @@ def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_rider
 
 # --- SIDEBAR NAVIGATIE ---
 st.sidebar.title("🚲 Navigatie")
-app_mode = st.sidebar.radio("Kies je spel:", ["Voorjaarsklassiekers", "Grote Ronden (WIP)"])
+app_mode = st.sidebar.radio("Kies je spel:", ["Scorito: Voorjaarsklassiekers", "Scorito: Grote Ronden", "Sporza Wielermanager"])
 
 # --- PAGINA: VOORJAARSKLASSIEKERS ---
-if app_mode == "Voorjaarsklassiekers":
+if app_mode == "Scorito: Voorjaarsklassiekers":
     
     df, early_races, late_races, koers_mapping = load_and_merge_data()
     
@@ -185,7 +185,7 @@ if app_mode == "Voorjaarsklassiekers":
     if "last_finetune" not in st.session_state:
         st.session_state.last_finetune = None
 
-    st.title("🏆 Klassiekers Team")
+    st.title("🏆 Scorito: Klassiekers Team")
 
     tab1, tab2, tab3 = st.tabs(["🚀 Team Builder", "📋 Alle Renners", "ℹ️ Uitleg & Credits"])
 
@@ -529,9 +529,9 @@ if app_mode == "Voorjaarsklassiekers":
         """)
 
 # --- PAGINA: GROTE RONDEN ---
-elif app_mode == "Grote Ronden (WIP)":
+elif app_mode == "Scorito: Grote Ronden":
     st.title("🏔️ Grote Ronden Solver (Giro, Tour, Vuelta)")
-    st.info("Deze pagina is gereserveerd voor de Grand Tours!")
+    st.info("Deze pagina is gereserveerd voor de Grand Tours in Scorito!")
     st.markdown("""
     Hier bouwen we later het algoritme voor het verdelen van de Scorito-categorieën over 21 etappes.
     
@@ -539,4 +539,18 @@ elif app_mode == "Grote Ronden (WIP)":
     * Een module voor het balanceren van **Klassementsrenners, Klimmers, Sprinters en Aanvallers**.
     * Rekening houden met **dagopstellingen** (de beruchte 9 starters per dag).
     * Bepalen van de perfecte **teampunten-balans** voor teamgenoten van de grote kopmannen.
+    """)
+
+# --- PAGINA: SPORZA WIELERMANAGER ---
+elif app_mode == "Sporza Wielermanager":
+    st.title("🦁 Sporza Wielermanager")
+    st.info("Hier komt de solver voor de Sporza Wielermanager!")
+    st.markdown("""
+    Sporza werkt met een heel andere dynamiek dan Scorito:
+    
+    * Een budget van **€100 miljoen**.
+    * Maximaal **16 renners**.
+    * Transferbeleid tijdens het voorjaar en minicompetities.
+    
+    Zodra we de specifieke data voor Sporza hebben (prijzen en aangepaste startlijsten), bouwen we hier het Knapsack-algoritme gericht op de Sporza-reglementen in.
     """)
