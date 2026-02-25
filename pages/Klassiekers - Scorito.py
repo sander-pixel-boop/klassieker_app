@@ -200,27 +200,16 @@ with tab1:
         st.divider()
         st.write("**Renners Forceren / Uitsluiten**")
         
-        force_early = st.multiselect("🟢 In start-team (Rol wordt bepaald door AI):", options=df['Renner'].tolist())
-        
-        if use_transfers:
-            with st.expander("🔁 Specifieke Wissels Forceren (Optioneel)"):
-                st.markdown("Kies hier exact wie de AI als wissel moet inzetten. Laat leeg als de AI dit zelf mag bepalen.")
-                force_uit = st.multiselect("❌ Forceer VERKOPEN (Transfer UIT):", options=[r for r in df['Renner'].tolist() if r not in force_early])
-                force_in = st.multiselect("📥 Forceer INKOPEN (Transfer IN):", options=[r for r in df['Renner'].tolist() if r not in force_early + force_uit])
-                force_base = st.multiselect("🛡️ Forceer als BASIS (Hele seizoen):", options=[r for r in df['Renner'].tolist() if r not in force_early + force_uit + force_in])
-                ban_early = st.multiselect("🔴 Mag NIET in start-team (Wel later inkopen):", options=[r for r in df['Renner'].tolist() if r not in force_early + force_uit + force_in + force_base])
-        else:
-            force_uit, force_in, force_base = [], [], []
-            ban_early = st.multiselect("🔴 Sluit uit van start-team:", options=[r for r in df['Renner'].tolist() if r not in force_early])
-
-        exclude_list = st.multiselect("🚫 Compleet negeren (Hele spel):", options=[r for r in df['Renner'].tolist() if r not in force_early + ban_early + force_uit + force_in + force_base])
+        force_early = st.multiselect("🟢 Moet in start-team (Rol wordt bepaald door AI):", options=df['Renner'].tolist())
+        ban_early = st.multiselect("🔴 Mag NIET in start-team (Misschien wel als wissel):", options=[r for r in df['Renner'].tolist() if r not in force_early])
+        exclude_list = st.multiselect("🚫 Compleet negeren (Hele spel uitsluiten):", options=[r for r in df['Renner'].tolist() if r not in force_early + ban_early])
 
         if st.button("🚀 Bereken Optimaal Team", type="primary", use_container_width=True):
             st.session_state.last_finetune = None
             res, transfer_plan = solve_knapsack_with_transfers(
                 df, max_bud, min_bud, max_ren, min_per_koers, 
                 force_early, ban_early, exclude_list, 
-                force_base, force_uit, force_in, [], 
+                [], [], [], [], 
                 early_races, late_races, use_transfers
             )
             if res:
@@ -327,11 +316,11 @@ with tab1:
 
         # --- FINETUNER BLOK ---
         st.divider()
-        st.header("🔄 2. Team Finetunen")
-        st.markdown("Gooi een renner eruit en laat de AI een vervanger zoeken, óf dwing een specifieke vervanger je team in.")
+        st.header("🔄 2. Team Finetunen & Rollen Wijzigen")
+        st.markdown("Gooi een renner eruit en laat de AI een vervanger zoeken, óf stuur specifieke rollen handmatig bij.")
         
         if st.session_state.last_finetune:
-            st.success(f"✅ **Wissel succesvol doorgevoerd!**\n\n❌ Eruit: {', '.join(st.session_state.last_finetune['uit'])}\n\n📥 Erin: {', '.join(st.session_state.last_finetune['in'])}")
+            st.success(f"✅ **Wijziging succesvol doorgevoerd!**\n\n❌ Eruit: {', '.join(st.session_state.last_finetune['uit'])}\n\n📥 Erin: {', '.join(st.session_state.last_finetune['in'])}")
             st.session_state.last_finetune = None 
         
         c_fine1, c_fine2 = st.columns(2, gap="small")
@@ -357,10 +346,25 @@ with tab1:
                 
                 sugg_keuze = st.multiselect("👉 Of selecteer hier direct één of meer suggesties:", options=sugg_df['Renner'].tolist())
                 to_add = list(set(to_add + sugg_keuze))
-        
-        if to_replace or to_add:
+                
+        # --- ROLLEN FORCEREN ---
+        with st.expander("🛠️ Wil je de rol van een renner veranderen? (Basis / Verkopen / Kopen)"):
+            st.write("Dwing het algoritme om een renner een specifieke wissel-rol te geven in plaats van zijn huidige rol.")
+            c_r1, c_r2, c_r3 = st.columns(3)
+            with c_r1:
+                force_new_base = st.multiselect("🛡️ Maak BASIS", options=list(set(all_display_riders + to_add)))
+            with c_r2:
+                force_new_uit = st.multiselect("❌ Maak VERKOPEN na PR", options=[r for r in list(set(all_display_riders + to_add)) if r not in force_new_base])
+            with c_r3:
+                force_new_in = st.multiselect("📥 Maak INKOPEN na PR", options=[r for r in list(set(all_display_riders + to_add)) if r not in force_new_base + force_new_uit])
+                
+            is_forcing_roles = bool(force_new_base or force_new_uit or force_new_in)
+            freeze_others = st.checkbox("🔒 Bevries de rollen van mijn overige renners", value=not is_forcing_roles, help="Vink dit UIT als je de AI de ruimte wilt geven om de rollen van je andere renners te herschikken zodat je nieuwe wens wiskundig past.")
+
+        # --- VERGELIJKING ---
+        if to_replace or to_add or is_forcing_roles:
             st.markdown("**📊 Vergelijking geselecteerde renners:**")
-            compare_riders = to_replace + to_add
+            compare_riders = list(set(to_replace + to_add + force_new_base + force_new_uit + force_new_in))
             compare_df = df[df['Renner'].isin(compare_riders)].copy()
             
             compare_cols = ['Renner', 'Prijs', 'Scorito_EV', 'COB', 'HLL', 'SPR', 'AVG'] + race_cols
@@ -369,34 +373,56 @@ with tab1:
             def mark_status(renner):
                 if renner in to_replace: return '❌ Eruit'
                 if renner in to_add: return '📥 Erin'
+                if renner in force_new_base: return '🔄 Basis'
+                if renner in force_new_uit: return '🔄 Verkopen'
+                if renner in force_new_in: return '🔄 Kopen'
                 return ''
                 
-            comp_display.insert(1, 'Actie', comp_display['Renner'].apply(mark_status))
+            comp_display.insert(1, 'Actie / Rol', comp_display['Renner'].apply(mark_status))
             comp_display[race_cols] = comp_display[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
             
             def style_compare(row):
-                if row['Actie'] == '❌ Eruit':
+                if row['Actie / Rol'] == '❌ Eruit' or row['Actie / Rol'] == '🔄 Verkopen':
                     return ['background-color: rgba(255, 99, 71, 0.2)'] * len(row)
-                return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
+                if row['Actie / Rol'] == '📥 Erin' or row['Actie / Rol'] == '🔄 Kopen':
+                    return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
+                return ['background-color: rgba(173, 216, 230, 0.2)'] * len(row)
                 
             st.dataframe(comp_display.style.apply(style_compare, axis=1), hide_index=True, use_container_width=True)
 
         st.write("") 
-        if st.button("🚀 Voer wissel door en bereken", use_container_width=True):
-            if not to_replace and not to_add:
-                st.warning("Kies minimaal een renner om te wisselen.")
+        if st.button("🚀 Voer wijziging door en bereken", use_container_width=True):
+            if not to_replace and not to_add and not is_forcing_roles:
+                st.warning("Kies minimaal één wijziging in renners of rollen.")
             else:
                 old_team = set(all_display_riders)
                 to_keep = [r for r in all_display_riders if r not in to_replace]
                 
-                frozen_x = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Basis']
-                frozen_y = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Verkopen na PR']
-                frozen_z = [r for r in to_keep if current_df[current_df['Renner'] == r]['Rol'].values[0] == 'Kopen na PR']
+                frozen_x, frozen_y, frozen_z = [], [], []
+                force_any = []
+                
+                all_to_process = list(set(to_keep + to_add))
+                
+                for r in all_to_process:
+                    if r in force_new_base:
+                        frozen_x.append(r)
+                    elif r in force_new_uit:
+                        frozen_y.append(r)
+                    elif r in force_new_in:
+                        frozen_z.append(r)
+                    else:
+                        if freeze_others and r in current_df['Renner'].values:
+                            rol = current_df[current_df['Renner'] == r]['Rol'].values[0]
+                            if rol == 'Basis': frozen_x.append(r)
+                            elif rol == 'Verkopen na PR': frozen_y.append(r)
+                            elif rol == 'Kopen na PR': frozen_z.append(r)
+                        else:
+                            force_any.append(r)
                 
                 new_res, new_plan = solve_knapsack_with_transfers(
                     df, max_bud, min_bud, max_ren, min_per_koers, 
                     force_early, ban_early, list(set(exclude_list + to_replace)), 
-                    frozen_x, frozen_y, frozen_z, to_add,
+                    frozen_x, frozen_y, frozen_z, force_any,
                     early_races, late_races, use_transfers
                 )
                 
@@ -413,7 +439,7 @@ with tab1:
                     st.session_state.transfer_plan = new_plan
                     st.rerun()
                 else:
-                    st.error("Geen mogelijke vervanger gevonden! Check of je budget toereikend is voor de gekozen renner(s).")
+                    st.error("Geen oplossing mogelijk! De limieten (zoals max 3 wissels of budget) zijn overschreden. Tip: Zet het vinkje 'Bevries rollen' uit.")
 
         def color_rows(row):
             if row['Rol'] == 'Verkopen na PR':
