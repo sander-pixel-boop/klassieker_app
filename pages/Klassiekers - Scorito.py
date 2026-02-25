@@ -333,7 +333,9 @@ with tab1:
             to_replace = st.multiselect("❌ Gooi eruit:", options=all_display_riders)
         with c_fine2:
             available_replacements = [r for r in df['Renner'].tolist() if r not in all_display_riders]
-            to_add = st.multiselect("📥 Kies specifieke vervanger (optioneel):", options=available_replacements)
+            to_add_manual = st.multiselect("📥 Zoek zelf een vervanger (optioneel):", options=available_replacements)
+            
+        to_add = to_add_manual.copy()
             
         if to_replace:
             freed_budget = df[df['Renner'].isin(to_replace)]['Prijs'].sum()
@@ -346,6 +348,9 @@ with tab1:
             if not sugg_df.empty:
                 st.info(f"💡 **Top 5 suggesties op basis van EV (Max budget voor 1 renner: € {max_affordable:,.0f}):**")
                 st.dataframe(sugg_df[['Renner', 'Prijs', 'Scorito_EV', 'COB', 'HLL', 'SPR', 'AVG']], hide_index=True, use_container_width=True)
+                
+                sugg_keuze = st.multiselect("👉 Of selecteer hier direct één of meer suggesties:", options=sugg_df['Renner'].tolist())
+                to_add = list(set(to_add + sugg_keuze))
         
         if to_replace or to_add:
             st.markdown("**📊 Vergelijking geselecteerde renners:**")
