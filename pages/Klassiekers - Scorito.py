@@ -200,21 +200,27 @@ with tab1:
         st.divider()
         st.write("**Renners Forceren / Uitsluiten**")
         
-        force_early = st.multiselect("🟢 WEL in team voor de wissel (Start-team):", options=df['Renner'].tolist())
+        force_early = st.multiselect("🟢 In start-team (Rol wordt bepaald door AI):", options=df['Renner'].tolist())
         
         if use_transfers:
-            ban_early = st.multiselect("🔴 NIET in team voor de wissel (Mag wél later gekocht worden):", options=[r for r in df['Renner'].tolist() if r not in force_early])
+            with st.expander("🔁 Specifieke Wissels Forceren (Optioneel)"):
+                st.markdown("Kies hier exact wie de AI als wissel moet inzetten. Laat leeg als de AI dit zelf mag bepalen.")
+                force_uit = st.multiselect("❌ Forceer VERKOPEN (Transfer UIT):", options=[r for r in df['Renner'].tolist() if r not in force_early])
+                force_in = st.multiselect("📥 Forceer INKOPEN (Transfer IN):", options=[r for r in df['Renner'].tolist() if r not in force_early + force_uit])
+                force_base = st.multiselect("🛡️ Forceer als BASIS (Hele seizoen):", options=[r for r in df['Renner'].tolist() if r not in force_early + force_uit + force_in])
+                ban_early = st.multiselect("🔴 Mag NIET in start-team (Wel later inkopen):", options=[r for r in df['Renner'].tolist() if r not in force_early + force_uit + force_in + force_base])
         else:
-            ban_early = []
+            force_uit, force_in, force_base = [], [], []
+            ban_early = st.multiselect("🔴 Sluit uit van start-team:", options=[r for r in df['Renner'].tolist() if r not in force_early])
 
-        exclude_list = st.multiselect("🚫 Sluit compleet uit (Hele spel):", options=[r for r in df['Renner'].tolist() if r not in force_early + ban_early])
+        exclude_list = st.multiselect("🚫 Compleet negeren (Hele spel):", options=[r for r in df['Renner'].tolist() if r not in force_early + ban_early + force_uit + force_in + force_base])
 
         if st.button("🚀 Bereken Optimaal Team", type="primary", use_container_width=True):
             st.session_state.last_finetune = None
             res, transfer_plan = solve_knapsack_with_transfers(
                 df, max_bud, min_bud, max_ren, min_per_koers, 
                 force_early, ban_early, exclude_list, 
-                [], [], [], [], 
+                force_base, force_uit, force_in, [], 
                 early_races, late_races, use_transfers
             )
             if res:
