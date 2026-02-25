@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import pulp
 import json
+import plotly.express as px
+import plotly.graph_objects as go
 from thefuzz import process, fuzz
 
 # --- CONFIGURATIE ---
@@ -282,7 +284,7 @@ with tab1:
             with c_in:
                 st.info(f"📥 **Inkopen (3):**\n" + "\n".join([f"- {r}" for r in st.session_state.transfer_plan['in']]))
 
-    # --- RESULTATEN ---
+    # --- RESULTATEN & GRAFIEKEN ---
     if st.session_state.selected_riders:
         if st.session_state.transfer_plan:
             all_display_riders = st.session_state.selected_riders + st.session_state.transfer_plan['in']
@@ -314,10 +316,41 @@ with tab1:
         else:
             m3.metric("Team EV", f"{start_team_df['Scorito_EV'].sum():.0f}")
 
+        # --- GRAFIEKEN ---
+        st.header("📈 Team Analyse")
+        c_chart1, c_chart2 = st.columns(2)
+        
+        with c_chart1:
+            # Radar chart based on average stats of the starting team
+            start_stats = start_team_df[['COB', 'HLL', 'SPR', 'AVG']].mean().round(1)
+            categories = ['Kassei (COB)', 'Heuvel (HLL)', 'Sprint (SPR)', 'Allround (AVG)']
+            values = [start_stats['COB'], start_stats['HLL'], start_stats['SPR'], start_stats['AVG']]
+            
+            fig_radar = go.Figure()
+            fig_radar.add_trace(go.Scatterpolar(
+                r=values + [values[0]],
+                theta=categories + [categories[0]],
+                fill='toself',
+                name='Gemiddelde'
+            ))
+            fig_radar.update_layout(
+                polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                showlegend=False,
+                title="Gemiddelde Stats (Start-Team)",
+                margin=dict(t=40, b=20, l=40, r=40)
+            )
+            st.plotly_chart(fig_radar, use_container_width=True)
+            
+        with c_chart2:
+            budget_data = current_df.groupby('Rol')['Prijs'].sum().reset_index()
+            fig_donut = px.pie(budget_data, values='Prijs', names='Rol', hole=0.4, title="Budget Verdeling")
+            fig_donut.update_layout(margin=dict(t=40, b=20, l=20, r=20))
+            st.plotly_chart(fig_donut, use_container_width=True)
+
         # --- FINETUNER BLOK ---
         st.divider()
-        st.header("🔄 2. Team Finetunen & Rollen Wijzigen")
-        st.markdown("Gooi een renner eruit en laat de AI een vervanger zoeken, óf stuur specifieke rollen handmatig bij.")
+        st.header("🔄 2. Team Finetunen")
+        st.markdown("Gooi een renner eruit en laat de AI een vervanger zoeken.")
         
         if st.session_state.last_finetune:
             st.success(f"✅ **Wijziging succesvol doorgevoerd!**\n\n❌ Eruit: {', '.join(st.session_state.last_finetune['uit'])}\n\n📥 Erin: {', '.join(st.session_state.last_finetune['in'])}")
@@ -347,9 +380,13 @@ with tab1:
                 sugg_keuze = st.multiselect("👉 Of selecteer hier direct één of meer suggesties:", options=sugg_df['Renner'].tolist())
                 to_add = list(set(to_add + sugg_keuze))
                 
-        # --- ROLLEN FORCEREN ---
-        with st.expander("🛠️ Wil je de rol van een renner veranderen? (Basis / Verkopen / Kopen)"):
-            st.write("Dwing het algoritme om een renner een specifieke wissel-rol te geven in plaats van zijn huidige rol.")
+        # --- ROLLEN FORCEREN (VERBORGEN IN EXPANDER) ---
+        force_new_base, force_new_uit, force_new_in = [], [], []
+        freeze_others = True
+        is_forcing_roles = False
+        
+        with st.expander("🛠️ Geavanceerd: Rol van een specifieke renner forceren"):
+            st.write("Dwing het algoritme om een renner een specifieke wissel-rol te geven.")
             c_r1, c_r2, c_r3 = st.columns(3)
             with c_r1:
                 force_new_base = st.multiselect("🛡️ Maak BASIS", options=list(set(all_display_riders + to_add)))
