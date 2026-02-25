@@ -334,6 +334,18 @@ with tab1:
         with c_fine2:
             available_replacements = [r for r in df['Renner'].tolist() if r not in all_display_riders]
             to_add = st.multiselect("📥 Kies specifieke vervanger (optioneel):", options=available_replacements)
+            
+        if to_replace:
+            freed_budget = df[df['Renner'].isin(to_replace)]['Prijs'].sum()
+            current_leftover = max_bud - start_team_df['Prijs'].sum()
+            max_affordable = freed_budget + current_leftover
+            
+            sugg_df = df[~df['Renner'].isin(all_display_riders)].copy()
+            sugg_df = sugg_df[sugg_df['Prijs'] <= max_affordable].sort_values(by='Scorito_EV', ascending=False).head(5)
+            
+            if not sugg_df.empty:
+                st.info(f"💡 **Top 5 suggesties op basis van EV (Max budget voor 1 renner: € {max_affordable:,.0f}):**")
+                st.dataframe(sugg_df[['Renner', 'Prijs', 'Scorito_EV', 'COB', 'HLL', 'SPR', 'AVG']], hide_index=True, use_container_width=True)
         
         if to_replace or to_add:
             st.markdown("**📊 Vergelijking geselecteerde renners:**")
@@ -381,7 +393,7 @@ with tab1:
                     new_team = set(new_res)
                     if new_plan:
                         new_team.update(new_plan['in'])
-                    
+                        
                     out_riders = list(old_team - new_team)
                     in_riders = list(new_team - old_team)
                     st.session_state.last_finetune = {"uit": out_riders, "in": in_riders}
