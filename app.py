@@ -15,7 +15,7 @@ st.markdown(
     
     ### Beschikbare Solvers:
     * **Scorito Klassiekers:** Optimaliseer je selectie met het 45M budget en bereken de perfecte wisselstrategie na Parijs-Roubaix.
-    * **WORK IN PROGRESS Sporza Wielermanager:** Bouw je team binnen de limieten van 120M, 20 renners en maximaal 4 per ploeg.
+    * **🚧 **WORK IN PROGRESS (WIP)** 🚧 Sporza Wielermanager:** Bouw je team binnen de limieten van 120M, 20 renners en maximaal 4 per ploeg.
     * *Binnenkort: Scorito en Sporza voor de Grote Ronden!*
     """
 )
