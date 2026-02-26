@@ -5,7 +5,6 @@ import json
 import plotly.express as px
 import plotly.graph_objects as go
 from thefuzz import process, fuzz
-import os
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Scorito Klassiekers AI", layout="wide", page_icon="🏆")
@@ -515,13 +514,12 @@ with tab1:
             
             if 'PR' in display_matrix.columns: display_matrix.insert(display_matrix.columns.get_loc('PR') + 1, '🔁', '|')
                 
-            # Totalen berekenen en loskoppelen om sorteer-bug te voorkomen
             totals_dict = {c: str(int(active_matrix[c].sum())) if c in race_cols else ('|' if c == '🔁' else ('TOTAAL' if c == 'Rol' else '')) for c in display_matrix.columns}
             totals_df = pd.DataFrame([totals_dict], index=['🏆 AANTAL AAN DE START'])
 
-            st.dataframe(display_matrix.style.apply(color_rows, axis=1), use_container_width=True)
-            st.markdown("**Totalen Actieve Renners Per Koers:**")
+            st.markdown("**🏆 Totalen Actieve Renners Per Koers:**")
             st.dataframe(totals_df, use_container_width=True)
+            st.dataframe(display_matrix.style.apply(color_rows, axis=1), use_container_width=True)
 
         with tab_stats:
             stats_overzicht = current_df[['Renner', 'Rol', 'Type', 'Team', 'Prijs', 'Waarde (EV/M)', 'Scorito_EV']].copy()
