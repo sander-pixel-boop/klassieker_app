@@ -45,23 +45,25 @@ def load_and_merge_data():
         full_names = df_stats['Renner'].unique()
         name_mapping = {}
         
+        # Voorkom dat de Fuzzy Matcher broers en naamgenoten samenvoegt
         manual_overrides = {
             "Poel": "Mathieu van der Poel", "Aert": "Wout van Aert", "Lie": "Arnaud De Lie",
-            "Gils": "Maxim Van Gils", "Berg": "Marijn van den Berg", "Broek": "Frank van den Broek",
+            "Gils": "Maxim Van Gils", "Broek": "Frank van den Broek",
             "Magnier": "Paul Magnier", "Pogacar": "Tadej Pogačar", "Skujins": "Toms Skujiņš",
             "Kooij": "Olav Kooij",
-            # Initialen overrides
-            "C. Hamilton": "Chris Hamilton",
-            "L. Hamilton": "Lucas Hamilton",
-            "H.M. Lopez": "Harold Martin Lopez",
-            "J.P. Lopez": "Juan Pedro Lopez",
-            "Ca. Rodriguez": "Carlos Rodriguez",
-            "Cr. Rodriguez": "Cristian Rodriguez",
-            "O. Rodriguez": "Oscar Rodriguez",
-            "G. Serrano": "Gonzalo Serrano",
-            "J. Serrano": "Javier Serrano",
-            "A. Raccagni": "Andrea Raccagni",
-            "G. Raccagni": "Gabriele Raccagni"
+            "C. Hamilton": "Chris Hamilton", "L. Hamilton": "Lucas Hamilton",
+            "H.M. Lopez": "Harold Martin Lopez", "J.P. Lopez": "Juan Pedro Lopez",
+            "Ca. Rodriguez": "Carlos Rodriguez", "Cr. Rodriguez": "Cristian Rodriguez", "O. Rodriguez": "Oscar Rodriguez",
+            "G. Serrano": "Gonzalo Serrano", "J. Serrano": "Javier Serrano",
+            "A. Raccagni": "Andrea Raccagni", "G. Raccagni": "Gabriele Raccagni",
+            "Mads Pedersen": "Mads Pedersen", "Rasmus Pedersen": "Rasmus Pedersen", 
+            "Martin Pedersen": "Martin Pedersen", "S. Pedersen": "S. Pedersen",
+            "Tim van Dijke": "Tim van Dijke", "Mick van Dijke": "Mick van Dijke",
+            "Aurelien Paret-Peintre": "Aurélien Paret-Peintre", "Valentin Paret-Peintre": "Valentin Paret-Peintre",
+            "Rui Oliveira": "Rui Oliveira", "Nelson Oliveira": "Nelson Oliveira", "Ivo Oliveira": "Ivo Oliveira",
+            "Ivan Garcia Cortina": "Iván García Cortina", "Raul Garcia Pierna": "Raúl García Pierna",
+            "Jonathan Milan": "Jonathan Milan", "Matteo Milan": "Matteo Milan",
+            "Marijn van den Berg": "Marijn van den Berg", "Julius van den Berg": "Julius van den Berg"
         }
         
         for short in short_names:
@@ -72,13 +74,6 @@ def load_and_merge_data():
                 name_mapping[short] = match_res[0] if match_res and match_res[1] > 75 else short
 
         df_prog['Renner_Full'] = df_prog['Renner'].map(name_mapping)
-        
-        # --- HANDMATIGE OVERRIDES VOOR DUBBELE NAMEN ZONDER INITIALEN ---
-        df_prog.loc[(df_prog['Renner'] == 'Pedersen') & (df_prog['Prijs'] > 1000000), 'Renner_Full'] = 'Mads Pedersen'
-        df_prog.loc[(df_prog['Renner'] == 'Pedersen') & (df_prog['Prijs'] <= 1000000), 'Renner_Full'] = 'Casper Pedersen'
-        
-        df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 1500000), 'Renner_Full'] = 'Florian Vermeersch'
-        df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 750000), 'Renner_Full'] = 'Gianni Vermeersch'
         
         merged_df = pd.merge(df_prog, df_stats, left_on='Renner_Full', right_on='Renner', how='left')
         
