@@ -3,3 +3,4 @@ pandas
 pulp
 thefuzz
 plotly
+pip install pypdf
