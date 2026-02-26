@@ -514,7 +514,15 @@ with tab1:
             
             if 'PR' in display_matrix.columns: display_matrix.insert(display_matrix.columns.get_loc('PR') + 1, '🔁', '|')
                 
-            totals_dict = {c: str(int(active_matrix[c].sum())) if c in race_cols else ('|' if c == '🔁' else ('TOTAAL' if c == 'Rol' else '')) for c in display_matrix.columns}
+            totals_dict = {}
+            for c in display_matrix.columns:
+                if c in ['Rol', 'Type', 'Prijs', 'Koersen']:
+                    continue
+                if c in race_cols:
+                    totals_dict[c] = str(int(active_matrix[c].sum()))
+                elif c == '🔁':
+                    totals_dict[c] = '|'
+                    
             totals_df = pd.DataFrame([totals_dict], index=['🏆 AANTAL AAN DE START'])
 
             st.markdown("**🏆 Totalen Actieve Renners Per Koers:**")
