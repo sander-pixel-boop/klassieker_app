@@ -13,24 +13,18 @@ st.set_page_config(page_title="Scorito Klassiekers", layout="wide", page_icon="�
 @st.cache_data
 def load_and_merge_data():
     try:
-        # Bron: Gebruiker / Kopmanpuzzel ruwe copy-paste data
         df_prog = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', on_bad_lines='skip')
-        
-        # Hernoem afwijkende afkortingen naar de app-standaard
         df_prog = df_prog.rename(columns={'RvB': 'BDP', 'IFF': 'GW'})
         
-        # Haal de prijs uit de naam ("Pogacar (7.00M)" -> "Pogacar" en 7000000)
         if 'Prijs' not in df_prog.columns and df_prog['Renner'].astype(str).str.contains(r'\(.*\)', regex=True).any():
             extracted = df_prog['Renner'].str.extract(r'^(.*?)\s*\(([\d\.]+)[Mm]\)')
             df_prog['Renner'] = extracted[0].str.strip()
             df_prog['Prijs'] = pd.to_numeric(extracted[1], errors='coerce') * 1000000
             
-        # Vinkjes omzetten naar 1, leeg naar 0
         for col in df_prog.columns:
             if col not in ['Renner', 'Prijs']:
                 df_prog[col] = df_prog[col].apply(lambda x: 1 if str(x).strip() in ['✓', 'v', 'V', '1', '1.0'] else 0)
 
-        # Toepassen regel: 0.8M -> 750000
         if 'Prijs' in df_prog.columns:
             df_prog['Prijs'] = df_prog['Prijs'].fillna(0)
             df_prog.loc[df_prog['Prijs'] == 800000, 'Prijs'] = 750000
@@ -97,41 +91,56 @@ def load_and_merge_data():
         
         koers_stat_map = {'OHN':'COB','KBK':'SPR','SB':'HLL','PN':'HLL','TA':'SPR','MSR':'AVG','BDP':'SPR','E3':'COB','GW':'SPR','DDV':'COB','RVV':'COB','SP':'SPR','PR':'COB','BP':'HLL','AGR':'HLL','WP':'HLL','LBL':'HLL'}
         
-        # Bereken EV_early met dynamische kopman bonus (x3, x2.5, x2)
-        merged_df['EV_early'] = 0.0
-        for koers in available_early:
-            stat = koers_stat_map.get(koers, 'AVG')
-            race_ev = merged_df[koers] * ((merged_df[stat] / 100)**4 * 100)
-            
-            # Vind de top 3 renners op de startlijst voor de Kopman multiplier
-            starters_idx = merged_df[merged_df[koers] == 1].sort_values(by=[stat, 'AVG'], ascending=[False, False]).head(3).index
-            multipliers = [3.0, 2.5, 2.0]
-            for rank, idx in enumerate(starters_idx):
-                race_ev.loc[idx] = race_ev.loc[idx] * multipliers[rank]
-                
-            merged_df['EV_early'] += race_ev
-            
-        # Bereken EV_late met dynamische kopman bonus (x3, x2.5, x2)
-        merged_df['EV_late'] = 0.0
-        for koers in available_late:
-            stat = koers_stat_map.get(koers, 'AVG')
-            race_ev = merged_df[koers] * ((merged_df[stat] / 100)**4 * 100)
-            
-            starters_idx = merged_df[merged_df[koers] == 1].sort_values(by=[stat, 'AVG'], ascending=[False, False]).head(3).index
-            multipliers = [3.0, 2.5, 2.0]
-            for rank, idx in enumerate(starters_idx):
-                race_ev.loc[idx] = race_ev.loc[idx] * multipliers[rank]
-                
-            merged_df['EV_late'] += race_ev
-
-        merged_df['EV_early'] = merged_df['EV_early'].fillna(0).round(0).astype(int)
-        merged_df['EV_late'] = merged_df['EV_late'].fillna(0).round(0).astype(int)
-        merged_df['Scorito_EV'] = merged_df['EV_early'] + merged_df['EV_late']
-        
         return merged_df, available_early, available_late, koers_stat_map
     except Exception as e:
         st.error(f"Fout in dataverwerking: {e}")
         return pd.DataFrame(), [], [], {}
+
+def calculate_ev(df, early_races, late_races, koers_stat_map, method):
+    df = df.copy()
+    df['EV_early'] = 0.0
+    df['EV_late'] = 0.0
+    
+    scorito_pts = [100, 90, 80, 72, 64, 58, 52, 46, 40, 36, 32, 28, 24, 20, 16, 14, 12, 10, 8, 6]
+    
+    def get_race_ev(koers):
+        stat = koers_stat_map.get(koers, 'AVG')
+        starters = df[df[koers] == 1].copy()
+        starters = starters.sort_values(by=[stat, 'AVG'], ascending=[False, False])
+        
+        race_ev = pd.Series(0.0, index=df.index)
+        
+        for i, idx in enumerate(starters.index):
+            val = 0.0
+            if "Scorito Ranking" in method:
+                val = scorito_pts[i] if i < len(scorito_pts) else 0.0
+            elif "Extreme Curve" in method:
+                val = (starters.loc[idx, stat] / 100)**10 * 100
+            elif "Tiers" in method:
+                if i < 3: val = 80.0
+                elif i < 8: val = 45.0
+                elif i < 15: val = 20.0
+                else: val = 0.0
+                
+            if i == 0: val *= 3.0
+            elif i == 1: val *= 2.5
+            elif i == 2: val *= 2.0
+            
+            race_ev.loc[idx] = val
+            
+        return race_ev
+
+    for koers in early_races:
+        df['EV_early'] += get_race_ev(koers)
+        
+    for koers in late_races:
+        df['EV_late'] += get_race_ev(koers)
+        
+    df['EV_early'] = df['EV_early'].fillna(0).round(0).astype(int)
+    df['EV_late'] = df['EV_late'].fillna(0).round(0).astype(int)
+    df['Scorito_EV'] = df['EV_early'] + df['EV_late']
+    
+    return df
 
 # --- SOLVER SCORITO ---
 def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_riders, min_per_race, force_early, ban_early, exclude_list, frozen_x, frozen_y, frozen_z, force_any, early_races, late_races, use_transfers):
@@ -205,13 +214,28 @@ def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_rider
     return None, None
 
 # --- HOOFDCODE ---
-df, early_races, late_races, koers_mapping = load_and_merge_data()
+df_raw, early_races, late_races, koers_mapping = load_and_merge_data()
 
-if df.empty:
+if df_raw.empty:
     st.warning("Data is leeg of kon niet worden geladen.")
     st.stop()
     
 race_cols = early_races + late_races
+
+# --- SIDEBAR: EV METHODE ---
+st.sidebar.header("🧮 Rekenmodel")
+ev_method = st.sidebar.selectbox(
+    "EV Berekeningsmethode",
+    [
+        "2. Scorito Ranking (Dynamisch)", 
+        "1. Extreme Curve (Macht 10)", 
+        "3. Tiers & Spreiding (Realistisch)"
+    ],
+    help="Kies hoe het algoritme de verwachte punten (EV) per renner berekent. Dit beïnvloedt direct welke renners de AI selecteert."
+)
+
+# Bereken de EV dynamisch op basis van de geselecteerde methode
+df = calculate_ev(df_raw, early_races, late_races, koers_mapping, ev_method)
 
 if "selected_riders" not in st.session_state:
     st.session_state.selected_riders = []
@@ -255,7 +279,7 @@ with tab1:
                 st.session_state.transfer_plan = transfer_plan
                 st.rerun()
             else:
-                st.error("Geen oplossing mogelijk. Probeer de eisen te versoepelen (bijv. minder dure renners tegelijk forceren).")
+                st.error("Geen oplossing mogelijk. Probeer de eisen te versoepelen (bijv. minder dure renners tegelijk forceren of budget te verhogen).")
                 
         # --- OPSLAAN / LADEN BLOK ---
         st.divider()
@@ -673,12 +697,9 @@ with tab3:
     Deze applicatie berekent wiskundig het meest optimale Scorito-team voor het Voorjaarsklassiekers-spel. Het haalt de emotie uit het spel en kijkt puur naar statistieken en wedstrijdprogramma's.
     
     ### 1. Expected Value (EV) Berekening & Kopman Bonus
-    Elke renner krijgt per koers een verwachte puntenwaarde (EV). Dit doen we door te kijken naar de specifieke vaardigheden van de renner (Sprint, Kassei, Heuvel of Allround). 
+    Elke renner krijgt per koers een verwachte puntenwaarde (EV). Je kunt via het menu in de zijbalk zelf kiezen hoe zwaar deze berekening is afgesteld. 
     
-    Daarnaast bevat het model een automatische **Kopman Bonus**. Voor elke koers identificeert de AI de 3 beste renners op de startlijst. Deze absolute favorieten krijgen een enorme boost in hun EV (x3, x2.5 en x2) om de werkelijke kopmanpunten in Scorito realistisch na te bootsen.
-    
-    De basisformule voor de punten per koers is een machtsformule om topspecialisten zwaarder te belonen dan allrounders:
-    **EV = Deelname (1 of 0) × ((Specifieke Stat / 100)⁴ × 100) × Kopman Multiplier**
+    Ongeacht de gekozen methode, identificeert de AI voor elke koers de 3 beste renners op de startlijst. Deze absolute favorieten krijgen een enorme boost in hun EV (x3, x2.5 en x2) om de werkelijke kopmanpunten in Scorito realistisch na te bootsen.
     
     ### 2. Het Algoritme (Knapsack Problem)
     Om van al deze individuele waarden tot het beste team van 20 renners te komen, gebruiken we een wiskundig principe genaamd het **Knapsack Problem** (krukzakprobleem). 
