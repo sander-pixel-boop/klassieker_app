@@ -13,18 +13,24 @@ st.set_page_config(page_title="Scorito Klassiekers", layout="wide", page_icon="�
 @st.cache_data
 def load_and_merge_data():
     try:
+        # Bron: Gebruiker / Kopmanpuzzel ruwe copy-paste data
         df_prog = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', on_bad_lines='skip')
+        
+        # Hernoem afwijkende afkortingen naar de app-standaard
         df_prog = df_prog.rename(columns={'RvB': 'BDP', 'IFF': 'GW'})
         
+        # Haal de prijs uit de naam ("Pogacar (7.00M)" -> "Pogacar" en 7000000)
         if 'Prijs' not in df_prog.columns and df_prog['Renner'].astype(str).str.contains(r'\(.*\)', regex=True).any():
             extracted = df_prog['Renner'].str.extract(r'^(.*?)\s*\(([\d\.]+)[Mm]\)')
             df_prog['Renner'] = extracted[0].str.strip()
             df_prog['Prijs'] = pd.to_numeric(extracted[1], errors='coerce') * 1000000
             
+        # Vinkjes omzetten naar 1, leeg naar 0
         for col in df_prog.columns:
             if col not in ['Renner', 'Prijs']:
                 df_prog[col] = df_prog[col].apply(lambda x: 1 if str(x).strip() in ['✓', 'v', 'V', '1', '1.0'] else 0)
 
+        # Toepassen regel: 0.8M -> 750000
         if 'Prijs' in df_prog.columns:
             df_prog['Prijs'] = df_prog['Prijs'].fillna(0)
             df_prog.loc[df_prog['Prijs'] == 800000, 'Prijs'] = 750000
@@ -114,6 +120,8 @@ def calculate_ev(df, early_races, late_races, koers_stat_map, method):
             val = 0.0
             if "Scorito Ranking" in method:
                 val = scorito_pts[i] if i < len(scorito_pts) else 0.0
+            elif "Originele Curve" in method:
+                val = (starters.loc[idx, stat] / 100)**4 * 100
             elif "Extreme Curve" in method:
                 val = (starters.loc[idx, stat] / 100)**10 * 100
             elif "Tiers" in method:
@@ -122,6 +130,7 @@ def calculate_ev(df, early_races, late_races, koers_stat_map, method):
                 elif i < 15: val = 20.0
                 else: val = 0.0
                 
+            # Kopman Bonus toepassen
             if i == 0: val *= 3.0
             elif i == 1: val *= 2.5
             elif i == 2: val *= 2.0
@@ -227,9 +236,10 @@ st.sidebar.header("🧮 Rekenmodel")
 ev_method = st.sidebar.selectbox(
     "EV Berekeningsmethode",
     [
-        "2. Scorito Ranking (Dynamisch)", 
-        "1. Extreme Curve (Macht 10)", 
-        "3. Tiers & Spreiding (Realistisch)"
+        "1. Scorito Ranking (Dynamisch)", 
+        "2. Originele Curve (Macht 4)",
+        "3. Extreme Curve (Macht 10)", 
+        "4. Tiers & Spreiding (Realistisch)"
     ],
     help="Kies hoe het algoritme de verwachte punten (EV) per renner berekent. Dit beïnvloedt direct welke renners de AI selecteert."
 )
