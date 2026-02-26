@@ -60,6 +60,11 @@ def load_and_merge_data():
                 name_mapping[short] = match_res[0] if match_res and match_res[1] > 75 else short
 
         df_prog['Renner_Full'] = df_prog['Renner'].map(name_mapping)
+        
+        # --- HANDMATIGE OVERRIDES VOOR DUBBELE NAMEN ---
+        df_prog.loc[(df_prog['Renner'] == 'Pedersen') & (df_prog['Prijs'] > 1000000), 'Renner_Full'] = 'Mads Pedersen'
+        df_prog.loc[(df_prog['Renner'] == 'Pedersen') & (df_prog['Prijs'] <= 1000000), 'Renner_Full'] = 'Casper Pedersen'
+        
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 1500000), 'Renner_Full'] = 'Florian Vermeersch'
         df_prog.loc[(df_prog['Renner'] == 'Vermeersch') & (df_prog['Prijs'] == 750000), 'Renner_Full'] = 'Gianni Vermeersch'
         
@@ -706,10 +711,15 @@ with tab3:
     st.markdown("""
     Deze applicatie berekent wiskundig het meest optimale Scorito-team voor het Voorjaarsklassiekers-spel. Het haalt de emotie uit het spel en kijkt puur naar statistieken en wedstrijdprogramma's.
     
-    ### 1. Expected Value (EV) Berekening & Kopman Bonus
-    Elke renner krijgt per koers een verwachte puntenwaarde (EV). Je kunt via het menu in de zijbalk zelf kiezen hoe zwaar deze berekening is afgesteld. 
+    ### 1. Rekenmodellen (EV Berekening)
+    Je kunt in het linker zijmenu exact kiezen hoe het algoritme de Verwachte Punten (EV) per renner berekent. Elke methode heeft een eigen wiskundige visie op de koers:
     
-    Ongeacht de gekozen methode, identificeert de AI voor elke koers de 3 beste renners op de startlijst. Deze absolute favorieten krijgen een enorme boost in hun EV (x3, x2.5 en x2) om de werkelijke kopmanpunten in Scorito realistisch na te bootsen.
+    * **1. Scorito Ranking (Dynamisch):** Sorteert de startlijst puur op basis van de stats en deelt exacte Scorito-punten uit (100 voor de #1, 90 voor de #2, etc.). Dit is perfect om het Scorito-spel exact na te bootsen, maar gaat er wel van uit dat de uitslag van een wielerwedstrijd 100% voorspelbaar is.
+    * **2. Originele Curve (Macht 4):** Gebruikt de formule `(Stat / 100)⁴ × 100`. Dit creëert een vloeiende exponentiële lijn waarbij topspecialisten veel punten krijgen en allrounders wat minder. Dit is de vertrouwde en bewezen standaardmethode van de applicatie.
+    * **3. Extreme Curve (Macht 10):** Gebruikt een veel agressievere machtsformule (`¹⁰`). Knechten en opvullers worden genadeloos afgestraft en vallen terug naar 0 punten. Alleen de absolute wereldtop houdt EV over in dit model.
+    * **4. Tiers & Spreiding (Realistisch):** Wielrennen is chaotisch en onvoorspelbaar. Deze methode deelt de startlijst op in 'Tiers'. De absolute top 3 krijgt gemiddeld 80 EV, nummers 4 t/m 8 krijgen 45 EV, en 9 t/m 15 krijgen 20 EV. Hiermee simuleer je dat een topfavoriet ook wel eens valt of lek rijdt.
+    
+    *Let op: In **alle** rekenmethodes krijgen de top 3 favorieten op de startlijst automatisch de Scorito Kopman-bonus (x3, x2.5 en x2) over hun EV berekend. Zo dwingt de app je om voor dure zekere kopmannen te gaan.*
     
     ### 2. Het Algoritme (Knapsack Problem)
     Om van al deze individuele waarden tot het beste team van 20 renners te komen, gebruiken we een wiskundig principe genaamd het **Knapsack Problem** (krukzakprobleem). 
