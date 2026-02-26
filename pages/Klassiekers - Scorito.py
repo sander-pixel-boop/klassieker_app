@@ -383,6 +383,13 @@ with tab1:
             
         current_df['Rol'] = current_df['Renner'].apply(bepaal_rol)
 
+        # Type bepalen en direct aan current_df toevoegen zodat het in grafieken én matrix beschikbaar is
+        def bepaal_type(row):
+            s = {'Kassei': row['COB'], 'Heuvel': row['HLL'], 'Sprint': row['SPR'], 'Allround': row['AVG']}
+            return max(s, key=s.get)
+            
+        current_df['Type'] = current_df.apply(bepaal_type, axis=1)
+
         start_team_df = current_df[current_df['Rol'] != 'Kopen na PR']
         
         st.divider()
@@ -430,12 +437,6 @@ with tab1:
             st.plotly_chart(fig_donut, use_container_width=True)
             
         with c_chart3:
-            def bepaal_type(row):
-                s = {'Kassei': row['COB'], 'Heuvel': row['HLL'], 'Sprint': row['SPR'], 'Allround': row['AVG']}
-                return max(s, key=s.get)
-                
-            current_df['Type'] = current_df.apply(bepaal_type, axis=1)
-            
             type_data = current_df.groupby('Type').agg(
                 Prijs=('Prijs', 'sum'),
                 Aantal=('Renner', 'count')
@@ -587,7 +588,7 @@ with tab1:
 
         # 3. MATRIX
         st.header("🗓️ 3. Startlijst Matrix (Seizoensoverzicht)")
-        matrix_df = current_df[['Renner', 'Rol', 'Prijs'] + race_cols].set_index('Renner')
+        matrix_df = current_df[['Renner', 'Rol', 'Type', 'Prijs'] + race_cols].set_index('Renner')
         
         active_matrix = matrix_df.copy()
         if st.session_state.transfer_plan:
@@ -613,7 +614,9 @@ with tab1:
 
         display_matrix = matrix_df[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
         display_matrix.insert(0, 'Rol', matrix_df['Rol'])
-        display_matrix.insert(1, 'Prijs', matrix_df['Prijs'].apply(lambda x: f"€ {x/1000000:.2f}M"))
+        display_matrix.insert(1, 'Type', matrix_df['Type'])
+        display_matrix.insert(2, 'Prijs', matrix_df['Prijs'].apply(lambda x: f"€ {x/1000000:.2f}M"))
+        display_matrix.insert(3, 'Koersen', active_matrix[race_cols].sum(axis=1).astype(int))
         
         if 'PR' in display_matrix.columns:
             pr_idx = display_matrix.columns.get_loc('PR')
@@ -636,7 +639,7 @@ with tab1:
 
         # 5. STATS
         st.header("📊 5. Team Statistieken")
-        stats_overzicht = current_df[['Renner', 'Rol', 'COB', 'HLL', 'SPR', 'AVG', 'Prijs', 'EV_early', 'EV_late', 'Scorito_EV']].copy()
+        stats_overzicht = current_df[['Renner', 'Rol', 'Type', 'COB', 'HLL', 'SPR', 'AVG', 'Prijs', 'EV_early', 'EV_late', 'Scorito_EV']].copy()
         
         stats_overzicht = stats_overzicht.rename(columns={
             'EV_early': 'EV Early', 
