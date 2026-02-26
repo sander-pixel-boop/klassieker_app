@@ -100,7 +100,9 @@ def load_and_merge_data():
         available_late = [k for k in late_races if k in merged_df.columns]
         available_races = available_early + available_late
         
-        for col in available_races + ['COB', 'HLL', 'SPR', 'AVG', 'Prijs']:
+        # Voeg nu ook alle andere stats van Wielerorakel toe
+        all_stats_cols = ['COB', 'HLL', 'SPR', 'AVG', 'FLT', 'MTN', 'ITT', 'GC', 'OR', 'TTL']
+        for col in available_races + all_stats_cols + ['Prijs']:
             if col not in merged_df.columns:
                 merged_df[col] = 0
             merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0).astype(int)
@@ -162,6 +164,37 @@ def calculate_ev(df, early_races, late_races, koers_stat_map, method):
     df['Scorito_EV'] = df['EV_early'] + df['EV_late']
     
     return df
+
+# Geavanceerde Type Bepaling (Pakt dubbele combinaties bij elitescores)
+def bepaal_klassieker_type(row):
+    cob = row.get('COB', 0)
+    hll = row.get('HLL', 0)
+    spr = row.get('SPR', 0)
+    
+    elite = []
+    if cob >= 85: elite.append('Kassei')
+    if hll >= 85: elite.append('Heuvel')
+    if spr >= 85: elite.append('Sprint')
+    
+    if len(elite) == 3:
+        return 'Allround / Multispecialist'
+    elif len(elite) == 2:
+        return ' / '.join(elite)
+    elif len(elite) == 1:
+        return elite[0]
+    else:
+        # Als ze nergens 85+ scoren, pakken we hun absolute topscore
+        s = {
+            'Kassei': cob, 
+            'Heuvel': hll, 
+            'Sprint': spr, 
+            'Klimmer': row.get('MTN', 0),
+            'Tijdrit': row.get('ITT', 0),
+            'Klassement': row.get('GC', 0)
+        }
+        if sum(s.values()) == 0:
+            return 'Onbekend'
+        return max(s, key=s.get)
 
 # --- SOLVER SCORITO ---
 def solve_knapsack_with_transfers(dataframe, total_budget, min_budget, max_riders, min_per_race, force_early, ban_early, exclude_list, frozen_x, frozen_y, frozen_z, force_any, early_races, late_races, use_transfers):
@@ -382,13 +415,7 @@ with tab1:
             return 'Basis'
             
         current_df['Rol'] = current_df['Renner'].apply(bepaal_rol)
-
-        # Type bepalen en direct aan current_df toevoegen zodat het in grafieken én matrix beschikbaar is
-        def bepaal_type(row):
-            s = {'Kassei': row['COB'], 'Heuvel': row['HLL'], 'Sprint': row['SPR'], 'Allround': row['AVG']}
-            return max(s, key=s.get)
-            
-        current_df['Type'] = current_df.apply(bepaal_type, axis=1)
+        current_df['Type'] = current_df.apply(bepaal_klassieker_type, axis=1)
 
         start_team_df = current_df[current_df['Rol'] != 'Kopen na PR']
         
@@ -690,6 +717,7 @@ with tab2:
         race_filter = st.multiselect("🏁 Rijdt ALLE geselecteerde koersen:", options=race_cols)
 
     filtered_df = df.copy()
+    filtered_df['Type'] = filtered_df.apply(bepaal_klassieker_type, axis=1)
     
     if search_name:
         filtered_df = filtered_df[filtered_df['Renner'].str.contains(search_name, case=False, na=False)]
@@ -699,7 +727,7 @@ with tab2:
     if race_filter:
         filtered_df = filtered_df[filtered_df[race_filter].sum(axis=1) == len(race_filter)]
 
-    display_cols = ['Renner', 'Prijs', 'Total_Races', 'Scorito_EV'] + race_cols
+    display_cols = ['Renner', 'Prijs', 'Type', 'Total_Races', 'Scorito_EV'] + race_cols
     display_df = filtered_df[display_cols].copy()
     
     display_df = display_df.rename(columns={
