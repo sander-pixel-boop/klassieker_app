@@ -13,7 +13,6 @@ st.set_page_config(page_title="Scorito Klassiekers AI", layout="wide", page_icon
 @st.cache_data
 def load_and_merge_data():
     try:
-        # Bron: Gebruiker / Kopmanpuzzel ruwe copy-paste data
         df_prog = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', on_bad_lines='skip')
         df_prog = df_prog.rename(columns={'RvB': 'BDP', 'IFF': 'GW'})
         
@@ -277,7 +276,7 @@ with st.sidebar:
 
     st.write("") # Extra witruimte
     
-    # DE GROTE ACTIEKNOP (Nu altijd zichtbaar zonder scrollen)
+    # DE GROTE ACTIEKNOP
     if st.button("🚀 BEREKEN OPTIMAAL TEAM", type="primary", use_container_width=True):
         st.session_state.last_finetune = None
         res, transfer_plan = solve_knapsack_with_transfers(
@@ -326,7 +325,7 @@ with st.sidebar:
                     st.error(f"Fout bij inladen: {e}")
 
 st.title("🏆 Voorjaarsklassiekers: Scorito")
-tab1, tab2, tab3 = st.tabs(["🚀 Jouw Team & Analyse", "📋 Alle Renners (Database)", "ℹ️ Uitleg"])
+tab1, tab2, tab3 = st.tabs(["🚀 Jouw Team & Analyse", "📋 Alle Renners (Database)", "ℹ️ Uitleg & Documentatie"])
 
 with tab1:
     if st.session_state.selected_riders:
@@ -566,16 +565,65 @@ with tab2:
     st.dataframe(d_df.sort_values(by='Scorito_EV', ascending=False), use_container_width=True, hide_index=True)
 
 with tab3:
-    st.header("ℹ️ Hoe werkt deze Solver?")
+    st.header("ℹ️ De Techniek: Hoe werkt deze AI?")
     st.markdown("""
-    Deze applicatie berekent wiskundig het meest optimale Scorito-team voor het Voorjaarsklassiekers-spel.
+    Deze applicatie elimineert emotie en 'gut feeling' uit het samenstellen van je Scorito team. Het is een wiskundige optimalisatie-tool die leunt op de wetten van de lineaire programmering. Het doel? Binnen een keihard budget de maximale hoeveelheid verwachte punten vinden.
+    """)
     
-    ### 1. Rekenmodellen (EV Berekening)
-    * **Scorito Ranking (Dynamisch):** Deelt exacte Scorito-punten uit o.b.v. positie in startlijst.
-    * **Originele Curve (Macht 4):** Vloeiende exponentiële lijn (`(Stat / 100)⁴ × 100`).
-    * **Extreme Curve (Macht 10):** Straft opvullers af, alleen wereldtop behoudt punten.
-    * **Tiers & Spreiding:** Meest realistisch; verdeelt verwachte punten over subgroepen (Tiers) om chaos en valpartijen te simuleren.
+    st.divider()
     
-    ### 2. Het Algoritme (Knapsack Problem)
-    Pulp (een wiskundige library) berekent miljoenen combinaties om binnen je budget de 20 (of 23) renners te vinden die de maximale team-waarde opleveren.
+    st.subheader("📊 1. Data Verzameling & Validatie")
+    st.markdown("""
+    De tool combineert data uit twee externe bronnen:
+    * **Wielerorakel:** Levert de AI-gebaseerde *Skill-scores* (0 tot 100) van renners op specifieke terreinen zoals Kasseien (COB), Heuvels (HLL) en Sprints (SPR).
+    * **Kopmanpuzzel (via Gebruiker):** Levert de voorlopige startlijsten en de actuele Scorito-prijzen.
+    
+    Een ingebouwde 'Fuzzy Matcher' (een slim algoritme voor tekstherkenning) koppelt deze lijsten aan elkaar, corrigeert automatische dubbele namen (zoals de gebroeders Van Dijke of Pedersen), en bouwt één centrale database op.
+    """)
+
+    st.subheader("🧮 2. Expected Value (EV) Berekenen")
+    st.markdown("""
+    Om renners objectief te kunnen vergelijken, moet hun kwaliteit (Skill) vertaald worden naar verwachte Scorito-punten (Expected Value). Elke koers heeft in de app een 'label' (bijv. de Ronde van Vlaanderen is `COB`, Milaan-San Remo is `AVG`). Omdat wielrennen geen exacte wetenschap is, kun je in de zijbalk kiezen uit vier visies op hoe deze punten verdeeld moeten worden:
+    
+    * **1. Scorito Ranking (Dynamisch):**
+      De meest binaire methode. De app sorteert de actuele startlijst op basis van de vereiste stat. De nummer 1 in stats krijgt keihard 100 EV (gelijk aan Scorito punten voor plek 1). De nummer 2 krijgt 90 EV, enzovoort. Dit negeert pech en chaos, maar weerspiegelt 100% de regels van het spel.
+    * **2. Originele Curve (Macht 4):**
+      De bewezen standaardmethode. Dit gebruikt de formule `(Stat / 100)⁴ × 100`. Door de vierde macht te gebruiken ontstaat een exponentiële curve. Dit betekent dat het verschil in punten tussen een topspecialist (score 99) en een subtopper (score 85) enorm wordt uitvergroot, wat essentieel is in een kopmannen-spel.
+    * **3. Extreme Curve (Macht 10):**
+      Voor de meedogenloze speler. De macht van 10 straft middelmaat genadeloos af. Een knecht met een stat van 70 valt vrijwel terug naar 0 EV. Alleen de absolute wereldtop behoudt hier wiskundige waarde.
+    * **4. Tiers & Spreiding (Realistisch):**
+      Simuleert de werkelijkheid. De absolute top 3 op de startlijst wint niet altijd; ze krijgen daarom *gemiddeld* 80 EV. De renners op plek 4 t/m 8 krijgen 45 EV. Valpartijen en slechte benen zitten zo ingebakken in de verwachting.
+      
+    > **Belangrijk: De Kopmanfactor!**
+    Ongeacht het model, controleert de app per koers wie de top 3 beste renners op de startlijst zijn. Deze krijgen direct de officiële Scorito Kopman-bonus (x3, x2.5 en x2) over hun EV. Zo dwingt het algoritme je om budget vrij te maken voor zekerheden als Pogačar of Van der Poel.
+    """)
+
+    st.subheader("🤖 3. Het Algoritme (The Knapsack Problem)")
+    st.markdown("""
+    Wanneer elke renner een prijskaartje en een totaalscore (EV over het hele seizoen) heeft, stuiten we op een beroemd wiskundig fenomeen: het **Knapsack Problem** (Krukzakprobleem). 
+    
+    Zie je budget van €45.000.000 als een rugzak en de 20 benodigde renners als objecten. Je wilt de rugzak vullen met objecten die samen de hoogste waarde vertegenwoordigen, zónder dat de tas scheurt (over budget) en terwijl er *exact* 20 items in zitten.
+    
+    De app gebruikt **PuLP** (een krachtige Python library voor lineaire optimalisatie) gekoppeld aan de CBC Solver. Deze engine berekent en verwerpt binnen enkele seconden miljoenen combinaties van renners totdat hij het 100% onbetwistbare, wiskundige optimum heeft gevonden.
+    """)
+
+    st.subheader("🔁 4. Wisselstrategie (Transfers)")
+    st.markdown("""
+    Als je de optie 'Met 3 wissels' aanzet in de zijbalk, wordt de wiskunde complexer. De agenda wordt doormidden geknipt ná Parijs-Roubaix (De grens tussen het kasseien- en het heuvelseizoen).
+    
+    Het algoritme gaat dan niet op zoek naar 20, maar naar **23 renners**. Het lost de puzzel op met deze keiharde restricties:
+    1. Selecteer 17 **Basis** renners (Die het hele seizoen in je team blijven).
+    2. Selecteer 3 **Early** renners (Die je in de winter inkoopt, maar direct na Roubaix dumpt).
+    3. Selecteer 3 **Late** renners (Die de rest van het seizoen in je team komen voor de Ardennen).
+    4. Het budget (inclusief het geld dat vrijkomt na verkoop) mag op *geen enkel moment* in het spel overschreden worden.
+    """)
+    
+    st.divider()
+    
+    st.subheader("💡 Best Practices: Haal het maximale uit de App")
+    st.markdown("""
+    1. **Staar je niet blind op de eerste output:** De AI kent de prijzen, maar de Scorito-werkelijkheid is soms anders. Mist het algoritme een absolute favoriet omdat hij 500k te duur is? Zet hem dan handmatig in de **'Moet in team'** lijst in de zijbalk en laat de AI het team eromheen bouwen.
+    2. **Check de Kwaliteitscontrole:** Onder je team in Tab 1 staat een expander. Dit is je vangnet. Het waarschuwt je als de AI stiekem 3 klimmers heeft opgesteld voor de Scheldeprijs om geld te besparen.
+    3. **Spreid je Teampunten:** Kijk naar de *'Teampunten Spreiding'* grafiek. Als je 8 renners van Visma hebt, ben je enorm kwetsbaar als dat team een off-day heeft. Gooi er eentje uit via de Finetuner en zoek een vergelijkbare renner van Lidl-Trek of Alpecin.
+    4. **Gebruik 'Value for Money':** In het Database-tabblad vind je de kolom `Waarde (EV/M)`. Dit is de heilige graal voor het vinden van donker paarden en goedkope opvullers. 
     """)
