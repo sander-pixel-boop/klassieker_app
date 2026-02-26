@@ -4,6 +4,8 @@ import pulp
 import plotly.express as px
 from thefuzz import process, fuzz
 import io
+import re
+import pypdf
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Cycling Fantasy AI", layout="wide", page_icon="🚲")
@@ -61,32 +63,66 @@ def load_static_data():
         st.error(f"Fout bij laden statische data: {e}")
         return pd.DataFrame()
 
+# --- PDF PARSER VOOR PCS STARTLIJSTEN ---
+def parse_pcs_pdf(uploaded_file):
+    pdf_reader = pypdf.PdfReader(uploaded_file)
+    text = ""
+    for page in pdf_reader.pages:
+        text += page.extract_text() + "\n"
+    
+    # Hak de tekst in stukken op basis van dubbele spaties (kolom-breuken) of nieuwe regels
+    raw_chunks = re.split(r'  +|\n', text)
+    
+    potential_names = []
+    for chunk in raw_chunks:
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+            
+        # Regex check: Begint het met een rugnummer (1-3 cijfers) gevolgd door een naam?
+        match = re.search(r'^\d{1,3}\.?\s+([A-Za-zÀ-ÖØ-öø-ÿ\-\'\s]{4,})', chunk)
+        if match:
+            name = match.group(1).strip()
+            # Verwijder getallen aan het eind (zoals leeftijd in PCS)
+            name = re.sub(r'\s+\d+$', '', name).strip()
+            potential_names.append(name)
+        else:
+            # Als er geen rugnummer staat, maar het is wel een langere string zonder cijfers, gok op een naam
+            if len(chunk) > 4 and not any(char.isdigit() for char in chunk):
+                potential_names.append(chunk)
+
+    return pd.DataFrame({'Renner': potential_names})
+
 # --- STARTLIJST VERWERKEN ---
 def process_startlist(uploaded_file, df_static):
     try:
-        if uploaded_file.name.endswith('.csv'):
+        if uploaded_file.name.endswith('.pdf'):
+            df_start = parse_pcs_pdf(uploaded_file)
+        elif uploaded_file.name.endswith('.csv'):
             df_start = pd.read_csv(uploaded_file, sep=None, engine='python')
         else:
             df_start = pd.read_excel(uploaded_file)
             
-        # Zoek de kolom met namen
-        col_name = None
-        for col in ['Renner', 'Rider', 'Naam', 'Name']:
-            if col in df_start.columns:
-                col_name = col
-                break
-        if not col_name:
-            col_name = df_start.columns[0] # Pak de eerste kolom als fallback
-            
-        df_start = df_start.rename(columns={col_name: 'Renner'})
+        if not uploaded_file.name.endswith('.pdf'):
+            # Zoek de kolom met namen
+            col_name = None
+            for col in ['Renner', 'Rider', 'Naam', 'Name']:
+                if col in df_start.columns:
+                    col_name = col
+                    break
+            if not col_name:
+                col_name = df_start.columns[0] # Pak de eerste kolom als fallback
+            df_start = df_start.rename(columns={col_name: 'Renner'})
         
         # Fuzzy match de geüploade namen aan de statische database
         full_names = df_static['Renner'].tolist()
         def match_name_upload(name):
             match = process.extractOne(str(name), full_names, scorer=fuzz.token_set_ratio)
-            return match[0] if match and match[1] > 75 else str(name)
+            # Accepteer alleen als de match betrouwbaar is (>75%), dit filtert ploegnamen etc. eruit
+            return match[0] if match and match[1] > 75 else None
             
         df_start['Renner_Matched'] = df_start['Renner'].apply(match_name_upload)
+        df_start = df_start.dropna(subset=['Renner_Matched']) # Gooi onzin (ploegleiders, teams) weg
         
         # Merge de startlijst met de database
         df_race = pd.merge(df_start[['Renner_Matched']], df_static, left_on='Renner_Matched', right_on='Renner', how='inner')
@@ -163,7 +199,7 @@ with st.sidebar:
     st.title("🚲 CF AI Coach")
     
     st.header("📂 1. Upload Startlijst")
-    uploaded_file = st.file_uploader("Upload CSV/Excel (met kolom 'Renner')", type=['csv', 'xlsx'])
+    uploaded_file = st.file_uploader("Upload PCS Startlijst", type=['pdf', 'csv', 'xlsx'])
     
     st.header("⚙️ 2. Instellingen")
     stat_mapping = {
@@ -203,12 +239,10 @@ with st.sidebar:
 st.title("🚲 Cycling Fantasy: Race Optimizer")
 
 if uploaded_file is None:
-    st.info("👈 Begin met het uploaden van een startlijst in de zijbalk.")
+    st.info("👈 Begin met het uploaden van een startlijst (PDF, CSV of Excel) in de zijbalk.")
     
-    # Format voorbeeld tonen
-    st.markdown("**Hoe moet je startlijst eruit zien?**")
-    st.markdown("Maak een simpel Excel of CSV bestand met tenminste de kolomnaam `Renner`. Kopieer namen direct van ProCyclingStats.")
-    st.code("Renner\nTadej Pogacar\nMathieu van der Poel\nWout van Aert")
+    st.markdown("**Hoe upload je een startlijst?**")
+    st.markdown("1. Ga naar [ProCyclingStats](https://www.procyclingstats.com/) en zoek je koers.\n2. Klik op **Startlist** en download de **PDF** versie.\n3. Upload die PDF direct hierboven in de zijbalk. De AI filtert de namen er zelf uit!")
 
 elif not df_race.empty:
     if "cf_team" in st.session_state and st.session_state.cf_team:
@@ -240,7 +274,7 @@ elif not df_race.empty:
             fig_teams = px.bar(team_df['Team'].value_counts().reset_index().rename(columns={'count':'Aantal'}), x='Team', y='Aantal', title="Spreiding per Ploeg", text_auto=True)
             st.plotly_chart(fig_teams, use_container_width=True)
     else:
-        st.info("👈 Klik op **Bereken CF Team** in de zijbalk.")
+        st.info(f"✅ Succesvol {len(df_race)} renners ingeladen uit je PDF! Klik op **Bereken CF Team** in de zijbalk.")
 
     st.divider()
     st.header(f"📋 Ingeladen Startlijst Database")
