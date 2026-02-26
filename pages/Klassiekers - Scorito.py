@@ -13,6 +13,7 @@ st.set_page_config(page_title="Scorito Klassiekers AI", layout="wide", page_icon
 @st.cache_data
 def load_and_merge_data():
     try:
+        # Bron: Gebruiker / Kopmanpuzzel ruwe copy-paste data
         df_prog = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', on_bad_lines='skip')
         df_prog = df_prog.rename(columns={'RvB': 'BDP', 'IFF': 'GW'})
         
@@ -255,27 +256,28 @@ if "last_finetune" not in st.session_state: st.session_state.last_finetune = Non
 # --- SIDEBAR (CONTROLECENTRUM) ---
 with st.sidebar:
     st.title("🏆 AI Coach")
-    st.header("⚙️ Instellingen")
-    use_transfers = st.checkbox("🔁 Bereken met 3 wissels (Parijs-Roubaix)", value=True)
-    max_ren = st.number_input("Totaal aantal renners", value=20)
-    max_bud = st.number_input("Max Budget", value=45000000, step=500000)
-    min_bud = st.number_input("Min Budget", value=43000000, step=500000)
-    min_per_koers = st.slider("Min. renners per koers", 0, 15, 3)
     
-    st.divider()
-    ev_method = st.selectbox(
-        "🧮 Rekenmodel (EV)",
-        ["1. Scorito Ranking (Dynamisch)", "2. Originele Curve (Macht 4)", "3. Extreme Curve (Macht 10)", "4. Tiers & Spreiding (Realistisch)"]
-    )
+    # Direct toegankelijke instellingen
+    ev_method = st.selectbox("🧮 Rekenmodel (EV)", ["1. Scorito Ranking (Dynamisch)", "2. Originele Curve (Macht 4)", "3. Extreme Curve (Macht 10)", "4. Tiers & Spreiding (Realistisch)"])
+    use_transfers = st.checkbox("🔁 Bereken met 3 wissels (Parijs-Roubaix)", value=True)
+    
+    # Verborgen instellingen om ruimte te besparen
+    with st.expander("⚙️ Budget & Limieten", expanded=False):
+        max_ren = st.number_input("Totaal aantal renners", value=20)
+        max_bud = st.number_input("Max Budget", value=45000000, step=500000)
+        min_bud = st.number_input("Min Budget", value=43000000, step=500000)
+        min_per_koers = st.slider("Min. renners per koers", 0, 15, 3)
+        
     df = calculate_ev(df_raw, early_races, late_races, koers_mapping, ev_method)
     
-    st.divider()
     with st.expander("🔒 Renners Forceren / Uitsluiten", expanded=False):
         force_early = st.multiselect("🟢 Moet in team:", options=df['Renner'].tolist())
         ban_early = st.multiselect("🔴 Niet als basis (evt wissel):", options=[r for r in df['Renner'].tolist() if r not in force_early])
         exclude_list = st.multiselect("🚫 Compleet negeren:", options=[r for r in df['Renner'].tolist() if r not in force_early + ban_early])
 
-    st.divider()
+    st.write("") # Extra witruimte
+    
+    # DE GROTE ACTIEKNOP (Nu altijd zichtbaar zonder scrollen)
     if st.button("🚀 BEREKEN OPTIMAAL TEAM", type="primary", use_container_width=True):
         st.session_state.last_finetune = None
         res, transfer_plan = solve_knapsack_with_transfers(
@@ -287,6 +289,41 @@ with st.sidebar:
             st.rerun()
         else:
             st.error("Geen oplossing mogelijk met deze eisen.")
+
+    st.divider()
+    
+    # ROBUUSTE JSON INLADER
+    with st.expander("📂 Oude Teams Inladen", expanded=False):
+        uploaded_file = st.file_uploader("Upload een JSON backup:", type="json")
+        if uploaded_file is not None:
+            if st.button("Laad Backup in", use_container_width=True):
+                try:
+                    ld = json.load(uploaded_file)
+                    oude_selectie = ld.get("selected_riders", [])
+                    oud_plan = ld.get("transfer_plan")
+                    
+                    huidige_renners = df['Renner'].tolist()
+                    
+                    # Fuzzy match functie om oude JSON namen veilig te updaten naar huidige data
+                    def update_naam(naam):
+                        if naam in huidige_renners: return naam
+                        match = process.extractOne(naam, huidige_renners, scorer=fuzz.token_set_ratio)
+                        return match[0] if match and match[1] > 80 else naam
+
+                    st.session_state.selected_riders = [update_naam(r) for r in oude_selectie]
+                    
+                    if oud_plan and isinstance(oud_plan, dict):
+                        st.session_state.transfer_plan = {
+                            "uit": [update_naam(r) for r in oud_plan.get("uit", [])],
+                            "in": [update_naam(r) for r in oud_plan.get("in", [])]
+                        }
+                    else:
+                        st.session_state.transfer_plan = None
+                        
+                    st.session_state.last_finetune = None
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Fout bij inladen: {e}")
 
 st.title("🏆 Voorjaarsklassiekers: Scorito")
 tab1, tab2, tab3 = st.tabs(["🚀 Jouw Team & Analyse", "📋 Alle Renners (Database)", "ℹ️ Uitleg"])
@@ -498,22 +535,16 @@ with tab1:
             st.dataframe(pd.DataFrame(kop_res), hide_index=True, use_container_width=True)
             
         st.divider()
-        with st.expander("💾 Team Opslaan / Exporteren"):
-            if st.session_state.selected_riders:
-                save_data = {"selected_riders": st.session_state.selected_riders, "transfer_plan": st.session_state.transfer_plan}
-                c_dl1, c_dl2 = st.columns(2)
-                with c_dl1: st.download_button("📥 Download als .JSON (Voor later inladen)", data=json.dumps(save_data), file_name="scorito_team.json", mime="application/json", use_container_width=True)
-                with c_dl2: st.download_button("📊 Download als .CSV (Voor Excel)", data=current_df[['Renner', 'Prijs', 'Team', 'Waarde (EV/M)', 'Scorito_EV']].to_csv(index=False), file_name="scorito_team.csv", mime="text/csv", use_container_width=True)
-            uploaded_file = st.file_uploader("📂 Upload een .json bestand om een team te laden:", type="json")
-            if uploaded_file and st.button("Laad Team in", use_container_width=True):
-                try:
-                    ld = json.load(uploaded_file)
-                    st.session_state.selected_riders = [process.extractOne(r, df['Renner'].tolist(), scorer=fuzz.token_set_ratio)[0] for r in ld.get("selected_riders", [])]
-                    st.session_state.transfer_plan = {"uit": [process.extractOne(r, df['Renner'].tolist(), scorer=fuzz.token_set_ratio)[0] for r in ld.get("transfer_plan", {}).get("uit", [])], "in": [process.extractOne(r, df['Renner'].tolist(), scorer=fuzz.token_set_ratio)[0] for r in ld.get("transfer_plan", {}).get("in", [])]} if ld.get("transfer_plan") else None
-                    st.rerun()
-                except: st.error("Fout bij inladen.")
+        st.subheader("💾 Exporteer Team")
+        c_dl1, c_dl2 = st.columns(2)
+        with c_dl1:
+            save_data = {"selected_riders": st.session_state.selected_riders, "transfer_plan": st.session_state.transfer_plan}
+            st.download_button("📥 Download als .JSON (Backup)", data=json.dumps(save_data), file_name="scorito_team.json", mime="application/json", use_container_width=True)
+        with c_dl2:
+            st.download_button("📊 Download als .CSV (Excel)", data=current_df[['Renner', 'Prijs', 'Team', 'Type', 'Waarde (EV/M)', 'Scorito_EV']].to_csv(index=False), file_name="scorito_team.csv", mime="text/csv", use_container_width=True)
+
     else:
-        st.info("Kies je instellingen in de linker zijbalk en klik op **Bereken Optimaal Team** om te starten!")
+        st.info("👈 Kies je instellingen in de zijbalk en klik op **Bereken Optimaal Team** om te starten! (Of laad een bestaande backup in).")
 
 with tab2:
     st.header("📋 Database: Alle Renners")
