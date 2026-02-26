@@ -13,6 +13,7 @@ st.set_page_config(page_title="Scorito Klassiekers AI", layout="wide", page_icon
 @st.cache_data
 def load_and_merge_data():
     try:
+        # Bron: Gebruiker / Kopmanpuzzel ruwe copy-paste data
         df_prog = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', on_bad_lines='skip')
         df_prog = df_prog.rename(columns={'RvB': 'BDP', 'IFF': 'GW'})
         
@@ -303,7 +304,6 @@ with st.sidebar:
                     
                     huidige_renners = df['Renner'].tolist()
                     
-                    # Fuzzy match functie om oude JSON namen veilig te updaten naar huidige data
                     def update_naam(naam):
                         if naam in huidige_renners: return naam
                         match = process.extractOne(naam, huidige_renners, scorer=fuzz.token_set_ratio)
@@ -575,8 +575,8 @@ with tab3:
     st.subheader("📊 1. Data Verzameling & Validatie")
     st.markdown("""
     De tool combineert data uit twee externe bronnen:
-    * **Wielerorakel:** Levert de AI-gebaseerde *Skill-scores* (0 tot 100) van renners op specifieke terreinen zoals Kasseien (COB), Heuvels (HLL) en Sprints (SPR).
-    * **Kopmanpuzzel (via Gebruiker):** Levert de voorlopige startlijsten en de actuele Scorito-prijzen.
+    * **[Wielerorakel](https://www.cyclingoracle.com/):** Levert de AI-gebaseerde *Skill-scores* (0 tot 100) van renners op specifieke terreinen zoals Kasseien (COB), Heuvels (HLL) en Sprints (SPR).
+    * **[Kopmanpuzzel](https://kopmanpuzzel.up.railway.app/) (via Gebruiker):** Levert de voorlopige startlijsten en de actuele Scorito-prijzen.
     
     Een ingebouwde 'Fuzzy Matcher' (een slim algoritme voor tekstherkenning) koppelt deze lijsten aan elkaar, corrigeert automatische dubbele namen (zoals de gebroeders Van Dijke of Pedersen), en bouwt één centrale database op.
     """)
@@ -626,4 +626,9 @@ with tab3:
     2. **Check de Kwaliteitscontrole:** Onder je team in Tab 1 staat een expander. Dit is je vangnet. Het waarschuwt je als de AI stiekem 3 klimmers heeft opgesteld voor de Scheldeprijs om geld te besparen.
     3. **Spreid je Teampunten:** Kijk naar de *'Teampunten Spreiding'* grafiek. Als je 8 renners van Visma hebt, ben je enorm kwetsbaar als dat team een off-day heeft. Gooi er eentje uit via de Finetuner en zoek een vergelijkbare renner van Lidl-Trek of Alpecin.
     4. **Gebruik 'Value for Money':** In het Database-tabblad vind je de kolom `Waarde (EV/M)`. Dit is de heilige graal voor het vinden van donker paarden en goedkope opvullers. 
+    """)
+
+    st.divider()
+    st.markdown("""
+    **🙏 Databronnen & Credits** Zonder de data uit de community was deze tool niet mogelijk geweest. Veel dank aan [Wielerorakel.nl](https://www.cyclingoracle.com/) voor de fantastische AI Skill-scores en [Kopmanpuzzel](https://kopmanpuzzel.up.railway.app/) voor het voorwerk op de startlijsten en prijzen!
     """)
