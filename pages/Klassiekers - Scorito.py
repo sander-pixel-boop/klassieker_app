@@ -353,8 +353,15 @@ with tab1:
                 return max(s, key=s.get)
                 
             current_df['Type'] = current_df.apply(bepaal_type, axis=1)
-            type_data = current_df.groupby('Type')['Prijs'].sum().reset_index()
-            fig_type = px.pie(type_data, values='Prijs', names='Type', hole=0.4, title="Budget per Type")
+            
+            type_data = current_df.groupby('Type').agg(
+                Prijs=('Prijs', 'sum'),
+                Aantal=('Renner', 'count')
+            ).reset_index()
+            
+            type_data['Label'] = type_data['Type'] + ' (' + type_data['Aantal'].astype(str) + ')'
+            
+            fig_type = px.pie(type_data, values='Prijs', names='Label', hole=0.4, title="Budget & Aantal per Type")
             fig_type.update_layout(height=300, margin=dict(t=40, b=20, l=20, r=20))
             st.plotly_chart(fig_type, use_container_width=True)
 
