@@ -5,14 +5,15 @@ import plotly.express as px
 from thefuzz import process, fuzz
 import io
 import re
-import pypdf
+from pypdf import PdfReader
 import os
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Cycling Fantasy AI", layout="wide", page_icon="🚲")
 
 # --- PADEN NAAR BRONBESTANDEN (IN MAIN) ---
-# Omdat dit script in pages/ staat, kijken we één map omhoog naar de root
+# Omdat dit script in pages/ staat, zoeken we in de root map.
+# Streamlit Cloud voert uit vanuit de root, dus directe bestandsnamen werken meestal.
 STATS_PATH = "renners_stats.csv"
 PRICES_PATH = "cf_prijzen.csv"
 
@@ -22,7 +23,7 @@ def load_static_data():
     try:
         # 1. Stats laden uit de root
         if not os.path.exists(STATS_PATH):
-            st.error(f"Bestand '{STATS_PATH}' niet gevonden in de hoofdmap.")
+            st.error(f"Bestand '{STATS_PATH}' niet gevonden in de root map.")
             return pd.DataFrame()
             
         df_stats = pd.read_csv(STATS_PATH, sep='\t') 
@@ -30,6 +31,7 @@ def load_static_data():
             df_stats = df_stats.rename(columns={'Naam': 'Renner'})
         if 'Team' not in df_stats.columns and 'Ploeg' in df_stats.columns:
             df_stats = df_stats.rename(columns={'Ploeg': 'Team'})
+            
         df_stats = df_stats.drop_duplicates(subset=['Renner'], keep='first')
 
         all_stats_cols = ['COB', 'HLL', 'SPR', 'AVG', 'FLT', 'MTN', 'ITT', 'GC', 'OR', 'TTL']
@@ -45,23 +47,28 @@ def load_static_data():
 
         # 2. Prijzen laden uit de root
         try:
-            df_prices = pd.read_csv(PRICES_PATH, sep=None, engine='python')
-            if 'Naam' in df_prices.columns:
-                df_prices = df_prices.rename(columns={'Naam': 'Renner'})
-        except FileNotFoundError:
-            st.warning(f"⚠️ Bestand '{PRICES_PATH}' niet gevonden. Alle renners krijgen standaard 200 credits.")
+            if os.path.exists(PRICES_PATH):
+                df_prices = pd.read_csv(PRICES_PATH, sep=None, engine='python')
+                if 'Naam' in df_prices.columns:
+                    df_prices = df_prices.rename(columns={'Naam': 'Renner'})
+            else:
+                st.warning(f"⚠️ Bestand '{PRICES_PATH}' niet gevonden in root. Alle renners krijgen 200 credits.")
+                df_prices = pd.DataFrame(columns=['Renner', 'Prijs'])
+        except Exception:
             df_prices = pd.DataFrame(columns=['Renner', 'Prijs'])
 
         # Koppel prijzen aan de stats via Fuzzy Match
         full_names = df_stats['Renner'].tolist()
-        def match_name(name):
-            match = process.extractOne(str(name), full_names, scorer=fuzz.token_set_ratio)
-            return match[0] if match and match[1] > 85 else name
-
+        
         if not df_prices.empty:
-            df_prices['Renner_Matched'] = df_prices['Renner'].apply(match_name)
-            df_stats = pd.merge(df_stats, df_prices[['Renner_Matched', 'Prijs']], left_on='Renner', right_on='Renner_Matched', how='left')
-            df_stats = df_stats.drop(columns=['Renner_Matched'])
+            # We doen een kleine pre-match om de merge sneller te maken
+            price_map = {}
+            for _, row in df_prices.iterrows():
+                match = process.extractOne(str(row['Renner']), full_names, scorer=fuzz.token_set_ratio)
+                if match and match[1] > 85:
+                    price_map[match[0]] = row['Prijs']
+            
+            df_stats['Prijs'] = df_stats['Renner'].map(price_map)
         else:
             df_stats['Prijs'] = 200
 
@@ -75,43 +82,50 @@ def load_static_data():
 
 # --- PDF PARSER VOOR PCS STARTLIJSTEN ---
 def parse_pcs_pdf(uploaded_file):
-    pdf_reader = pypdf.PdfReader(uploaded_file)
-    text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text() + "\n"
-    
-    raw_chunks = re.split(r'  +|\n', text)
-    potential_names = []
-    for chunk in raw_chunks:
-        chunk = chunk.strip()
-        if not chunk: continue
-        # Rugnummer + Naam
-        match = re.search(r'^\d{1,3}\.?\s+([A-Za-zÀ-ÖØ-öø-ÿ\-\'\s]{4,})', chunk)
-        if match:
-            name = match.group(1).strip()
-            name = re.sub(r'\s+\d+$', '', name).strip()
-            potential_names.append(name)
-        elif len(chunk) > 5 and not any(char.isdigit() for char in chunk):
-            potential_names.append(chunk)
+    try:
+        pdf_reader = PdfReader(uploaded_file)
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+        
+        raw_chunks = re.split(r'  +|\n', text)
+        potential_names = []
+        for chunk in raw_chunks:
+            chunk = chunk.strip()
+            if not chunk: continue
+            
+            # Zoek naar patronen zoals "1. Tadej Pogacar" of "121 Philipsen Jasper"
+            match = re.search(r'^\d{1,3}\.?\s+([A-Za-zÀ-ÖØ-öø-ÿ\-\'\s]{4,})', chunk)
+            if match:
+                name = match.group(1).strip()
+                name = re.sub(r'\s+\d+$', '', name).strip() # Verwijder leeftijd-getallen aan eind
+                potential_names.append(name)
+            elif len(chunk) > 5 and not any(char.isdigit() for char in chunk):
+                potential_names.append(chunk)
 
-    return pd.DataFrame({'Renner': potential_names})
+        return pd.DataFrame({'Renner': potential_names})
+    except Exception as e:
+        st.error(f"Fout bij lezen PDF: {e}")
+        return pd.DataFrame()
 
 # --- STARTLIJST VERWERKEN ---
 def process_startlist(uploaded_file, df_static):
     try:
-        if uploaded_file.name.endswith('.pdf'):
+        if uploaded_file.name.lower().endswith('.pdf'):
             df_start = parse_pcs_pdf(uploaded_file)
-        elif uploaded_file.name.endswith('.csv'):
+        elif uploaded_file.name.lower().endswith('.csv'):
             df_start = pd.read_csv(uploaded_file, sep=None, engine='python')
         else:
             df_start = pd.read_excel(uploaded_file)
             
-        if not uploaded_file.name.endswith('.pdf'):
+        if not uploaded_file.name.lower().endswith('.pdf'):
             col_name = next((c for c in ['Renner', 'Rider', 'Naam', 'Name'] if c in df_start.columns), df_start.columns[0])
             df_start = df_start.rename(columns={col_name: 'Renner'})
         
         full_names = df_static['Renner'].tolist()
+        
         def match_name_upload(name):
+            if not name or pd.isna(name): return None
             match = process.extractOne(str(name), full_names, scorer=fuzz.token_set_ratio)
             return match[0] if match and match[1] > 75 else None
             
@@ -145,6 +159,7 @@ def calculate_cf_ev(df, stat, method):
 def solve_cf_team(dataframe, total_budget, force_list, exclude_list):
     prob = pulp.LpProblem("CF_Solver", pulp.LpMaximize)
     rider_vars = pulp.LpVariable.dicts("Riders", dataframe.index, cat='Binary')
+    
     prob += pulp.lpSum([dataframe.loc[i, 'CF_EV'] * rider_vars[i] for i in dataframe.index])
     prob += pulp.lpSum([rider_vars[i] for i in dataframe.index]) == 9
     prob += pulp.lpSum([dataframe.loc[i, 'Prijs'] * rider_vars[i] for i in dataframe.index]) <= total_budget
@@ -162,16 +177,24 @@ def solve_cf_team(dataframe, total_budget, force_list, exclude_list):
 # --- HOOFDCODE ---
 df_static = load_static_data()
 if df_static.empty:
+    st.warning("De database kon niet worden geïnitialiseerd. Controleer of de CSV bestanden in de root map staan.")
     st.stop()
 
 # --- SIDEBAR ---
 with st.sidebar:
     st.title("🚲 CF AI Coach")
     st.header("📂 1. Upload Startlijst")
-    uploaded_file = st.file_uploader("Upload PCS PDF of Excel", type=['pdf', 'csv', 'xlsx'])
+    uploaded_file = st.file_uploader("Upload PCS PDF, CSV of Excel", type=['pdf', 'csv', 'xlsx', 'xls'])
     
     st.header("⚙️ 2. Instellingen")
-    stat_mapping = {'Kasseien (COB)': 'COB', 'Heuvels (HLL)': 'HLL', 'Sprint (SPR)': 'SPR', 'Allround (AVG)': 'AVG', 'Klimmen (MTN)': 'MTN', 'Tijdrit (ITT)': 'ITT'}
+    stat_mapping = {
+        'Kasseien (COB)': 'COB', 
+        'Heuvels (HLL)': 'HLL', 
+        'Sprint (SPR)': 'SPR', 
+        'Allround (AVG)': 'AVG', 
+        'Klimmen (MTN)': 'MTN', 
+        'Tijdrit (ITT)': 'ITT'
+    }
     koers_type = st.selectbox("🏁 Type Koers:", list(stat_mapping.keys()))
     ev_method = st.selectbox("🧮 Rekenmodel", ["1. Ranking (CF Punten)", "2. Macht 4 Curve"])
     max_bud = st.number_input("💰 Budget (Credits)", value=5000, step=200)
@@ -185,15 +208,16 @@ with st.sidebar:
             with st.expander("🔒 Forceer / Uitsluit"):
                 force_list = st.multiselect("🟢 Moet in team:", options=df_race['Renner'].tolist())
                 exclude_list = st.multiselect("🚫 Negeren:", options=[r for r in df_race['Renner'].tolist() if r not in force_list])
+            
             if st.button("🚀 BEREKEN TEAM", type="primary", use_container_width=True):
                 st.session_state.cf_team = solve_cf_team(df_race, max_bud, force_list, exclude_list)
 
-st.title("🚲 Cycling Fantasy Race Optimizer")
+st.title("🚲 Cycling Fantasy Optimizer")
 tab1, tab2, tab3 = st.tabs(["🚀 Optimaal Team", "📋 Database", "📖 Uitleg"])
 
 with tab1:
     if uploaded_file is None:
-        st.info("👈 Upload eerst een PDF startlijst van ProCyclingStats.")
+        st.info("👈 Upload eerst de PDF startlijst van ProCyclingStats in de zijbalk.")
     elif "cf_team" in st.session_state and st.session_state.cf_team:
         team_df = df_race[df_race['Renner'].isin(st.session_state.cf_team)].sort_values(by='CF_EV', ascending=False).reset_index(drop=True)
         multipliers = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2]
@@ -204,23 +228,27 @@ with tab1:
         m2.metric("🚴 Renners", "9 / 9")
         m3.metric("🎯 Team EV", f"{team_df['CF_EV'].sum():.1f}")
         
-        st.success("💡 **Tie-Breaker:** Gebruik de volgorde hieronder in de CF-app!")
+        st.success("💡 **Tie-Breaker:** Gebruik de volgorde hieronder exact zo in de Cycling Fantasy app!")
         st.dataframe(team_df[['Tie-Breaker', 'Renner', 'Team', 'Prijs', 'CF_EV', stat_mapping[koers_type]]], hide_index=True, use_container_width=True)
         
         c1, c2 = st.columns(2)
-        with c1: st.plotly_chart(px.pie(team_df, values='Prijs', names='Team', title="Spreiding per Ploeg"), use_container_width=True)
-        with c2: st.plotly_chart(px.bar(team_df, x='Renner', y='CF_EV', title="Individuele EV Bijdrage"), use_container_width=True)
+        with c1:
+            st.plotly_chart(px.pie(team_df, values='Prijs', names='Team', title="Team Budgetverdeling"), use_container_width=True)
+        with c2:
+            st.plotly_chart(px.bar(team_df, x='Renner', y='CF_EV', title="Verwachte Punten per Renner"), use_container_width=True)
+    elif not df_race.empty:
+        st.info("✅ Startlijst geladen. Klik op 'Bereken Team' in de zijbalk.")
 
 with tab2:
     if not df_race.empty:
+        st.subheader("Volledige Startlijst Analyse")
         st.dataframe(df_race[['Renner', 'Team', 'Prijs', 'CF_EV', 'Waarde (EV/Credit)', stat_mapping[koers_type]]].sort_values(by='CF_EV', ascending=False), hide_index=True, use_container_width=True)
 
 with tab3:
-    st.header("📖 Quick Start Guide")
+    st.header("📖 Hoe werkt het?")
     st.markdown("""
-    1. **Data voorbereiden:** Zorg dat `renners_stats.csv` en `cf_prijzen.csv` in de hoofdmap van je project staan.
-    2. **Startlijst ophalen:** Ga naar [ProCyclingStats](https://www.procyclingstats.com/), zoek je koers, klik op **Startlist** en download de **PDF**.
-    3. **Uploaden:** Gooi de PDF in de zijbalk van deze app.
-    4. **Samenstellen:** Kies het type koers (Kasseien voor Vlaanderen, Heuvels voor Amstel) en klik op berekenen.
-    5. **Tie-Breaker:** Cycling Fantasy beloont de volgorde van je renners bij een gelijke stand. De AI zet de renners met de meeste kans automatisch bovenaan.
+    1. **PDF Import:** De app leest de officiële PDF startlijst van ProCyclingStats. Hij herkent rugnummers en namen.
+    2. **Prijzen:** Hij koppelt namen aan `cf_prijzen.csv`. Renners buiten de top 200 kosten automatisch **200 credits**.
+    3. **Tie-Breaker:** In Cycling Fantasy is de volgorde van je 9 renners de tie-breaker (multiplier x1.0 tot x0.2). De AI zet de renners met de hoogste puntenverwachting altijd bovenaan.
+    4. **Requirements:** Zorg dat `pypdf` in je `requirements.txt` staat op GitHub.
     """)
