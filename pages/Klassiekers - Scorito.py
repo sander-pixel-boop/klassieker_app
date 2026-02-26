@@ -587,7 +587,7 @@ with tab1:
 
         # 3. MATRIX
         st.header("🗓️ 3. Startlijst Matrix (Seizoensoverzicht)")
-        matrix_df = current_df[['Renner', 'Rol'] + race_cols].set_index('Renner')
+        matrix_df = current_df[['Renner', 'Rol', 'Prijs'] + race_cols].set_index('Renner')
         
         active_matrix = matrix_df.copy()
         if st.session_state.transfer_plan:
@@ -613,6 +613,7 @@ with tab1:
 
         display_matrix = matrix_df[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
         display_matrix.insert(0, 'Rol', matrix_df['Rol'])
+        display_matrix.insert(1, 'Prijs', matrix_df['Prijs'].apply(lambda x: f"€ {x/1000000:.2f}M"))
         
         if 'PR' in display_matrix.columns:
             pr_idx = display_matrix.columns.get_loc('PR')
