@@ -13,8 +13,27 @@ st.set_page_config(page_title="Scorito Klassiekers", layout="wide", page_icon="�
 @st.cache_data
 def load_and_merge_data():
     try:
+        # Bron: Gebruiker / Kopmanpuzzel ruwe copy-paste data
         df_prog = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', on_bad_lines='skip')
-        df_prog.loc[df_prog['Prijs'] == 800000, 'Prijs'] = 750000
+        
+        # Hernoem afwijkende afkortingen naar de app-standaard
+        df_prog = df_prog.rename(columns={'RvB': 'BDP', 'IFF': 'GW'})
+        
+        # Haal de prijs uit de naam ("Pogacar (7.00M)" -> "Pogacar" en 7000000)
+        if 'Prijs' not in df_prog.columns and df_prog['Renner'].astype(str).str.contains(r'\(.*\)', regex=True).any():
+            extracted = df_prog['Renner'].str.extract(r'^(.*?)\s*\(([\d\.]+)[Mm]\)')
+            df_prog['Renner'] = extracted[0].str.strip()
+            df_prog['Prijs'] = pd.to_numeric(extracted[1], errors='coerce') * 1000000
+            
+        # Vinkjes omzetten naar 1, leeg naar 0
+        for col in df_prog.columns:
+            if col not in ['Renner', 'Prijs']:
+                df_prog[col] = df_prog[col].apply(lambda x: 1 if str(x).strip() in ['✓', 'v', 'V', '1', '1.0'] else 0)
+
+        # Toepassen regel: 0.8M -> 750000
+        if 'Prijs' in df_prog.columns:
+            df_prog['Prijs'] = df_prog['Prijs'].fillna(0)
+            df_prog.loc[df_prog['Prijs'] == 800000, 'Prijs'] = 750000
         
         df_stats = pd.read_csv("renners_stats.csv", sep='\t') 
         if 'Naam' in df_stats.columns:
@@ -78,15 +97,32 @@ def load_and_merge_data():
         
         koers_stat_map = {'OHN':'COB','KBK':'SPR','SB':'HLL','PN':'HLL','TA':'SPR','MSR':'AVG','BDP':'SPR','E3':'COB','GW':'SPR','DDV':'COB','RVV':'COB','SP':'SPR','PR':'COB','BP':'HLL','AGR':'HLL','WP':'HLL','LBL':'HLL'}
         
+        # Bereken EV_early met dynamische kopman bonus (x3, x2.5, x2)
         merged_df['EV_early'] = 0.0
         for koers in available_early:
             stat = koers_stat_map.get(koers, 'AVG')
-            merged_df['EV_early'] += merged_df[koers] * ((merged_df[stat] / 100)**4 * 100)
+            race_ev = merged_df[koers] * ((merged_df[stat] / 100)**4 * 100)
             
+            # Vind de top 3 renners op de startlijst voor de Kopman multiplier
+            starters_idx = merged_df[merged_df[koers] == 1].sort_values(by=[stat, 'AVG'], ascending=[False, False]).head(3).index
+            multipliers = [3.0, 2.5, 2.0]
+            for rank, idx in enumerate(starters_idx):
+                race_ev.loc[idx] = race_ev.loc[idx] * multipliers[rank]
+                
+            merged_df['EV_early'] += race_ev
+            
+        # Bereken EV_late met dynamische kopman bonus (x3, x2.5, x2)
         merged_df['EV_late'] = 0.0
         for koers in available_late:
             stat = koers_stat_map.get(koers, 'AVG')
-            merged_df['EV_late'] += merged_df[koers] * ((merged_df[stat] / 100)**4 * 100)
+            race_ev = merged_df[koers] * ((merged_df[stat] / 100)**4 * 100)
+            
+            starters_idx = merged_df[merged_df[koers] == 1].sort_values(by=[stat, 'AVG'], ascending=[False, False]).head(3).index
+            multipliers = [3.0, 2.5, 2.0]
+            for rank, idx in enumerate(starters_idx):
+                race_ev.loc[idx] = race_ev.loc[idx] * multipliers[rank]
+                
+            merged_df['EV_late'] += race_ev
 
         merged_df['EV_early'] = merged_df['EV_early'].fillna(0).round(0).astype(int)
         merged_df['EV_late'] = merged_df['EV_late'].fillna(0).round(0).astype(int)
@@ -636,13 +672,13 @@ with tab3:
     st.markdown("""
     Deze applicatie berekent wiskundig het meest optimale Scorito-team voor het Voorjaarsklassiekers-spel. Het haalt de emotie uit het spel en kijkt puur naar statistieken en wedstrijdprogramma's.
     
-    ### 1. Expected Value (EV) Berekening
-    Elke renner krijgt per koers een verwachte puntenwaarde (EV). Dit doen we door te kijken naar de specifieke vaardigheden van de renner (Sprint, Kassei, Heuvel of Allround).
+    ### 1. Expected Value (EV) Berekening & Kopman Bonus
+    Elke renner krijgt per koers een verwachte puntenwaarde (EV). Dit doen we door te kijken naar de specifieke vaardigheden van de renner (Sprint, Kassei, Heuvel of Allround). 
     
-    Elke koers is gekoppeld aan de belangrijkste statistiek voor dat parcours. Omloop Het Nieuwsblad is gekoppeld aan Kassei (COB), de Amstel Gold Race aan Heuvel (HLL) en de Scheldeprijs aan Sprint (SPR).
+    Daarnaast bevat het model een automatische **Kopman Bonus**. Voor elke koers identificeert de AI de 3 beste renners op de startlijst. Deze absolute favorieten krijgen een enorme boost in hun EV (x3, x2.5 en x2) om de werkelijke kopmanpunten in Scorito realistisch na te bootsen.
     
     De basisformule voor de punten per koers is een machtsformule om topspecialisten zwaarder te belonen dan allrounders:
-    **EV = Deelname (1 of 0) × ((Specifieke Stat / 100)⁴ × 100)**
+    **EV = Deelname (1 of 0) × ((Specifieke Stat / 100)⁴ × 100) × Kopman Multiplier**
     
     ### 2. Het Algoritme (Knapsack Problem)
     Om van al deze individuele waarden tot het beste team van 20 renners te komen, gebruiken we een wiskundig principe genaamd het **Knapsack Problem** (krukzakprobleem). 
