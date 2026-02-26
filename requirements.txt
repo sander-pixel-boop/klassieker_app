@@ -1,6 +1,7 @@
 streamlit
 pandas
 pulp
-thefuzz
 plotly
-pip install pypdf
+thefuzz
+pypdf
+openpyxl
