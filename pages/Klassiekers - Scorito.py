@@ -38,6 +38,10 @@ def load_and_merge_data():
         df_stats = pd.read_csv("renners_stats.csv", sep='\t') 
         if 'Naam' in df_stats.columns:
             df_stats = df_stats.rename(columns={'Naam': 'Renner'})
+        
+        # Zorg dat de Team kolom correct heet
+        if 'Team' not in df_stats.columns and 'Ploeg' in df_stats.columns:
+            df_stats = df_stats.rename(columns={'Ploeg': 'Team'})
             
         df_stats = df_stats.drop_duplicates(subset=['Renner'], keep='first')
         
@@ -106,6 +110,11 @@ def load_and_merge_data():
             if col not in merged_df.columns:
                 merged_df[col] = 0
             merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0).astype(int)
+            
+        if 'Team' not in merged_df.columns:
+            merged_df['Team'] = 'Onbekend'
+        else:
+            merged_df['Team'] = merged_df['Team'].fillna('Onbekend')
         
         merged_df['Total_Races'] = merged_df[available_races].sum(axis=1).astype(int)
         
@@ -163,6 +172,9 @@ def calculate_ev(df, early_races, late_races, koers_stat_map, method):
     df['EV_late'] = df['EV_late'].fillna(0).round(0).astype(int)
     df['Scorito_EV'] = df['EV_early'] + df['EV_late']
     
+    # Value for Money (EV per Miljoen)
+    df['Waarde (EV/M)'] = (df['Scorito_EV'] / (df['Prijs'] / 1000000)).replace([float('inf'), -float('inf')], 0).fillna(0).round(1)
+    
     return df
 
 # Geavanceerde Type Bepaling (Pakt dubbele combinaties bij elitescores)
@@ -183,7 +195,6 @@ def bepaal_klassieker_type(row):
     elif len(elite) == 1:
         return elite[0]
     else:
-        # Als ze nergens 85+ scoren, pakken we hun absolute topscore
         s = {
             'Kassei': cob, 
             'Heuvel': hll, 
@@ -338,20 +349,33 @@ with tab1:
                 
         # --- OPSLAAN / LADEN BLOK ---
         st.divider()
-        with st.expander("💾 Team Opslaan / Inladen"):
+        with st.expander("💾 Team Opslaan / Exporteren"):
             if st.session_state.selected_riders:
                 save_data = {
                     "selected_riders": st.session_state.selected_riders,
                     "transfer_plan": st.session_state.transfer_plan
                 }
                 json_str = json.dumps(save_data)
-                st.download_button(
-                    label="📥 Download huidig team",
-                    data=json_str,
-                    file_name="scorito_team.json",
-                    mime="application/json",
-                    use_container_width=True
-                )
+                
+                c_dl1, c_dl2 = st.columns(2)
+                with c_dl1:
+                    st.download_button(
+                        label="📥 Download als .JSON (Backup)",
+                        data=json_str,
+                        file_name="scorito_team.json",
+                        mime="application/json",
+                        use_container_width=True
+                    )
+                with c_dl2:
+                    current_df_export = df[df['Renner'].isin(st.session_state.selected_riders + (st.session_state.transfer_plan['in'] if st.session_state.transfer_plan else []))].copy()
+                    csv_export = current_df_export[['Renner', 'Prijs', 'Team', 'Waarde (EV/M)', 'Scorito_EV']].to_csv(index=False)
+                    st.download_button(
+                        label="📊 Download als .CSV (Excel)",
+                        data=csv_export,
+                        file_name="scorito_team.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
             
             uploaded_file = st.file_uploader("📂 Upload een bewaard team (.json)", type="json")
             if uploaded_file is not None:
@@ -432,9 +456,37 @@ with tab1:
         else:
             m3.metric("Team EV", f"{start_team_df['Scorito_EV'].sum():.0f}")
 
+        # --- KWALITEITSCONTROLE WAARSCHUWINGEN ---
+        matrix_df_check = current_df[['Renner', 'Rol', 'Type', 'Prijs'] + race_cols].set_index('Renner')
+        active_matrix_check = matrix_df_check.copy()
+        if st.session_state.transfer_plan:
+            for r in early_races: active_matrix_check.loc[active_matrix_check['Rol'] == 'Kopen na PR', r] = 0
+            for r in late_races: active_matrix_check.loc[active_matrix_check['Rol'] == 'Verkopen na PR', r] = 0
+
+        warnings = []
+        for c in race_cols:
+            starters = active_matrix_check[active_matrix_check[c] == 1]
+            if len(starters) > 0:
+                stat = koers_mapping.get(c, 'AVG')
+                starters_stats = current_df[current_df['Renner'].isin(starters.index)]
+                max_stat = starters_stats[stat].max()
+                if max_stat < 85:
+                    warnings.append(f"**{c}**: Je beste renner heeft slechts een '{stat}'-score van {max_stat}. Overweeg een sterkere kopman voor deze koers!")
+            else:
+                warnings.append(f"**{c}**: Je hebt momenteel GEEN actieve renners aan de start staan!")
+
+        if warnings:
+            with st.expander("🚨 **Kwaliteitscontrole: Gevonden zwaktes in je programma**", expanded=True):
+                for w in warnings:
+                    st.warning(w)
+        else:
+            st.success("✅ **Kwaliteitscontrole:** Je team ziet er robuust uit met een sterke kopman (>85 score) voor élke koers!")
+
         # --- GRAFIEKEN ---
         st.header("📈 Team Analyse")
-        c_chart1, c_chart2, c_chart3 = st.columns(3)
+        
+        c_chart1, c_chart2 = st.columns(2)
+        c_chart3, c_chart4 = st.columns(2)
         
         with c_chart1:
             start_stats = start_team_df[['COB', 'HLL', 'SPR', 'AVG']].mean().round(1)
@@ -449,10 +501,10 @@ with tab1:
                 name='Gemiddelde'
             ))
             fig_radar.update_layout(
-                height=300,
+                height=350,
                 polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
                 showlegend=False,
-                title="Stats (Start-Team)",
+                title="Gemiddelde Stats (Start-Team)",
                 margin=dict(t=40, b=20, l=40, r=40)
             )
             st.plotly_chart(fig_radar, use_container_width=True)
@@ -460,7 +512,7 @@ with tab1:
         with c_chart2:
             budget_data = current_df.groupby('Rol')['Prijs'].sum().reset_index()
             fig_donut = px.pie(budget_data, values='Prijs', names='Rol', hole=0.4, title="Budget per Rol")
-            fig_donut.update_layout(height=300, margin=dict(t=40, b=20, l=20, r=20))
+            fig_donut.update_layout(height=350, margin=dict(t=40, b=20, l=20, r=20))
             st.plotly_chart(fig_donut, use_container_width=True)
             
         with c_chart3:
@@ -468,12 +520,17 @@ with tab1:
                 Prijs=('Prijs', 'sum'),
                 Aantal=('Renner', 'count')
             ).reset_index()
-            
             type_data['Label'] = type_data['Type'] + ' (' + type_data['Aantal'].astype(str) + ')'
-            
-            fig_type = px.pie(type_data, values='Prijs', names='Label', hole=0.4, title="Budget & Aantal per Type")
-            fig_type.update_layout(height=300, margin=dict(t=40, b=20, l=20, r=20))
+            fig_type = px.pie(type_data, values='Prijs', names='Label', hole=0.4, title="Budget & Aantal per Renner Type")
+            fig_type.update_layout(height=350, margin=dict(t=40, b=20, l=20, r=20))
             st.plotly_chart(fig_type, use_container_width=True)
+            
+        with c_chart4:
+            team_data = current_df['Team'].value_counts().reset_index()
+            team_data.columns = ['Team', 'Aantal']
+            fig_teams = px.bar(team_data, x='Team', y='Aantal', title="Spreiding per Ploeg (Teampunten)", text_auto=True)
+            fig_teams.update_layout(height=350, xaxis_title="", yaxis_title="Aantal Renners", margin=dict(t=40, b=20, l=20, r=20))
+            st.plotly_chart(fig_teams, use_container_width=True)
 
         # --- FINETUNER BLOK ---
         st.divider()
@@ -503,7 +560,8 @@ with tab1:
             
             if not sugg_df.empty:
                 st.info(f"💡 **Top 5 suggesties op basis van EV (Max budget voor 1 renner: € {max_affordable:,.0f}):**")
-                st.dataframe(sugg_df[['Renner', 'Prijs', 'Scorito_EV', 'COB', 'HLL', 'SPR', 'AVG']], hide_index=True, use_container_width=True)
+                sugg_display = sugg_df[['Renner', 'Prijs', 'Waarde (EV/M)', 'Scorito_EV', 'COB', 'HLL', 'SPR', 'AVG']]
+                st.dataframe(sugg_display, hide_index=True, use_container_width=True)
                 
                 sugg_keuze = st.multiselect("👉 Of selecteer hier direct één of meer suggesties:", options=sugg_df['Renner'].tolist())
                 to_add = list(set(to_add + sugg_keuze))
@@ -532,7 +590,7 @@ with tab1:
             compare_riders = list(set(to_replace + to_add + force_new_base + force_new_uit + force_new_in))
             compare_df = df[df['Renner'].isin(compare_riders)].copy()
             
-            compare_cols = ['Renner', 'Prijs', 'Scorito_EV', 'COB', 'HLL', 'SPR', 'AVG'] + race_cols
+            compare_cols = ['Renner', 'Prijs', 'Waarde (EV/M)', 'Scorito_EV', 'COB', 'HLL', 'SPR', 'AVG'] + race_cols
             comp_display = compare_df[compare_cols].copy()
             
             def mark_status(renner):
@@ -608,7 +666,7 @@ with tab1:
 
         # 3. MATRIX
         st.header("🗓️ 3. Startlijst Matrix (Seizoensoverzicht)")
-        matrix_df = current_df[['Renner', 'Rol', 'Type', 'Prijs'] + race_cols].set_index('Renner')
+        matrix_df = current_df[['Renner', 'Rol', 'Type', 'Team', 'Prijs'] + race_cols].set_index('Renner')
         
         active_matrix = matrix_df.copy()
         if st.session_state.transfer_plan:
@@ -620,14 +678,14 @@ with tab1:
         display_matrix = matrix_df[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
         display_matrix.insert(0, 'Rol', matrix_df['Rol'])
         display_matrix.insert(1, 'Type', matrix_df['Type'])
-        display_matrix.insert(2, 'Prijs', matrix_df['Prijs'].apply(lambda x: f"€ {x/1000000:.2f}M"))
-        display_matrix.insert(3, 'Koersen', active_matrix[race_cols].sum(axis=1).astype(int))
+        display_matrix.insert(2, 'Team', matrix_df['Team'])
+        display_matrix.insert(3, 'Prijs', matrix_df['Prijs'].apply(lambda x: f"€ {x/1000000:.2f}M"))
+        display_matrix.insert(4, 'Koersen', active_matrix[race_cols].sum(axis=1).astype(int))
         
         if 'PR' in display_matrix.columns:
             pr_idx = display_matrix.columns.get_loc('PR')
             display_matrix.insert(pr_idx + 1, '🔁', '|')
             
-        # Totaalrij berekenen en toevoegen als onderste rij IN de tabel
         totals_dict = {}
         for c in display_matrix.columns:
             if c in race_cols:
@@ -667,7 +725,7 @@ with tab1:
 
         # 5. STATS
         st.header("📊 5. Team Statistieken")
-        stats_overzicht = current_df[['Renner', 'Rol', 'Type', 'COB', 'HLL', 'SPR', 'AVG', 'Prijs', 'EV_early', 'EV_late', 'Scorito_EV']].copy()
+        stats_overzicht = current_df[['Renner', 'Rol', 'Type', 'Team', 'Prijs', 'Waarde (EV/M)', 'EV_early', 'EV_late', 'Scorito_EV']].copy()
         
         stats_overzicht = stats_overzicht.rename(columns={
             'EV_early': 'EV Early', 
@@ -714,7 +772,7 @@ with tab2:
     col_f1, col_f2, col_f3 = st.columns(3)
     
     with col_f1:
-        search_name = st.text_input("🔍 Zoek op naam:")
+        search_name = st.text_input("🔍 Zoek op naam of Ploeg:")
     
     with col_f2:
         min_p = int(df['Prijs'].min())
@@ -728,14 +786,17 @@ with tab2:
     filtered_df['Type'] = filtered_df.apply(bepaal_klassieker_type, axis=1)
     
     if search_name:
-        filtered_df = filtered_df[filtered_df['Renner'].str.contains(search_name, case=False, na=False)]
+        filtered_df = filtered_df[
+            filtered_df['Renner'].str.contains(search_name, case=False, na=False) |
+            filtered_df['Team'].str.contains(search_name, case=False, na=False)
+        ]
         
     filtered_df = filtered_df[(filtered_df['Prijs'] >= price_filter[0]) & (filtered_df['Prijs'] <= price_filter[1])]
     
     if race_filter:
         filtered_df = filtered_df[filtered_df[race_filter].sum(axis=1) == len(race_filter)]
 
-    display_cols = ['Renner', 'Prijs', 'Type', 'Total_Races', 'Scorito_EV'] + race_cols
+    display_cols = ['Renner', 'Team', 'Prijs', 'Waarde (EV/M)', 'Type', 'Total_Races', 'Scorito_EV'] + race_cols
     display_df = filtered_df[display_cols].copy()
     
     display_df = display_df.rename(columns={
