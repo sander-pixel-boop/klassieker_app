@@ -606,13 +606,6 @@ with tab1:
                 else:
                     st.error("Geen oplossing mogelijk! De limieten (zoals max 3 wissels of budget) zijn overschreden. Tip: Zet het vinkje 'Bevries rollen' uit.")
 
-        def color_rows(row):
-            if row['Rol'] == 'Verkopen na PR':
-                return ['background-color: rgba(255, 99, 71, 0.2)'] * len(row)
-            elif row['Rol'] == 'Kopen na PR':
-                return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
-            return [''] * len(row)
-
         # 3. MATRIX
         st.header("🗓️ 3. Startlijst Matrix (Seizoensoverzicht)")
         matrix_df = current_df[['Renner', 'Rol', 'Type', 'Prijs'] + race_cols].set_index('Renner')
@@ -624,21 +617,6 @@ with tab1:
             for r in late_races:
                 active_matrix.loc[active_matrix['Rol'] == 'Verkopen na PR', r] = 0
 
-        totals = active_matrix[race_cols].sum().astype(int).astype(str)
-        totals_dict = totals.to_dict()
-        
-        if 'PR' in race_cols:
-            new_totals = {}
-            for k, v in totals_dict.items():
-                new_totals[k] = v
-                if k == 'PR':
-                    new_totals['🔁'] = ''
-            totals_row = pd.DataFrame([new_totals], index=['🏆 TOTAAL AAN DE START (Actief)'])
-        else:
-            totals_row = pd.DataFrame([totals_dict], index=['🏆 TOTAAL AAN DE START (Actief)'])
-            
-        st.dataframe(totals_row, use_container_width=True)
-
         display_matrix = matrix_df[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
         display_matrix.insert(0, 'Rol', matrix_df['Rol'])
         display_matrix.insert(1, 'Type', matrix_df['Type'])
@@ -648,8 +626,31 @@ with tab1:
         if 'PR' in display_matrix.columns:
             pr_idx = display_matrix.columns.get_loc('PR')
             display_matrix.insert(pr_idx + 1, '🔁', '|')
-        
-        styled_matrix = display_matrix.style.apply(color_rows, axis=1)
+            
+        # Totaalrij berekenen en toevoegen als onderste rij IN de tabel
+        totals_dict = {}
+        for c in display_matrix.columns:
+            if c in race_cols:
+                totals_dict[c] = str(int(active_matrix[c].sum()))
+            elif c == '🔁':
+                totals_dict[c] = '|'
+            elif c == 'Rol':
+                totals_dict[c] = 'TOTAAL ACTIEF'
+            else:
+                totals_dict[c] = ''
+                
+        display_matrix.loc['🏆 TOTAAL AAN DE START'] = pd.Series(totals_dict)
+
+        def style_rows(row):
+            if row.name == '🏆 TOTAAL AAN DE START':
+                return ['background-color: rgba(255, 215, 0, 0.2); font-weight: bold; border-top: 2px solid black'] * len(row)
+            if row['Rol'] == 'Verkopen na PR':
+                return ['background-color: rgba(255, 99, 71, 0.2)'] * len(row)
+            elif row['Rol'] == 'Kopen na PR':
+                return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
+            return [''] * len(row)
+
+        styled_matrix = display_matrix.style.apply(style_rows, axis=1)
         st.dataframe(styled_matrix, use_container_width=True)
 
         # 4. KOPMAN
@@ -674,7 +675,14 @@ with tab1:
             'Scorito_EV': 'Scorito EV'
         })
         
-        styled_stats = stats_overzicht.sort_values(by=['Rol', 'Scorito EV'], ascending=[True, False]).style.apply(color_rows, axis=1)
+        def style_stats(row):
+            if row['Rol'] == 'Verkopen na PR':
+                return ['background-color: rgba(255, 99, 71, 0.2)'] * len(row)
+            elif row['Rol'] == 'Kopen na PR':
+                return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
+            return [''] * len(row)
+            
+        styled_stats = stats_overzicht.sort_values(by=['Rol', 'Scorito EV'], ascending=[True, False]).style.apply(style_stats, axis=1)
         st.dataframe(styled_stats, hide_index=True, use_container_width=True)
 
 with tab2:
@@ -781,6 +789,6 @@ with tab3:
     st.markdown("""
     Zonder de data uit de community was deze tool niet mogelijk geweest. Veel dank aan:
     
-    - **📊 Statistieken:** [Wielerorakel](https://www.cyclingoracle.com/) levert de onmisbare, actuele skill-scores (COB, HLL, SPR, AVG) per renner.
+    - **📊 Statistieken:** [Wielerorakel](https://www.cyclingoracle.com/) levert de onmisbare, actuele skill-scores (COB, HLL, SPR, AVG, MTN, ITT, GC) per renner.
     - **🗓️ Programma's & Prijzen:** [Kopman Puzzel](https://kopmanpuzzel.up.railway.app/) verzamelt en structureert de voorlopige startlijsten en Scorito-prijzen.
     """)
