@@ -49,7 +49,19 @@ def load_and_merge_data():
             "Poel": "Mathieu van der Poel", "Aert": "Wout van Aert", "Lie": "Arnaud De Lie",
             "Gils": "Maxim Van Gils", "Berg": "Marijn van den Berg", "Broek": "Frank van den Broek",
             "Magnier": "Paul Magnier", "Pogacar": "Tadej Pogačar", "Skujins": "Toms Skujiņš",
-            "Kooij": "Olav Kooij"
+            "Kooij": "Olav Kooij",
+            # Initialen overrides
+            "C. Hamilton": "Chris Hamilton",
+            "L. Hamilton": "Lucas Hamilton",
+            "H.M. Lopez": "Harold Martin Lopez",
+            "J.P. Lopez": "Juan Pedro Lopez",
+            "Ca. Rodriguez": "Carlos Rodriguez",
+            "Cr. Rodriguez": "Cristian Rodriguez",
+            "O. Rodriguez": "Oscar Rodriguez",
+            "G. Serrano": "Gonzalo Serrano",
+            "J. Serrano": "Javier Serrano",
+            "A. Raccagni": "Andrea Raccagni",
+            "G. Raccagni": "Gabriele Raccagni"
         }
         
         for short in short_names:
@@ -61,7 +73,7 @@ def load_and_merge_data():
 
         df_prog['Renner_Full'] = df_prog['Renner'].map(name_mapping)
         
-        # --- HANDMATIGE OVERRIDES VOOR DUBBELE NAMEN ---
+        # --- HANDMATIGE OVERRIDES VOOR DUBBELE NAMEN ZONDER INITIALEN ---
         df_prog.loc[(df_prog['Renner'] == 'Pedersen') & (df_prog['Prijs'] > 1000000), 'Renner_Full'] = 'Mads Pedersen'
         df_prog.loc[(df_prog['Renner'] == 'Pedersen') & (df_prog['Prijs'] <= 1000000), 'Renner_Full'] = 'Casper Pedersen'
         
