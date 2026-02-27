@@ -92,7 +92,6 @@ def load_and_merge_data():
                 merged_df[col] = 0
             merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0).astype(int)
             
-        # --- COMBINATIE STATISTIEK HLL/MTN MAKEN ---
         merged_df['HLL/MTN'] = merged_df[['HLL', 'MTN']].max(axis=1).astype(int)
             
         if 'Team' not in merged_df.columns:
@@ -295,11 +294,11 @@ with st.sidebar:
                         match = process.extractOne(naam, huidige_renners, scorer=fuzz.token_set_ratio)
                         return match[0] if match and match[1] > 80 else naam
 
-                    st.session_state.selected_riders = [update_naam(r) for r in oude_selectie]
+                    st.session_state.selected_riders = [update_naam(r) for r in oude_selectie if update_naam(r) in huidige_renners]
                     if oud_plan and isinstance(oud_plan, dict):
                         st.session_state.transfer_plan = {
-                            "uit": [update_naam(r) for r in oud_plan.get("uit", [])],
-                            "in": [update_naam(r) for r in oud_plan.get("in", [])]
+                            "uit": [update_naam(r) for r in oud_plan.get("uit", []) if update_naam(r) in huidige_renners],
+                            "in": [update_naam(r) for r in oud_plan.get("in", []) if update_naam(r) in huidige_renners]
                         }
                     else:
                         st.session_state.transfer_plan = None
@@ -358,7 +357,8 @@ with tab1:
         col_t1, col_t2 = st.columns([1, 1], gap="large")
         with col_t1:
             st.markdown("**🛡️ Jouw Basis-Team**")
-            st.session_state.selected_riders = st.multiselect("Selectie (Start):", options=df['Renner'].tolist(), default=st.session_state.selected_riders, label_visibility="collapsed")
+            valid_options = df['Renner'].tolist()
+            st.session_state.selected_riders = st.multiselect("Selectie (Start):", options=valid_options, default=[r for r in st.session_state.selected_riders if r in valid_options], label_visibility="collapsed")
         
         with col_t2:
             if st.session_state.transfer_plan:
@@ -454,7 +454,6 @@ with tab1:
                     
                 st.dataframe(comp_display.style.apply(style_compare, axis=1), hide_index=True, use_container_width=True)
 
-            if to_replace or to_add or is_forcing_roles:
                 if st.button("🚀 VOER WIJZIGING DOOR", type="primary", use_container_width=True):
                     old_team = set(all_display_riders)
                     to_keep = [r for r in all_display_riders if r not in to_replace]
@@ -515,7 +514,6 @@ with tab1:
 
         # --- DATA TABELLEN ---
         st.header("🗓️ Kalender & Statistieken")
-        
         tab_matrix, tab_stats, tab_kopman = st.tabs(["Startlijst Matrix", "Team Statistieken", "Kopmannen Advies"])
         
         def color_rows(row):
@@ -540,15 +538,11 @@ with tab1:
                 
             totals_dict = {}
             for c in display_matrix.columns:
-                if c in ['Rol', 'Type', 'Prijs', 'Koersen']:
-                    continue
-                if c in race_cols:
-                    totals_dict[c] = str(int(active_matrix[c].sum()))
-                elif c == '🔁':
-                    totals_dict[c] = '|'
+                if c in ['Rol', 'Type', 'Prijs', 'Koersen']: continue
+                if c in race_cols: totals_dict[c] = str(int(active_matrix[c].sum()))
+                elif c == '🔁': totals_dict[c] = '|'
                     
             totals_df = pd.DataFrame([totals_dict], index=['🏆 AANTAL AAN DE START'])
-
             st.markdown("**🏆 Totalen Actieve Renners Per Koers:**")
             st.dataframe(totals_df, use_container_width=True)
             st.dataframe(display_matrix.style.apply(color_rows, axis=1), use_container_width=True)
@@ -568,8 +562,7 @@ with tab1:
                     koers_type = type_vertaling.get(stat, stat)
                     top = current_df[current_df['Renner'].isin(starters.index)].sort_values(by=[stat, 'AVG'], ascending=False)['Renner'].tolist()
                     kop_res.append({
-                        "Koers": c, 
-                        "Type": koers_type, 
+                        "Koers": c, "Type": koers_type, 
                         "🥇 Kopman 1": top[0] if len(top)>0 else "-", 
                         "🥈 Kopman 2": top[1] if len(top)>1 else "-", 
                         "🥉 Kopman 3": top[2] if len(top)>2 else "-"
@@ -585,28 +578,20 @@ with tab1:
         with c_dl2:
             export_df = current_df[['Renner', 'Rol', 'Prijs', 'Team', 'Type', 'Waarde (EV/M)', 'Scorito_EV']].copy()
             for c in race_cols:
-                status_list = []
                 stat = koers_mapping.get(c, 'AVG')
                 starters = active_matrix[active_matrix[c] == 1]
                 top = current_df[current_df['Renner'].isin(starters.index)].sort_values(by=[stat, 'AVG'], ascending=False)['Renner'].tolist()
                 
-                for renner in export_df['Renner']:
-                    if renner not in active_matrix.index or active_matrix.loc[renner, c] == 0:
-                        status_list.append('-')
-                    elif len(top) > 0 and renner == top[0]:
-                        status_list.append('Kopman 1')
-                    elif len(top) > 1 and renner == top[1]:
-                        status_list.append('Kopman 2')
-                    elif len(top) > 2 and renner == top[2]:
-                        status_list.append('Kopman 3')
-                    else:
-                        status_list.append('✅')
-                export_df[c] = status_list
+                def get_status(r, top_list, starters_list):
+                    if r in top_list:
+                        return f"Kopman {top_list.index(r) + 1}"
+                    return "✅" if r in starters_list else "-"
                 
+                export_df[c] = export_df['Renner'].apply(lambda x: get_status(x, top[:3], starters.index))
             st.download_button("📊 Download als .CSV (Excel)", data=export_df.to_csv(index=False).encode('utf-8'), file_name="scorito_team.csv", mime="text/csv", use_container_width=True)
 
     else:
-        st.info("👈 Kies je instellingen in de zijbalk en klik op **Bereken Optimaal Team** om te starten! (Of laad een bestaande backup in).")
+        st.info("👈 Kies je instellingen in de zijbalk en klik op **Bereken Optimaal Team** om te starten!")
 
 with tab2:
     st.header("📋 Database: Alle Renners")
@@ -629,8 +614,6 @@ with tab2:
 
 with tab3:
     st.header("🗓️ Kalender & Toegekende Profielen")
-    st.markdown("Hieronder zie je precies welke koersen in de app zijn meegenomen, in welke periode van de Scorito-wissel ze vallen en welk type renner (statistiek) de AI verwacht dat er gaat scoren.")
-
     kalender_data = [
         {"Koers": "Omloop Het Nieuwsblad", "Afkorting": "OHN", "Profiel AI": "Kassei (COB)", "Fase": "Voor Roubaix"},
         {"Koers": "Kuurne-Brussel-Kuurne", "Afkorting": "KBK", "Profiel AI": "Sprint (SPR)", "Fase": "Voor Roubaix"},
@@ -655,68 +638,5 @@ with tab3:
 with tab4:
     st.header("ℹ️ De Techniek: Hoe werkt deze AI?")
     st.markdown("""
-    Deze applicatie elimineert emotie en 'gut feeling' uit het samenstellen van je Scorito team. Het is een wiskundige optimalisatie-tool die leunt op de wetten van de lineaire programmering. Het doel? Binnen een keihard budget de maximale hoeveelheid verwachte punten vinden.
-    """)
-    
-    st.divider()
-    
-    st.subheader("📊 1. Data Verzameling & Validatie")
-    st.markdown("""
-    De tool combineert data uit twee externe bronnen:
-    * **[Wielerorakel](https://www.cyclingoracle.com/):** Levert de AI-gebaseerde *Skill-scores* (0 tot 100) van renners op specifieke terreinen zoals Kasseien (COB), Heuvels (HLL) en Sprints (SPR).
-    * **[Kopmanpuzzel](https://kopmanpuzzel.up.railway.app/) (via Gebruiker):** Levert de voorlopige startlijsten en de actuele Scorito-prijzen.
-    
-    Een ingebouwde 'Fuzzy Matcher' (een slim algoritme voor tekstherkenning) koppelt deze lijsten aan elkaar, corrigeert automatische dubbele namen (zoals de gebroeders Van Dijke of Pedersen), en bouwt één centrale database op.
-    """)
-
-    st.subheader("🧮 2. Expected Value (EV) Berekenen")
-    st.markdown("""
-    Om renners objectief te kunnen vergelijken, moet hun kwaliteit (Skill) vertaald worden naar verwachte Scorito-punten (Expected Value). Elke koers heeft in de app een 'label' (bijv. de Ronde van Vlaanderen is `COB`, Milaan-San Remo is `AVG`). Omdat wielrennen geen exacte wetenschap is, kun je in de zijbalk kiezen uit vier visies op hoe deze punten verdeeld moeten worden:
-    
-    * **1. Scorito Ranking (Dynamisch):**
-      De meest binaire methode. De app sorteert de actuele startlijst op basis van de vereiste stat. De nummer 1 in stats krijgt keihard 100 EV (gelijk aan Scorito punten voor plek 1). De nummer 2 krijgt 90 EV, enzovoort. Dit negeert pech en chaos, maar weerspiegelt 100% de regels van het spel.
-    * **2. Originele Curve (Macht 4):**
-      De bewezen standaardmethode. Dit gebruikt de formule `(Stat / 100)⁴ × 100`. Door de vierde macht te gebruiken ontstaat een exponentiële curve. Dit betekent dat het verschil in punten tussen een topspecialist (score 99) en een subtopper (score 85) enorm wordt uitvergroot, wat essentieel is in een kopmannen-spel.
-    * **3. Extreme Curve (Macht 10):**
-      Voor de meedogenloze speler. De macht van 10 straft middelmaat genadeloos af. Een knecht met een stat van 70 valt vrijwel terug naar 0 EV. Alleen de absolute wereldtop behoudt hier wiskundige waarde.
-    * **4. Tiers & Spreiding (Realistisch):**
-      Simuleert de werkelijkheid. De absolute top 3 op de startlijst wint niet altijd; ze krijgen daarom *gemiddeld* 80 EV. De renners op plek 4 t/m 8 krijgen 45 EV. Valpartijen en slechte benen zitten zo ingebakken in de verwachting.
-      
-    > **Belangrijk: De Kopmanfactor!**
-    Ongeacht het model, controleert de app per koers wie de top 3 beste renners op de startlijst zijn. Deze krijgen direct de officiële Scorito Kopman-bonus (x3, x2.5 en x2) over hun EV. Zo dwingt het algoritme je om budget vrij te maken voor zekerheden als Pogačar of Van der Poel.
-    """)
-
-    st.subheader("🤖 3. Het Algoritme (The Knapsack Problem)")
-    st.markdown("""
-    Wanneer elke renner een prijskaartje en een totaalscore (EV over het hele seizoen) heeft, stuiten we op een beroemd wiskundig fenomeen: het **Knapsack Problem** (Krukzakprobleem). 
-    
-    Zie je budget van €45.000.000 als een rugzak en de 20 benodigde renners als objecten. Je wilt de rugzak vullen met objecten die samen de hoogste waarde vertegenwoordigen, zónder dat de tas scheurt (over budget) en terwijl er *exact* 20 items in zitten.
-    
-    De app gebruikt **PuLP** (een krachtige Python library voor lineaire optimalisatie) gekoppeld aan de CBC Solver. Deze engine berekent en verwerpt binnen enkele seconden miljoenen combinaties van renners totdat hij het 100% onbetwistbare, wiskundige optimum heeft gevonden.
-    """)
-
-    st.subheader("🔁 4. Wisselstrategie (Transfers)")
-    st.markdown("""
-    Als je de optie 'Met 3 wissels' aanzet in de zijbalk, wordt de wiskunde complexer. De agenda wordt doormidden geknipt ná Parijs-Roubaix (De grens tussen het kasseien- en het heuvelseizoen).
-    
-    Het algoritme gaat dan niet op zoek naar 20, maar naar **23 renners**. Het lost de puzzel op met deze keiharde restricties:
-    1. Selecteer 17 **Basis** renners (Die het hele seizoen in je team blijven).
-    2. Selecteer 3 **Early** renners (Die je in de winter inkoopt, maar direct na Roubaix dumpt).
-    3. Selecteer 3 **Late** renners (Die de rest van het seizoen in je team komen voor de Ardennen).
-    4. Het budget (inclusief het geld dat vrijkomt na verkoop) mag op *geen enkel moment* in het spel overschreden worden.
-    """)
-    
-    st.divider()
-    
-    st.subheader("💡 Best Practices: Haal het maximale uit de App")
-    st.markdown("""
-    1. **Staar je niet blind op de eerste output:** De AI kent de prijzen, maar de Scorito-werkelijkheid is soms anders. Mist het algoritme een absolute favoriet omdat hij 500k te duur is? Zet hem dan handmatig in de **'Moet in team'** lijst in de zijbalk en laat de AI het team eromheen bouwen.
-    2. **Check de Kwaliteitscontrole:** Onder je team in Tab 1 staat een expander. Dit is je vangnet. Het waarschuwt je als de AI stiekem 3 klimmers heeft opgesteld voor de Scheldeprijs om geld te besparen.
-    3. **Spreid je Teampunten:** Kijk naar de *'Teampunten Spreiding'* grafiek. Als je 8 renners van Visma hebt, ben je enorm kwetsbaar als dat team een off-day heeft. Gooi er eentje uit via de Finetuner en zoek een vergelijkbare renner van Lidl-Trek of Alpecin.
-    4. **Gebruik 'Value for Money':** In het Database-tabblad vind je de kolom `Waarde (EV/M)`. Dit is de heilige graal voor het vinden van donker paarden en goedkope opvullers. 
-    """)
-
-    st.divider()
-    st.markdown("""
-    **🙏 Databronnen & Credits** Zonder de data uit de community was deze tool niet mogelijk geweest. Veel dank aan [Wielerorakel.nl](https://www.cyclingoracle.com/) voor de fantastische AI Skill-scores en [Kopmanpuzzel](https://kopmanpuzzel.up.railway.app/) voor het voorwerk op de startlijsten en prijzen!
+    Deze applicatie gebruikt lineaire optimalisatie (PuLP) om het ideale Scorito-team te berekenen. Het doel is om binnen het keiharde budget de maximale hoeveelheid verwachte punten te vinden, rekening houdend met de verplichte teamstructuur en wisselregels.
     """)
