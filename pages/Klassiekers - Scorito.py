@@ -431,6 +431,35 @@ with tab1:
                 is_forcing_roles = bool(force_new_base or force_new_uit or force_new_in)
                 freeze_others = st.checkbox("🔒 Bevries de rollen van overige renners", value=not is_forcing_roles)
 
+            # --- VERGELIJKING ---
+            if to_replace or to_add or is_forcing_roles:
+                st.markdown("**📊 Vergelijking geselecteerde renners:**")
+                compare_riders = list(set(to_replace + to_add + force_new_base + force_new_uit + force_new_in))
+                compare_df = df[df['Renner'].isin(compare_riders)].copy()
+                
+                compare_cols = ['Renner', 'Prijs', 'Waarde (EV/M)', 'Scorito_EV'] + race_cols
+                comp_display = compare_df[compare_cols].copy()
+                
+                def mark_status(renner):
+                    if renner in to_replace: return '❌ Eruit'
+                    if renner in to_add: return '📥 Erin'
+                    if renner in force_new_base: return '🔄 Basis'
+                    if renner in force_new_uit: return '🔄 Verkopen'
+                    if renner in force_new_in: return '🔄 Kopen'
+                    return ''
+                    
+                comp_display.insert(1, 'Actie / Rol', comp_display['Renner'].apply(mark_status))
+                comp_display[race_cols] = comp_display[race_cols].applymap(lambda x: '✅' if x == 1 else '-')
+                
+                def style_compare(row):
+                    if row['Actie / Rol'] in ['❌ Eruit', '🔄 Verkopen']:
+                        return ['background-color: rgba(255, 99, 71, 0.2)'] * len(row)
+                    if row['Actie / Rol'] in ['📥 Erin', '🔄 Kopen']:
+                        return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
+                    return ['background-color: rgba(173, 216, 230, 0.2)'] * len(row)
+                    
+                st.dataframe(comp_display.style.apply(style_compare, axis=1), hide_index=True, use_container_width=True)
+
             if to_replace or to_add or is_forcing_roles:
                 if st.button("🚀 VOER WIJZIGING DOOR", type="primary", use_container_width=True):
                     old_team = set(all_display_riders)
@@ -614,7 +643,7 @@ with tab3:
     st.markdown("""
     Wanneer elke renner een prijskaartje en een totaalscore (EV over het hele seizoen) heeft, stuiten we op een beroemd wiskundig fenomeen: het **Knapsack Problem** (Krukzakprobleem). 
     
-    Zie je budget van **45.000.000** als een rugzak en de 20 benodigde renners als objecten. Je wilt de rugzak vullen met objecten die samen de hoogste waarde vertegenwoordigen, zónder dat de tas scheurt (over budget) en terwijl er *exact* 20 items in zitten.
+    Zie je budget van €45.000.000 als een rugzak en de 20 benodigde renners als objecten. Je wilt de rugzak vullen met objecten die samen de hoogste waarde vertegenwoordigen, zónder dat de tas scheurt (over budget) en terwijl er *exact* 20 items in zitten.
     
     De app gebruikt **PuLP** (een krachtige Python library voor lineaire optimalisatie) gekoppeld aan de CBC Solver. Deze engine berekent en verwerpt binnen enkele seconden miljoenen combinaties van renners totdat hij het 100% onbetwistbare, wiskundige optimum heeft gevonden.
     """)
