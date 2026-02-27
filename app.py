@@ -23,7 +23,7 @@ st.markdown(
     
     ### 🙏 Credits & Databronnen
     Deze applicatie is gebouwd op de schouders van de fantastische wielercommunity. Veel dank aan:
-    * **[Wielerorakel.nl](https://www.cyclingoracle.com/):** Voor het leveren van de AI-gebaseerde Skill-scores van de renners.
+    * **[Wielerorakel.nl](https://www.cyclingoracle.com/):** Voor het leveren van de Stats van de renners.
     * **[Kopmanpuzzel](https://kopmanpuzzel.up.railway.app/):** Voor het uitstekende voorwerk rondom de startlijsten en de actuele Scorito-prijzen.
     """
 )
