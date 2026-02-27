@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 from thefuzz import process, fuzz
 
 # --- CONFIGURATIE ---
-st.set_page_config(page_title="Scorito Klassiekers AI", layout="wide", page_icon="🏆")
+st.set_page_config(page_title="Scorito Klassiekers Solver", layout="wide", page_icon="🏆")
 
 # --- DATA LADEN (KLASSIEKERS SCORITO) ---
 @st.cache_data
@@ -256,7 +256,7 @@ if "last_finetune" not in st.session_state: st.session_state.last_finetune = Non
 
 # --- SIDEBAR (CONTROLECENTRUM) ---
 with st.sidebar:
-    st.title("🏆 AI Coach")
+    st.title("Settings")
     
     ev_method = st.selectbox("🧮 Rekenmodel (EV)", ["1. Scorito Ranking (Dynamisch)", "2. Originele Curve (Macht 4)", "3. Extreme Curve (Macht 10)", "4. Tiers & Spreiding (Realistisch)"])
     use_transfers = st.checkbox("🔁 Bereken met 3 wissels (Parijs-Roubaix)", value=True)
