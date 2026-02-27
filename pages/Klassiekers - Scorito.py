@@ -7,13 +7,12 @@ import plotly.graph_objects as go
 from thefuzz import process, fuzz
 
 # --- CONFIGURATIE ---
-st.set_page_config(page_title="Scorito Klassiekers Solver", layout="wide", page_icon="🏆")
+st.set_page_config(page_title="Scorito Klassiekers AI", layout="wide", page_icon="🏆")
 
 # --- DATA LADEN (KLASSIEKERS SCORITO) ---
 @st.cache_data
 def load_and_merge_data():
     try:
-        # Bron: Gebruiker / Kopmanpuzzel ruwe copy-paste data
         df_prog = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', on_bad_lines='skip')
         df_prog = df_prog.rename(columns={'RvB': 'BDP', 'IFF': 'GW'})
         
@@ -30,7 +29,6 @@ def load_and_merge_data():
             df_prog['Prijs'] = df_prog['Prijs'].fillna(0)
             df_prog.loc[df_prog['Prijs'] == 800000, 'Prijs'] = 750000
         
-        # Bron: Wielerorakel stats
         df_stats = pd.read_csv("renners_stats.csv", sep='\t') 
         if 'Naam' in df_stats.columns:
             df_stats = df_stats.rename(columns={'Naam': 'Renner'})
@@ -77,18 +75,9 @@ def load_and_merge_data():
         if 'Renner_x' in merged_df.columns:
             merged_df = merged_df.drop(columns=['Renner_x', 'Renner_y'], errors='ignore')
             
-        merged_df = merged_df.rename(columns={'Renner_Full': 'Renner'}).drop_duplicates(subset=['Renner', 'Prijs'])
-        
-        counts = {}
-        unique_renners = []
-        for r in merged_df['Renner']:
-            if r in counts:
-                counts[r] += 1
-                unique_renners.append(f"{r} ({counts[r]})")
-            else:
-                counts[r] = 0
-                unique_renners.append(r)
-        merged_df['Renner'] = unique_renners
+        merged_df = merged_df.sort_values(by='Prijs', ascending=False)
+        merged_df = merged_df.drop_duplicates(subset=['Renner_Full'], keep='first')
+        merged_df = merged_df.rename(columns={'Renner_Full': 'Renner'})
         
         early_races = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'BDP', 'E3', 'GW', 'DDV', 'RVV', 'SP', 'PR']
         late_races = ['BP', 'AGR', 'WP', 'LBL']
@@ -103,6 +92,9 @@ def load_and_merge_data():
                 merged_df[col] = 0
             merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0).astype(int)
             
+        # --- NIEUW: COMBINATIE STATISTIEK HLL/MTN MAKEN ---
+        merged_df['HLL/MTN'] = merged_df[['HLL', 'MTN']].max(axis=1).astype(int)
+            
         if 'Team' not in merged_df.columns:
             merged_df['Team'] = 'Onbekend'
         else:
@@ -110,7 +102,7 @@ def load_and_merge_data():
         
         merged_df['Total_Races'] = merged_df[available_races].sum(axis=1).astype(int)
         
-        koers_stat_map = {'OHN':'COB','KBK':'SPR','SB':'HLL','PN':'HLL','TA':'SPR','MSR':'AVG','BDP':'SPR','E3':'COB','GW':'SPR','DDV':'COB','RVV':'COB','SP':'SPR','PR':'COB','BP':'HLL','AGR':'HLL','WP':'HLL','LBL':'HLL'}
+        koers_stat_map = {'OHN':'COB','KBK':'SPR','SB':'HLL','PN':'HLL/MTN','TA':'SPR','MSR':'AVG','BDP':'SPR','E3':'COB','GW':'SPR','DDV':'COB','RVV':'COB','SP':'SPR','PR':'COB','BP':'HLL','AGR':'HLL','WP':'HLL','LBL':'HLL'}
         
         return merged_df, available_early, available_late, koers_stat_map
     except Exception as e:
@@ -256,7 +248,7 @@ if "last_finetune" not in st.session_state: st.session_state.last_finetune = Non
 
 # --- SIDEBAR (CONTROLECENTRUM) ---
 with st.sidebar:
-    st.title("Settings")
+    st.title("🏆 AI Coach")
     
     ev_method = st.selectbox("🧮 Rekenmodel (EV)", ["1. Scorito Ranking (Dynamisch)", "2. Originele Curve (Macht 4)", "3. Extreme Curve (Macht 10)", "4. Tiers & Spreiding (Realistisch)"])
     use_transfers = st.checkbox("🔁 Bereken met 3 wissels (Parijs-Roubaix)", value=True)
@@ -318,10 +310,10 @@ with st.sidebar:
                     st.error(f"Fout bij inladen: {e}")
 
 st.title("🏆 Voorjaarsklassiekers: Scorito")
-st.markdown("**🔗 Met dank aan:** [Wielerorakel.nl](https://www.cyclingoracle.com/) | [Kopmanpuzzel](https://kopmanpuzzel.up.railway.app/)")
+st.markdown("**🔗 Handige links:** [Wielerorakel.nl](https://www.cyclingoracle.com/) | [Kopmanpuzzel](https://kopmanpuzzel.up.railway.app/)")
 st.divider()
 
-tab1, tab2, tab3 = st.tabs(["🚀 Jouw Team & Analyse", "📋 Alle Renners (Database)", "ℹ️ Uitleg & Documentatie"])
+tab1, tab2, tab3, tab4 = st.tabs(["🚀 Jouw Team & Analyse", "📋 Alle Renners (Database)", "🗓️ Kalender & Profielen", "ℹ️ Uitleg & Documentatie"])
 
 with tab1:
     if st.session_state.selected_riders:
@@ -434,7 +426,6 @@ with tab1:
                 is_forcing_roles = bool(force_new_base or force_new_uit or force_new_in)
                 freeze_others = st.checkbox("🔒 Bevries de rollen van overige renners", value=not is_forcing_roles)
 
-            # --- VERGELIJKING ---
             if to_replace or to_add or is_forcing_roles:
                 st.markdown("**📊 Vergelijking geselecteerde renners:**")
                 compare_riders = list(set(to_replace + to_add + force_new_base + force_new_uit + force_new_in))
@@ -569,12 +560,20 @@ with tab1:
 
         with tab_kopman:
             kop_res = []
+            type_vertaling = {'COB': 'Kassei', 'SPR': 'Sprint', 'HLL': 'Heuvel', 'MTN': 'Klimmer', 'GC': 'Klassement', 'AVG': 'Allround', 'HLL/MTN': 'Heuvel/Klimmer'}
             for c in race_cols:
                 starters = active_matrix[active_matrix[c] == 1]
                 if not starters.empty:
                     stat = koers_mapping.get(c, 'AVG')
+                    koers_type = type_vertaling.get(stat, stat)
                     top = current_df[current_df['Renner'].isin(starters.index)].sort_values(by=[stat, 'AVG'], ascending=False)['Renner'].tolist()
-                    kop_res.append({"Koers": c, "🥇 Kopman 1": top[0] if len(top)>0 else "-", "🥈 Kopman 2": top[1] if len(top)>1 else "-", "🥉 Kopman 3": top[2] if len(top)>2 else "-"})
+                    kop_res.append({
+                        "Koers": c, 
+                        "Type": koers_type, 
+                        "🥇 Kopman 1": top[0] if len(top)>0 else "-", 
+                        "🥈 Kopman 2": top[1] if len(top)>1 else "-", 
+                        "🥉 Kopman 3": top[2] if len(top)>2 else "-"
+                    })
             st.dataframe(pd.DataFrame(kop_res), hide_index=True, use_container_width=True)
             
         st.divider()
@@ -609,6 +608,31 @@ with tab2:
     st.dataframe(d_df.sort_values(by='Scorito_EV', ascending=False), use_container_width=True, hide_index=True)
 
 with tab3:
+    st.header("🗓️ Kalender & Toegekende Profielen")
+    st.markdown("Hieronder zie je precies welke koersen in de app zijn meegenomen, in welke periode van de Scorito-wissel ze vallen en welk type renner (statistiek) de AI verwacht dat er gaat scoren.")
+
+    kalender_data = [
+        {"Koers": "Omloop Het Nieuwsblad", "Afkorting": "OHN", "Profiel AI": "Kassei (COB)", "Fase": "Voor Roubaix"},
+        {"Koers": "Kuurne-Brussel-Kuurne", "Afkorting": "KBK", "Profiel AI": "Sprint (SPR)", "Fase": "Voor Roubaix"},
+        {"Koers": "Strade Bianche", "Afkorting": "SB", "Profiel AI": "Heuvel (HLL)", "Fase": "Voor Roubaix"},
+        {"Koers": "Parijs-Nice (Etappe 7)", "Afkorting": "PN", "Profiel AI": "Heuvel/Klimmer (HLL/MTN)", "Fase": "Voor Roubaix"},
+        {"Koers": "Tirreno-Adriatico (Etappe 7)", "Afkorting": "TA", "Profiel AI": "Sprint (SPR)", "Fase": "Voor Roubaix"},
+        {"Koers": "Milaan-San Remo", "Afkorting": "MSR", "Profiel AI": "Allround (AVG)", "Fase": "Voor Roubaix"},
+        {"Koers": "Bredene Koksijde Classic", "Afkorting": "BDP", "Profiel AI": "Sprint (SPR)", "Fase": "Voor Roubaix"},
+        {"Koers": "E3 Saxo Classic", "Afkorting": "E3", "Profiel AI": "Kassei (COB)", "Fase": "Voor Roubaix"},
+        {"Koers": "Gent-Wevelgem", "Afkorting": "GW", "Profiel AI": "Sprint (SPR)", "Fase": "Voor Roubaix"},
+        {"Koers": "Dwars door Vlaanderen", "Afkorting": "DDV", "Profiel AI": "Kassei (COB)", "Fase": "Voor Roubaix"},
+        {"Koers": "Ronde van Vlaanderen", "Afkorting": "RVV", "Profiel AI": "Kassei (COB)", "Fase": "Voor Roubaix"},
+        {"Koers": "Scheldeprijs", "Afkorting": "SP", "Profiel AI": "Sprint (SPR)", "Fase": "Voor Roubaix"},
+        {"Koers": "Parijs-Roubaix", "Afkorting": "PR", "Profiel AI": "Kassei (COB)", "Fase": "Wisselmoment"},
+        {"Koers": "Brabantse Pijl", "Afkorting": "BP", "Profiel AI": "Heuvel (HLL)", "Fase": "Na Roubaix"},
+        {"Koers": "Amstel Gold Race", "Afkorting": "AGR", "Profiel AI": "Heuvel (HLL)", "Fase": "Na Roubaix"},
+        {"Koers": "Waalse Pijl", "Afkorting": "WP", "Profiel AI": "Heuvel (HLL)", "Fase": "Na Roubaix"},
+        {"Koers": "Luik-Bastenaken-Luik", "Afkorting": "LBL", "Profiel AI": "Heuvel (HLL)", "Fase": "Na Roubaix"}
+    ]
+    st.dataframe(pd.DataFrame(kalender_data), use_container_width=True, hide_index=True)
+
+with tab4:
     st.header("ℹ️ De Techniek: Hoe werkt deze AI?")
     st.markdown("""
     Deze applicatie elimineert emotie en 'gut feeling' uit het samenstellen van je Scorito team. Het is een wiskundige optimalisatie-tool die leunt op de wetten van de lineaire programmering. Het doel? Binnen een keihard budget de maximale hoeveelheid verwachte punten vinden.
