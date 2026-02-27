@@ -7,6 +7,10 @@ st.set_page_config(
 
 st.write("# Welkom bij de Wieler Spellen Solver! 🚴‍♂️")
 
+st.write("# De tool combineert data uit twee externe bronnen:
+    * **[Wielerorakel](https://www.cyclingoracle.com/):** Levert de AI-gebaseerde *Skill-scores* (0 tot 100) van renners op specifieke terreinen zoals Kasseien (COB), Heuvels (HLL) en Sprints (SPR).
+    * **[Kopmanpuzzel](https://kopmanpuzzel.up.railway.app/) (via Gebruiker):** Levert de voorlopige startlijsten en de actuele Scorito-prijzen.")
+
 st.markdown(
     """
     Dit is jouw centrale dashboard voor het berekenen van de ultieme selecties voor de voorjaarsklassiekers en grote ronden.
