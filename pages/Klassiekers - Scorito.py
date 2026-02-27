@@ -92,7 +92,7 @@ def load_and_merge_data():
                 merged_df[col] = 0
             merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0).astype(int)
             
-        # --- NIEUW: COMBINATIE STATISTIEK HLL/MTN MAKEN ---
+        # --- COMBINATIE STATISTIEK HLL/MTN MAKEN ---
         merged_df['HLL/MTN'] = merged_df[['HLL', 'MTN']].max(axis=1).astype(int)
             
         if 'Team' not in merged_df.columns:
@@ -583,7 +583,27 @@ with tab1:
             save_data = {"selected_riders": st.session_state.selected_riders, "transfer_plan": st.session_state.transfer_plan}
             st.download_button("📥 Download als .JSON (Backup)", data=json.dumps(save_data), file_name="scorito_team.json", mime="application/json", use_container_width=True)
         with c_dl2:
-            st.download_button("📊 Download als .CSV (Excel)", data=current_df[['Renner', 'Prijs', 'Team', 'Type', 'Waarde (EV/M)', 'Scorito_EV']].to_csv(index=False), file_name="scorito_team.csv", mime="text/csv", use_container_width=True)
+            export_df = current_df[['Renner', 'Rol', 'Prijs', 'Team', 'Type', 'Waarde (EV/M)', 'Scorito_EV']].copy()
+            for c in race_cols:
+                status_list = []
+                stat = koers_mapping.get(c, 'AVG')
+                starters = active_matrix[active_matrix[c] == 1]
+                top = current_df[current_df['Renner'].isin(starters.index)].sort_values(by=[stat, 'AVG'], ascending=False)['Renner'].tolist()
+                
+                for renner in export_df['Renner']:
+                    if renner not in active_matrix.index or active_matrix.loc[renner, c] == 0:
+                        status_list.append('-')
+                    elif len(top) > 0 and renner == top[0]:
+                        status_list.append('Kopman 1')
+                    elif len(top) > 1 and renner == top[1]:
+                        status_list.append('Kopman 2')
+                    elif len(top) > 2 and renner == top[2]:
+                        status_list.append('Kopman 3')
+                    else:
+                        status_list.append('✅')
+                export_df[c] = status_list
+                
+            st.download_button("📊 Download als .CSV (Excel)", data=export_df.to_csv(index=False).encode('utf-8'), file_name="scorito_team.csv", mime="text/csv", use_container_width=True)
 
     else:
         st.info("👈 Kies je instellingen in de zijbalk en klik op **Bereken Optimaal Team** om te starten! (Of laad een bestaande backup in).")
