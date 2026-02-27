@@ -4,16 +4,29 @@ import pulp
 import json
 import plotly.express as px
 import plotly.graph_objects as go
+import unicodedata
 from thefuzz import process, fuzz
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Scorito Klassiekers AI", layout="wide", page_icon="🏆")
 
+# --- HULPFUNCTIE: NORMALISATIE (Leestekens verwijderen voor matching) ---
+def normalize_name_logic(text):
+    if not isinstance(text, str):
+        return ""
+    # Omzetten naar kleine letters en witruimte trimmen
+    text = text.lower().strip()
+    # Normaliseer Unicode (splitst letters en accenten, bijv. 'ü' -> 'u' + '¨')
+    nfkd_form = unicodedata.normalize('NFKD', text)
+    # Behoud alleen de basis karakters (geen accent-tekens)
+    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+
 # --- DATA LADEN (KLASSIEKERS SCORITO) ---
 @st.cache_data
 def load_and_merge_data():
     try:
-        df_prog = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', on_bad_lines='skip')
+        # 1. Programma inladen (met utf-8-sig voor Excel-compatibiliteit)
+        df_prog = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
         df_prog = df_prog.rename(columns={'RvB': 'BDP', 'IFF': 'GW'})
         
         if 'Prijs' not in df_prog.columns and df_prog['Renner'].astype(str).str.contains(r'\(.*\)', regex=True).any():
@@ -29,7 +42,8 @@ def load_and_merge_data():
             df_prog['Prijs'] = df_prog['Prijs'].fillna(0)
             df_prog.loc[df_prog['Prijs'] == 800000, 'Prijs'] = 750000
         
-        df_stats = pd.read_csv("renners_stats.csv", sep='\t') 
+        # 2. Stats inladen
+        df_stats = pd.read_csv("renners_stats.csv", sep='\t', encoding='utf-8-sig') 
         if 'Naam' in df_stats.columns:
             df_stats = df_stats.rename(columns={'Naam': 'Renner'})
         
@@ -38,36 +52,36 @@ def load_and_merge_data():
             
         df_stats = df_stats.drop_duplicates(subset=['Renner'], keep='first')
         
+        # 3. VERBETERDE NAAM MATCHING (Inclusief Küng/Gregoire fix)
         short_names = df_prog['Renner'].unique()
         full_names = df_stats['Renner'].unique()
+        
+        # Maak een dictionary voor snelle terugkoppeling van genormaliseerd naar origineel
+        norm_to_full = {normalize_name_logic(n): n for n in full_names}
+        norm_full_names = list(norm_to_full.keys())
+        
         name_mapping = {}
         
         manual_overrides = {
             "Poel": "Mathieu van der Poel", "Aert": "Wout van Aert", "Lie": "Arnaud De Lie",
             "Gils": "Maxim Van Gils", "Broek": "Frank van den Broek",
             "Magnier": "Paul Magnier", "Pogacar": "Tadej Pogačar", "Skujins": "Toms Skujiņš",
-            "Kooij": "Olav Kooij",
-            "C. Hamilton": "Chris Hamilton", "L. Hamilton": "Lucas Hamilton",
-            "H.M. Lopez": "Harold Martin Lopez", "J.P. Lopez": "Juan Pedro Lopez",
-            "Ca. Rodriguez": "Carlos Rodriguez", "Cr. Rodriguez": "Cristian Rodriguez", "O. Rodriguez": "Oscar Rodriguez",
-            "G. Serrano": "Gonzalo Serrano", "J. Serrano": "Javier Serrano",
-            "A. Raccagni": "Andrea Raccagni", "G. Raccagni": "Gabriele Raccagni",
-            "Mads Pedersen": "Mads Pedersen", "Rasmus Pedersen": "Rasmus Pedersen", 
-            "Martin Pedersen": "Martin Pedersen", "S. Pedersen": "S. Pedersen",
-            "Tim van Dijke": "Tim van Dijke", "Mick van Dijke": "Mick van Dijke",
-            "Aurelien Paret-Peintre": "Aurélien Paret-Peintre", "Valentin Paret-Peintre": "Valentin Paret-Peintre",
-            "Rui Oliveira": "Rui Oliveira", "Nelson Oliveira": "Nelson Oliveira", "Ivo Oliveira": "Ivo Oliveira",
-            "Ivan Garcia Cortina": "Iván García Cortina", "Raul Garcia Pierna": "Raúl García Pierna",
-            "Jonathan Milan": "Jonathan Milan", "Matteo Milan": "Matteo Milan",
-            "Marijn van den Berg": "Marijn van den Berg", "Julius van den Berg": "Julius van den Berg"
+            "Kooij": "Olav Kooij"
         }
         
         for short in short_names:
             if short in manual_overrides:
                 name_mapping[short] = manual_overrides[short]
             else:
-                match_res = process.extractOne(short, full_names, scorer=fuzz.token_set_ratio)
-                name_mapping[short] = match_res[0] if match_res and match_res[1] > 75 else short
+                # Gebruik normalisatie voor de fuzzy match
+                norm_short = normalize_name_logic(short)
+                match_res = process.extractOne(norm_short, norm_full_names, scorer=fuzz.token_set_ratio)
+                
+                if match_res and match_res[1] > 75:
+                    # Koppel de korte naam aan de originele database naam (met accenten)
+                    name_mapping[short] = norm_to_full[match_res[0]]
+                else:
+                    name_mapping[short] = short
 
         df_prog['Renner_Full'] = df_prog['Renner'].map(name_mapping)
         merged_df = pd.merge(df_prog, df_stats, left_on='Renner_Full', right_on='Renner', how='left')
@@ -638,5 +652,5 @@ with tab3:
 with tab4:
     st.header("ℹ️ De Techniek: Hoe werkt deze AI?")
     st.markdown("""
-    Deze applicatie gebruikt lineaire optimalisatie (PuLP) om het ideale Scorito-team te berekenen. Het doel is om binnen het keiharde budget de maximale hoeveelheid verwachte punten te vinden, rekening houdend met de verplichte teamstructuur en wisselregels.
+    Deze applicatie gebruikt lineaire optimalisatie (PuLP) om het ideale Scorito-team te berekenen. Het doel is om binnen het keiharde budget de maximale hoeveelheid verwachte punten vinden, rekening houdend met de verplichte teamstructuur en wisselregels.
     """)
