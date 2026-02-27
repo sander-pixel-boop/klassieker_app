@@ -417,6 +417,7 @@ with tab1:
                 sugg_df = df[~df['Renner'].isin(all_display_riders)][df['Prijs'] <= max_affordable].sort_values(by='Scorito_EV', ascending=False).head(5)
                 
                 if not sugg_df.empty:
+                    sugg_df['Type'] = sugg_df.apply(bepaal_klassieker_type, axis=1)
                     st.info(f"💡 **Top Suggesties (Budget per renner: € {max_affordable:,.0f}):**")
                     st.dataframe(sugg_df[['Renner', 'Prijs', 'Waarde (EV/M)', 'Scorito_EV', 'Type']], hide_index=True, use_container_width=True)
                     sugg_keuze = st.multiselect("👉 Of selecteer hier directe suggesties:", options=sugg_df['Renner'].tolist())
@@ -613,7 +614,7 @@ with tab3:
     st.markdown("""
     Wanneer elke renner een prijskaartje en een totaalscore (EV over het hele seizoen) heeft, stuiten we op een beroemd wiskundig fenomeen: het **Knapsack Problem** (Krukzakprobleem). 
     
-    Zie je budget van €45.000.000 als een rugzak en de 20 benodigde renners als objecten. Je wilt de rugzak vullen met objecten die samen de hoogste waarde vertegenwoordigen, zónder dat de tas scheurt (over budget) en terwijl er *exact* 20 items in zitten.
+    Zie je budget van **45.000.000** als een rugzak en de 20 benodigde renners als objecten. Je wilt de rugzak vullen met objecten die samen de hoogste waarde vertegenwoordigen, zónder dat de tas scheurt (over budget) en terwijl er *exact* 20 items in zitten.
     
     De app gebruikt **PuLP** (een krachtige Python library voor lineaire optimalisatie) gekoppeld aan de CBC Solver. Deze engine berekent en verwerpt binnen enkele seconden miljoenen combinaties van renners totdat hij het 100% onbetwistbare, wiskundige optimum heeft gevonden.
     """)
