@@ -20,41 +20,34 @@ def normalize_name_logic(text):
 def get_file_mod_time(filepath):
     return os.path.getmtime(filepath) if os.path.exists(filepath) else 0
 
-# DE MAGISCHE SORTEER HACK (Onzichtbare karakters voor Streamlit)
-def get_sortable_status(is_on_startlist, is_starter, is_verreden=False, rank_str=None):
-    chars = ['\u200B', '\u200C', '\u200D', '\uFEFF']
-    def get_prefix(val):
-        b4 = ""
-        t = val
-        for _ in range(5):
-            b4 = str(t % 4) + b4
-            t //= 4
-        return "".join(chars[int(c)] for c in b4)
-    
+# --- OPMAAK & SORTEER LOGICA ---
+def get_numeric_status(is_on_startlist, is_starter, is_verreden=False, rank_str=None):
     if is_verreden:
         if rank_str and str(rank_str) not in ['nan', 'None', 'DNS', '']:
             if str(rank_str).isdigit():
-                r = int(rank_str)
-                # SPORZA: Punten t/m plek 30
-                if r <= 30:
-                    return get_prefix(r) + f"🏅 {r}"
-                else:
-                    return get_prefix(r) + str(r)
+                return int(rank_str)
             else:
-                return get_prefix(996) + f"❌ {rank_str}"
+                return 996 # DNF
         else:
-            if is_on_startlist:
-                return get_prefix(997) + "❌ DNF"
-            else:
-                return get_prefix(999) + "-"
+            return 996 if is_on_startlist else 999
     else:
         if is_on_startlist:
-            if is_starter:
-                return get_prefix(998) + "✅"
-            else:
-                return get_prefix(998) + "🪑"
-        else:
-            return get_prefix(999) + "-"
+            return 997 if is_starter else 998
+        return 999
+
+def format_race_status(val, limit):
+    if pd.isna(val): return ""
+    try:
+        v = int(float(val))
+    except:
+        return str(val)
+        
+    if v == 999: return "-"
+    if v == 998: return "🪑"
+    if v == 997: return "✅"
+    if v == 996: return "❌ DNF"
+    if v <= limit: return f"🏅 {v}"
+    return str(v)
 
 # --- DATA LADEN (SPORZA SPECIFIEK) ---
 @st.cache_data
@@ -318,7 +311,7 @@ if "sporza_transfer_plan" not in st.session_state: st.session_state.sporza_trans
 with st.sidebar:
     st.title("🚴 Sporza AI Coach")
     ev_method = st.selectbox("🧮 Rekenmodel (EV)", ["1. Sporza Ranking (Dynamisch)", "2. Originele Curve (Macht 4)"])
-    toon_uitslagen = st.checkbox("🏁 Koersen zijn begonnen (Toon uitslagen in Matrix)", value=True)
+    toon_uitslagen = st.checkbox("🏁 Koersen zijn begonnen (Toon uitslagen)", value=True)
     
     st.divider()
     st.markdown("### 🔁 Transfer Strategie")
@@ -432,8 +425,6 @@ else:
 
         with st.container(border=True):
             st.subheader("🛠️ Team Finetuner (Start-Team aanpassen)")
-            st.markdown("Vervang renners in je team. De AI zoekt direct naar passend budget en repareert je geplande transfers en 12-starters logica.")
-            
             c_fine1, c_fine2 = st.columns(2)
             with c_fine1: 
                 to_replace = st.multiselect("❌ Selecteer renner(s) om te verwijderen:", options=st.session_state.sporza_selected_riders)
@@ -553,10 +544,10 @@ else:
                 rank_str = None
                 if is_verreden:
                     res = df_k[df_k['Renner'] == r]
-                    if not res.empty:
-                        rank_str = res['Rnk'].values[0]
+                    if not res.empty: rank_str = res['Rnk'].values[0]
                 
-                display_matrix.loc[r, c] = get_sortable_status(is_on_list, is_starter, is_verreden, rank_str)
+                display_matrix.loc[r, c] = get_numeric_status(is_on_list, is_starter, is_verreden, rank_str)
+            display_matrix[c] = pd.to_numeric(display_matrix[c])
 
         display_matrix.insert(0, 'Rol', matrix_df['Rol'])
         
@@ -571,9 +562,8 @@ else:
             if 'Gekocht' in row['Rol']: return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
             return [''] * len(row)
 
-        totals_df = pd.DataFrame([totals_dict], index=['🚀 AANTAL STARTERS (Max 12)'])
-        st.dataframe(totals_df, use_container_width=True)
-        st.dataframe(display_matrix.style.apply(color_rows, axis=1), use_container_width=True)
+        format_dict = {c: lambda x: format_race_status(x, 30) for c in available_races}
+        st.dataframe(display_matrix.style.apply(color_rows, axis=1).format(format_dict), use_container_width=True)
 
     with tab3:
         st.header("👑 Kopmannen Advies")
@@ -606,7 +596,6 @@ with tab4:
     if race_filter: f_df = f_df[f_df[race_filter].sum(axis=1) == len(race_filter)]
 
     d_df = f_df[['Renner', 'Team', 'Prijs', 'Waarde (EV/M)', 'Type', 'Sporza_EV'] + available_races].copy()
-    d_df['Prijs'] = d_df['Prijs'].apply(lambda x: f"€ {x}M")
     
     if toon_uitslagen:
         u_time = get_file_mod_time("uitslagen.csv")
@@ -626,12 +615,13 @@ with tab4:
             rank_str = None
             if is_verreden:
                 res = df_k[df_k['Renner'] == r]
-                if not res.empty:
-                    rank_str = res['Rnk'].values[0]
-            new_col.append(get_sortable_status(is_on_list, is_on_list, is_verreden, rank_str))
-        d_df[c] = new_col
+                if not res.empty: rank_str = res['Rnk'].values[0]
+            new_col.append(get_numeric_status(is_on_list, is_on_list, is_verreden, rank_str))
+        d_df[c] = pd.to_numeric(new_col)
     
-    st.dataframe(d_df.sort_values(by='Sporza_EV', ascending=False), use_container_width=True, hide_index=True)
+    format_dict = {c: lambda x: format_race_status(x, 30) for c in available_races}
+    format_dict['Prijs'] = lambda x: f"€ {int(x)}M"
+    st.dataframe(d_df.sort_values(by='Sporza_EV', ascending=False).style.format(format_dict), use_container_width=True, hide_index=True)
 
 with tab5:
     st.header("ℹ️ Uitgebreide Handleiding & AI Uitleg")
