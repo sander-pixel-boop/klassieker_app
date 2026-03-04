@@ -578,6 +578,30 @@ with tab4:
     d_df['Prijs'] = d_df['Prijs'].apply(lambda x: f"€ {x}M")
     d_df[available_races] = d_df[available_races].applymap(lambda x: '✅' if x == 1 else '-')
     
+    # Voeg uitslagen toe aan de database als vinkje aan staat
+    if toon_uitslagen:
+        u_time = get_file_mod_time("uitslagen.csv")
+        df_uitslagen_db = get_uitslagen(u_time, df['Renner'].tolist())
+        verreden_koersen_db = df_uitslagen_db['Race'].unique() if not df_uitslagen_db.empty else []
+        
+        d_df = d_df.set_index('Renner')
+        for c in available_races:
+            if c in verreden_koersen_db:
+                df_k = df_uitslagen_db[df_uitslagen_db['Race'] == c]
+                for r in d_df.index:
+                    if d_df.loc[r, c] == '✅':
+                        res = df_k[df_k['Renner'] == r]
+                        if not res.empty:
+                            rank_str = res['Rnk'].values[0]
+                            if str(rank_str).isdigit() and int(rank_str) <= 20:
+                                d_df.loc[r, c] = f"🏅 {rank_str}"
+                            else:
+                                d_df.loc[r, c] = str(rank_str)
+                        else:
+                            d_df.loc[r, c] = "❌ DNF"
+        d_df = d_df.reset_index()
+        d_df = d_df[['Renner', 'Team', 'Prijs', 'Waarde (EV/M)', 'Type', 'Sporza_EV'] + available_races]
+    
     st.dataframe(d_df.sort_values(by='Sporza_EV', ascending=False), use_container_width=True, hide_index=True)
 
 with tab5:
