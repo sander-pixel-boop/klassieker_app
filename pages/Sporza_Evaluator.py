@@ -130,15 +130,15 @@ else:
                         pts = SPORZA_PUNTEN.get(rank, 0)
                         is_kopman = (renner == kopman)
                         
-                        if pts > 0:
-                            if is_kopman:
-                                pts *= 2
-                            punten_k += pts
-                            details_lijst.append({
-                                "Koers": koers, "Model": m_naam, "Renner": renner,
-                                "Kopman": "✅" if is_kopman else "-",
-                                "Rank": rank, "Punten": pts
-                            })
+                        if is_kopman:
+                            pts *= 2
+                        
+                        punten_k += pts
+                        details_lijst.append({
+                            "Koers": koers, "Model": m_naam, "Renner": renner,
+                            "Kopman": "✅" if is_kopman else "-",
+                            "Rank": rank, "Punten": pts
+                        })
                 
                 resultaten.append({
                     "Model": m_naam, "Koers": koers, "Punten": punten_k, "Kopman": kopman
@@ -173,7 +173,7 @@ else:
                         st.dataframe(df_det_koers[['Renner', 'Kopman', 'Rank', 'Punten']].sort_values('Punten', ascending=False), hide_index=True)
                         st.write(f"**Totaal: {data_k['Punten'].values[0]} pt**")
                     else:
-                        st.write("Geen punten gescoord.")
+                        st.write("Geen renners in de uitslag.")
 
 # --- OVERZICHT SELECTIES ---
 st.divider()
