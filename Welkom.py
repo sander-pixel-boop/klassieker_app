@@ -26,9 +26,9 @@ def home_page():
         * **Evaluator:** Test en vergelijk live hoe verschillende wiskundige modellen presteren ten opzichte van jouw eigen selectie.
 
         **Sporza**
-        * **Klassiekers:** 🚧 *(WIP)* Bouw je team binnen de limieten van 120M, 20 renners en maximaal 4 per ploeg.
+        * **Klassiekers:**  Bouw je team binnen de limieten van 120M, 20 renners en maximaal 4 per ploeg.
         * **Grand Tour:** *(Binnenkort)* Optimaliseer je Sporza-team voor de grote rondes.
-        * **Evaluator:** *(Binnenkort)* Test en vergelijk Sporza modellen in de praktijk.
+        * **Evaluator:**  Test en vergelijk Sporza modellen in de praktijk.
         
         ---
         
@@ -50,7 +50,7 @@ scorito_evaluator = st.Page("pages/Model_Evaluator_(Scorito).py", title="Evaluat
 
 sporza_klassiekers = st.Page("pages/Klassiekers - Sporza.py", title="Klassiekers", icon="🏁")
 sporza_grand_tour = st.Page("pages/Sporza_Grand_Tour.py", title="[Binnenkort] Grand Tour", icon="⛰️")
-sporza_evaluator = st.Page("pages/Sporza_Evaluator.py", title="[Binnenkort] Evaluator", icon="📊")
+sporza_evaluator = st.Page("pages/Sporza_Evaluator.py", title="Evaluator", icon="📊")
 
 # 3. Groepeer de navigatie voor de sidebar
 pg = st.navigation({
