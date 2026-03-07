@@ -117,20 +117,10 @@ def format_race_status(val, limit):
     if v <= limit: return f"🏅 {v}"
     return str(v)
 
-# --- DATA LADEN ---
+# --- DATA LADEN (ALLEEN SCORITO STARTLIJST) ---
 @st.cache_data
-def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
+def load_and_merge_data(scorito_mod_time, stats_mod_time):
     try:
-        df_prog = pd.read_csv("sporza_prijzen_startlijst.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
-        df_prog.columns = df_prog.columns.str.strip()
-        if 'Naam' in df_prog.columns and 'Renner' not in df_prog.columns:
-            df_prog = df_prog.rename(columns={'Naam': 'Renner'})
-        if 'Prijs' in df_prog.columns:
-            df_prog = df_prog.drop(columns=['Prijs'])
-            
-        sporza_to_scorito = {'OML': 'OHN', 'STR': 'SB', 'RVB': 'BDP', 'IFF': 'GW', 'BRP': 'BP', 'AGT': 'AGR', 'WAP': 'WP'}
-        df_prog = df_prog.rename(columns=sporza_to_scorito)
-        
         df_scorito = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
         df_scorito.columns = df_scorito.columns.str.strip()
         if 'Naam' in df_scorito.columns and 'Renner' not in df_scorito.columns:
@@ -144,8 +134,6 @@ def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
         if 'Prijs' in df_scorito.columns:
             df_scorito['Prijs'] = df_scorito['Prijs'].fillna(0)
             df_scorito.loc[df_scorito['Prijs'] == 800000, 'Prijs'] = 750000
-            
-        df_prijzen = df_scorito[['Renner', 'Prijs']].drop_duplicates(subset=['Renner'])
 
         df_stats = pd.read_csv("renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip') 
         df_stats.columns = df_stats.columns.str.strip()
@@ -155,31 +143,21 @@ def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
             df_stats = df_stats.rename(columns={'Ploeg': 'Team'})
         df_stats = df_stats.drop_duplicates(subset=['Renner'], keep='first')
         
-        scorito_names = df_prijzen['Renner'].unique()
         stats_names = df_stats['Renner'].unique()
-        
-        norm_to_scorito = {normalize_name_logic(n): n for n in scorito_names}
-        norm_scorito_list = list(norm_to_scorito.keys())
         norm_to_stats = {normalize_name_logic(n): n for n in stats_names}
         norm_stats_list = list(norm_to_stats.keys())
 
-        df_prog['Renner_Scorito'] = df_prog['Renner']
-        df_prog['Renner_Stats'] = df_prog['Renner']
+        df_scorito['Renner_Stats'] = df_scorito['Renner']
 
-        for i, row in df_prog.iterrows():
+        for i, row in df_scorito.iterrows():
             short = row['Renner']
-            best_scorito = process.extractOne(normalize_name_logic(short), norm_scorito_list, scorer=fuzz.token_set_ratio)
-            if best_scorito and best_scorito[1] > 75:
-                df_prog.at[i, 'Renner_Scorito'] = norm_to_scorito[best_scorito[0]]
-            
             best_stats = process.extractOne(normalize_name_logic(short), norm_stats_list, scorer=fuzz.token_set_ratio)
             if best_stats and best_stats[1] > 75:
-                df_prog.at[i, 'Renner_Stats'] = norm_to_stats[best_stats[0]]
+                df_scorito.at[i, 'Renner_Stats'] = norm_to_stats[best_stats[0]]
                 
-        merged_df = pd.merge(df_prog, df_prijzen, left_on='Renner_Scorito', right_on='Renner', how='left')
-        merged_df = pd.merge(merged_df, df_stats, left_on='Renner_Stats', right_on='Renner', how='left')
+        merged_df = pd.merge(df_scorito, df_stats, left_on='Renner_Stats', right_on='Renner', how='left', suffixes=('', '_drop'))
         
-        drop_cols = [c for c in merged_df.columns if '_drop' in c or c in ['Renner_Scorito', 'Renner_Stats']]
+        drop_cols = [c for c in merged_df.columns if '_drop' in c or c == 'Renner_Stats']
         merged_df = merged_df.drop(columns=drop_cols)
         
         merged_df['Prijs'] = pd.to_numeric(merged_df['Prijs'], errors='coerce').fillna(0).astype(int)
@@ -375,11 +353,10 @@ def rebuild_team_and_transfers(df, max_bud, min_bud, max_ren, new_base_team, t_m
         return new_base_team, []
 
 # --- HOOFDCODE ---
-prog_time = get_file_mod_time("sporza_prijzen_startlijst.csv")
 scorito_time = get_file_mod_time("bron_startlijsten.csv")
 stats_time = get_file_mod_time("renners_stats.csv")
 
-df_raw, available_races, koers_mapping = load_and_merge_data(prog_time, scorito_time, stats_time)
+df_raw, available_races, koers_mapping = load_and_merge_data(scorito_time, stats_time)
 
 if df_raw.empty:
     st.warning("Data is leeg of kon niet worden geladen.")
@@ -729,7 +706,6 @@ else:
             if 'Gekocht' in row['Rol']: return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
             return [''] * len(row)
 
-        # De formatter die de getallen onzichtbaar terugzet naar Emoji's voor de gebruiker
         format_dict = {c: lambda x: format_race_status(x, 20) for c in available_races}
         st.dataframe(display_matrix.style.apply(color_rows, axis=1).format(format_dict), use_container_width=True)
 
