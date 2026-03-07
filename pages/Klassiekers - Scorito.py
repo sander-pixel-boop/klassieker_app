@@ -12,7 +12,7 @@ from thefuzz import process, fuzz
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Scorito Klassiekers AI", layout="wide", page_icon="🏆")
 
-# --- HULPFUNCTIES ---
+# --- HULPFUNCTIE: NORMALISATIE ---
 def normalize_name_logic(text):
     if not isinstance(text, str):
         return ""
@@ -20,6 +20,7 @@ def normalize_name_logic(text):
     nfkd_form = unicodedata.normalize('NFKD', text)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
+# --- HULPFUNCTIES: BESTANDSCONTROLE & UITSLAGEN ---
 def get_file_mod_time(filepath):
     return os.path.getmtime(filepath) if os.path.exists(filepath) else 0
 
@@ -30,6 +31,7 @@ def get_verreden_koersen():
             if 'Race' not in df_u.columns:
                 df_u = pd.read_csv("uitslagen.csv", sep=None, engine='python')
             if 'Race' in df_u.columns:
+                # Vertaal Sporza afkortingen naar Scorito voor de sidebar check
                 sporza_naar_scorito_map = {'OML': 'OHN', 'STR': 'SB', 'RVB': 'BDP', 'IFF': 'GW', 'BRP': 'BP', 'AGT': 'AGR', 'WAP': 'WP'}
                 races = [str(x).strip().upper() for x in df_u['Race'].unique()]
                 return [sporza_naar_scorito_map.get(r, r) for r in races]
@@ -86,49 +88,25 @@ def evaluate_plan_ev(df_eval, base_team, plan, available_races):
             totaal += df_eval.loc[df_eval['Renner'] == r, f'EV_{race}'].values[0]
     return totaal
 
-# --- OPMAAK & SORTEER LOGICA ---
-def get_numeric_status(is_on_startlist, is_starter, is_verreden=False, rank_str=None):
-    if is_verreden:
-        if rank_str and str(rank_str) not in ['nan', 'None', 'DNS', '']:
-            if str(rank_str).isdigit():
-                return int(rank_str)
-            else:
-                return 996 # DNF
-        else:
-            return 996 if is_on_startlist else 999
-    else:
-        if is_on_startlist:
-            return 997 if is_starter else 998
-        return 999
-
-def format_race_status(val, limit):
-    if pd.isna(val): return ""
-    try:
-        v = int(float(val))
-    except:
-        return str(val)
-        
-    if v == 999: return "-"
-    if v == 998: return "🪑"
-    if v == 997: return "✅"
-    if v == 996: return "❌ DNF"
-    if v <= limit: return f"🏅 {v}"
-    return str(v)
-
-# --- DATA LADEN ---
+# --- DATA LADEN (PROGRAMMA VAN SPORZA, PRIJS VAN SCORITO) ---
 @st.cache_data
 def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
     try:
+        # 1. Haal programma uit Sporza bestand
         df_prog = pd.read_csv("sporza_prijzen_startlijst.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
         df_prog.columns = df_prog.columns.str.strip()
         if 'Naam' in df_prog.columns and 'Renner' not in df_prog.columns:
             df_prog = df_prog.rename(columns={'Naam': 'Renner'})
+        
+        # Verwijder de Sporza prijs
         if 'Prijs' in df_prog.columns:
             df_prog = df_prog.drop(columns=['Prijs'])
             
+        # Vertaal de koersnamen van Sporza naar Scorito
         sporza_to_scorito = {'OML': 'OHN', 'STR': 'SB', 'RVB': 'BDP', 'IFF': 'GW', 'BRP': 'BP', 'AGT': 'AGR', 'WAP': 'WP'}
         df_prog = df_prog.rename(columns=sporza_to_scorito)
         
+        # 2. Haal de Scorito prijzen uit bron_startlijsten.csv
         df_scorito = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
         df_scorito.columns = df_scorito.columns.str.strip()
         if 'Naam' in df_scorito.columns and 'Renner' not in df_scorito.columns:
@@ -145,19 +123,23 @@ def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
             
         df_prijzen = df_scorito[['Renner', 'Prijs']].drop_duplicates(subset=['Renner'])
 
+        # 3. Haal statistieken uit renners_stats.csv
         df_stats = pd.read_csv("renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip') 
         df_stats.columns = df_stats.columns.str.strip()
         if 'Naam' in df_stats.columns and 'Renner' not in df_stats.columns:
             df_stats = df_stats.rename(columns={'Naam': 'Renner'})
+        
         if 'Team' not in df_stats.columns and 'Ploeg' in df_stats.columns:
             df_stats = df_stats.rename(columns={'Ploeg': 'Team'})
         df_stats = df_stats.drop_duplicates(subset=['Renner'], keep='first')
         
+        # Fuzzy Matching Setup
         scorito_names = df_prijzen['Renner'].unique()
         stats_names = df_stats['Renner'].unique()
         
         norm_to_scorito = {normalize_name_logic(n): n for n in scorito_names}
         norm_scorito_list = list(norm_to_scorito.keys())
+        
         norm_to_stats = {normalize_name_logic(n): n for n in stats_names}
         norm_stats_list = list(norm_to_stats.keys())
 
@@ -166,20 +148,25 @@ def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
 
         for i, row in df_prog.iterrows():
             short = row['Renner']
+            # Match met Scorito Prijs
             best_scorito = process.extractOne(normalize_name_logic(short), norm_scorito_list, scorer=fuzz.token_set_ratio)
             if best_scorito and best_scorito[1] > 75:
                 df_prog.at[i, 'Renner_Scorito'] = norm_to_scorito[best_scorito[0]]
             
+            # Match met Stats
             best_stats = process.extractOne(normalize_name_logic(short), norm_stats_list, scorer=fuzz.token_set_ratio)
             if best_stats and best_stats[1] > 75:
                 df_prog.at[i, 'Renner_Stats'] = norm_to_stats[best_stats[0]]
                 
-        merged_df = pd.merge(df_prog, df_prijzen, left_on='Renner_Scorito', right_on='Renner', how='left')
-        merged_df = pd.merge(merged_df, df_stats, left_on='Renner_Stats', right_on='Renner', how='left')
+        # Mergen van de 3 bronnen
+        merged_df = pd.merge(df_prog, df_prijzen, left_on='Renner_Scorito', right_on='Renner', how='left', suffixes=('', '_drop1'))
+        merged_df = pd.merge(merged_df, df_stats, left_on='Renner_Stats', right_on='Renner', how='left', suffixes=('', '_drop2'))
         
+        # Opruimen kolommen
         drop_cols = [c for c in merged_df.columns if '_drop' in c or c in ['Renner_Scorito', 'Renner_Stats']]
         merged_df = merged_df.drop(columns=drop_cols)
         
+        # Alleen renners behouden die een Scorito prijs hebben (Prijs > 0)
         merged_df['Prijs'] = pd.to_numeric(merged_df['Prijs'], errors='coerce').fillna(0).astype(int)
         merged_df = merged_df[merged_df['Prijs'] > 0]
         
@@ -191,14 +178,20 @@ def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
         
         all_stats_cols = ['COB', 'HLL', 'SPR', 'AVG', 'FLT', 'MTN', 'ITT', 'GC', 'OR', 'TTL']
         for col in available_races + all_stats_cols:
-            if col not in merged_df.columns: merged_df[col] = 0
+            if col not in merged_df.columns:
+                merged_df[col] = 0
             merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0).astype(int)
             
         merged_df['HLL/MTN'] = merged_df[['HLL', 'MTN']].max(axis=1).astype(int)
-        merged_df['Team'] = merged_df.get('Team', pd.Series(['Onbekend']*len(merged_df))).fillna('Onbekend')
-        merged_df['Total_Races'] = merged_df[available_races].sum(axis=1).astype(int)
+            
+        if 'Team' not in merged_df.columns:
+            merged_df['Team'] = 'Onbekend'
+        else:
+            merged_df['Team'] = merged_df['Team'].fillna('Onbekend')
         
+        merged_df['Total_Races'] = merged_df[available_races].sum(axis=1).astype(int)
         koers_stat_map = {'OHN':'COB','KBK':'SPR','SB':'HLL','PN':'HLL/MTN','TA':'SPR','MSR':'AVG','BDP':'SPR','E3':'COB','GW':'SPR','DDV':'COB','RVV':'COB','SP':'SPR','PR':'COB','BP':'HLL','AGR':'HLL','WP':'HLL','LBL':'HLL'}
+        
         return merged_df, available_races, koers_stat_map
     except Exception as e:
         st.error(f"Fout in dataverwerking: {e}")
@@ -215,6 +208,7 @@ def calculate_dynamic_ev(df, available_races, koers_stat_map, method, skip_races
         starters = starters.sort_values(by=[stat, 'AVG'], ascending=[False, False])
         
         race_ev = pd.Series(0.0, index=df.index)
+        
         if koers not in skip_races:
             for i, idx in enumerate(starters.index):
                 val = 0.0
@@ -234,26 +228,33 @@ def calculate_dynamic_ev(df, available_races, koers_stat_map, method, skip_races
                 elif i == 1: val *= 2.5
                 elif i == 2: val *= 2.0
                 race_ev.loc[idx] = val
+        
         race_evs[koers] = race_ev
         df[f'EV_{koers}'] = race_ev
 
     df['EV_all'] = sum(race_evs.values()) if race_evs else 0.0
     df['Scorito_EV'] = df['EV_all'].fillna(0).round(0).astype(int)
     df['Waarde (EV/M)'] = (df['Scorito_EV'] / (df['Prijs'] / 1000000)).replace([float('inf'), -float('inf')], 0).fillna(0).round(1)
+    
     return df
 
 def bepaal_klassieker_type(row):
-    cob, hll, spr = row.get('COB', 0), row.get('HLL', 0), row.get('SPR', 0)
+    cob = row.get('COB', 0)
+    hll = row.get('HLL', 0)
+    spr = row.get('SPR', 0)
+    
     elite = []
     if cob >= 85: elite.append('Kassei')
     if hll >= 85: elite.append('Heuvel')
     if spr >= 85: elite.append('Sprint')
+    
     if len(elite) == 3: return 'Allround / Multispecialist'
     elif len(elite) == 2: return ' / '.join(elite)
     elif len(elite) == 1: return elite[0]
     else:
         s = {'Kassei': cob, 'Heuvel': hll, 'Sprint': spr, 'Klimmer': row.get('MTN', 0), 'Tijdrit': row.get('ITT', 0), 'Klassement': row.get('GC', 0)}
-        return max(s, key=s.get) if sum(s.values()) > 0 else 'Onbekend'
+        if sum(s.values()) == 0: return 'Onbekend'
+        return max(s, key=s.get)
 
 # --- HOOFD SOLVER ---
 def solve_knapsack_dynamic(df, total_budget, min_budget, max_riders, force_base, ban_base, exclude_list):
@@ -280,6 +281,7 @@ def solve_knapsack_dynamic(df, total_budget, min_budget, max_riders, force_base,
 def find_emergency_replacements(df_eval, base_team, transfer_plan, injured_riders, last_race, max_budget, available_races):
     all_historical_riders = set(base_team + [t['in'] for t in transfer_plan])
     candidates = df_eval[~df_eval['Renner'].isin(all_historical_riders)].copy()
+    
     idx = available_races.index(last_race)
     remaining_races = available_races[idx+1:]
     candidates['EV_remaining'] = candidates[[f'EV_{r}' for r in remaining_races]].sum(axis=1)
@@ -298,7 +300,8 @@ def find_emergency_replacements(df_eval, base_team, transfer_plan, injured_rider
                 current_team.add(t['in'])
                 
     for inj in injured_riders:
-        if inj in current_team: current_team.remove(inj)
+        if inj in current_team:
+            current_team.remove(inj)
             
     base_cost_now = df_eval[df_eval['Renner'].isin(current_team)]['Prijs'].sum()
     prob += base_cost_now + pulp.lpSum([candidates.loc[i, 'Prijs'] * vars[i] for i in candidates.index]) <= max_budget
@@ -316,11 +319,12 @@ def find_emergency_replacements(df_eval, base_team, transfer_plan, injured_rider
             prob += cost_future + pulp.lpSum([candidates.loc[i, 'Prijs'] * vars[i] for i in candidates.index]) <= max_budget
             
     prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=10))
+    
     if pulp.LpStatus[prob.status] == 'Optimal':
         return [candidates.loc[i, 'Renner'] for i in candidates.index if vars[i].varValue > 0.5]
     return []
 
-# --- TEAM REBUILDER ---
+# --- TEAM REBUILDER (VOOR FINETUNER) ---
 def rebuild_team_and_transfers(df, max_bud, min_bud, max_ren, new_base_team, t_moments, use_transfers):
     prob = pulp.LpProblem("Scorito_Rebuild_Solver", pulp.LpMaximize)
     x = pulp.LpVariable.dicts("Base", df.index, cat='Binary')
@@ -334,11 +338,14 @@ def rebuild_team_and_transfers(df, max_bud, min_bud, max_ren, new_base_team, t_m
             split_idx = available_races.index(t_moments[k]) + 1 if t_moments[k] != 'GEEN' else len(available_races)
             races_before = available_races[:split_idx]
             races_after = available_races[split_idx:]
+            
             df[f'EV_y{k}'] = df[[f'EV_{r}' for r in races_before]].sum(axis=1) if races_before else 0.0
             df[f'EV_z{k}'] = df[[f'EV_{r}' for r in races_after]].sum(axis=1) if races_after else 0.0
+            
             obj += pulp.lpSum([y_vars[k][i] * df.loc[i, f'EV_y{k}'] + z_vars[k][i] * df.loc[i, f'EV_z{k}'] for i in df.index])
             
         prob += obj
+        
         for i in df.index:
             prob += x[i] + y_vars[0][i] + y_vars[1][i] + y_vars[2][i] + z_vars[0][i] + z_vars[1][i] + z_vars[2][i] <= 1
             renner = df.loc[i, 'Renner']
@@ -352,12 +359,14 @@ def rebuild_team_and_transfers(df, max_bud, min_bud, max_ren, new_base_team, t_m
             prob += pulp.lpSum([y_vars[k][i] for i in df.index]) == pulp.lpSum([z_vars[k][i] for i in df.index]) 
             
         prob += pulp.lpSum([x[i] for i in df.index]) + pulp.lpSum([y_vars[0][i] for i in df.index]) + pulp.lpSum([y_vars[1][i] for i in df.index]) + pulp.lpSum([y_vars[2][i] for i in df.index]) == max_ren
+        
         prob += pulp.lpSum([(x[i] + y_vars[0][i] + y_vars[1][i] + y_vars[2][i]) * df.loc[i, 'Prijs'] for i in df.index]) <= max_bud
         prob += pulp.lpSum([(x[i] + z_vars[0][i] + y_vars[1][i] + y_vars[2][i]) * df.loc[i, 'Prijs'] for i in df.index]) <= max_bud
         prob += pulp.lpSum([(x[i] + z_vars[0][i] + z_vars[1][i] + y_vars[2][i]) * df.loc[i, 'Prijs'] for i in df.index]) <= max_bud
         prob += pulp.lpSum([(x[i] + z_vars[0][i] + z_vars[1][i] + z_vars[2][i]) * df.loc[i, 'Prijs'] for i in df.index]) <= max_bud
 
         prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=15))
+        
         if pulp.LpStatus[prob.status] == 'Optimal':
             base_team_res = [df.loc[i, 'Renner'] for i in df.index if x[i].varValue > 0.5]
             transfer_plan_res = []
@@ -386,6 +395,7 @@ if df_raw.empty:
 if "selected_riders" not in st.session_state: st.session_state.selected_riders = []
 if "transfer_plan" not in st.session_state: st.session_state.transfer_plan = []
 
+# --- SIDEBAR ---
 with st.sidebar:
     st.title("🏆 AI Coach")
     
@@ -395,7 +405,7 @@ with st.sidebar:
     
     if actieve_koersen:
         st.success(f"✅ Gereden koersen gedetecteerd (t/m {actieve_koersen[-1]})")
-        toon_uitslagen = st.checkbox("🏁 Koersen zijn begonnen (Toon uitslagen)", value=True)
+        toon_uitslagen = st.checkbox("🏁 Koersen zijn begonnen (Toon uitslagen in Matrix)", value=True)
         if st.checkbox("🔮 Toon alleen Resterende EV", value=True, help="Negeer behaalde punten."):
             skip_races = actieve_koersen
     else:
@@ -422,6 +432,7 @@ with st.sidebar:
 
     with st.expander("🚑 Directe Noodwissel (Blessure)", expanded=False):
         st.info("Valt een renner uit? Vind direct de beste wissel op dít moment en blijf netjes binnen de 3-wissels limiet.")
+        
         if len(st.session_state.selected_riders) > 0:
             default_lr_idx = available_races.index(actieve_koersen[-1]) if actieve_koersen else 0
             last_race = st.selectbox("Laatst gereden koers (Moment van wissel):", options=available_races[:-1], index=default_lr_idx)
@@ -437,15 +448,18 @@ with st.sidebar:
             
             if injured_selection:
                 planned_transfers_copy = list(st.session_state.transfer_plan)
+                
                 auto_drop = []
                 for i, t in enumerate(planned_transfers_copy):
                     if t['uit'] in injured_selection and available_races.index(t['moment']) >= idx_last:
                         auto_drop.append(i)
+                        
                 for idx in sorted(auto_drop, reverse=True):
-                    st.write(f"💡 *Geplande verkoop van {planned_transfers_copy[idx]['uit']} vervalt automatisch.*")
+                    st.write(f"💡 *Geplande verkoop van {planned_transfers_copy[idx]['uit']} vervalt automatisch ter compensatie.*")
                     planned_transfers_copy.pop(idx)
                     
                 drops_needed = (len(planned_transfers_copy) + len(injured_selection)) - 3
+                
                 ai_auto_drop = False
                 drop_choices = []
                 if drops_needed > 0:
@@ -453,7 +467,7 @@ with st.sidebar:
                     ai_auto_drop = st.checkbox("🤖 Laat de AI de minst pijnlijke wissel(s) opofferen", value=True)
                     if not ai_auto_drop:
                         opts = {i: f"{t['uit']} -> {t['in']} (na {t['moment']})" for i, t in enumerate(planned_transfers_copy)}
-                        drop_choices = st.multiselect("Selecteer annuleringen:", options=list(opts.keys()), format_func=lambda x: opts[x], max_selections=drops_needed)
+                        drop_choices = st.multiselect("Selecteer handmatig welke wissel(s) moeten vervallen:", options=list(opts.keys()), format_func=lambda x: opts[x], max_selections=drops_needed)
                     
                 if st.button("Vind & Voer Wissel Uit", type="primary", use_container_width=True):
                     if drops_needed > 0 and not ai_auto_drop and len(drop_choices) != drops_needed:
@@ -462,20 +476,23 @@ with st.sidebar:
                         if drops_needed > 0 and ai_auto_drop:
                             best_ev = -1
                             best_plan = None
+                            
                             for drop_indices in itertools.combinations(range(len(planned_transfers_copy)), drops_needed):
                                 temp_plan = [t for i, t in enumerate(planned_transfers_copy) if i not in drop_indices]
                                 repls = find_emergency_replacements(df, st.session_state.selected_riders, temp_plan, injured_selection, last_race, max_bud, available_races)
+                                
                                 if repls:
                                     temp_full_plan = temp_plan + [{"uit": u, "in": r, "moment": last_race} for u, r in zip(injured_selection, repls)]
                                     ev = evaluate_plan_ev(df, st.session_state.selected_riders, temp_full_plan, available_races)
                                     if ev > best_ev:
                                         best_ev = ev
                                         best_plan = temp_full_plan
+                                        
                             if best_plan:
                                 st.session_state.transfer_plan = best_plan
                                 st.rerun()
                             else:
-                                st.error("Geen budgettaire oplossing gevonden.")
+                                st.error("Geen budgettaire oplossing gevonden met deze opofferingen.")
                         else:
                             temp_plan = [t for i, t in enumerate(planned_transfers_copy) if i not in drop_choices]
                             replacements = find_emergency_replacements(df, st.session_state.selected_riders, temp_plan, injured_selection, last_race, max_bud, available_races)
@@ -484,7 +501,7 @@ with st.sidebar:
                                 st.session_state.transfer_plan = temp_full_plan
                                 st.rerun()
                             else:
-                                st.error("Niet genoeg budget!")
+                                st.error("Niet genoeg budget voor een geldige vervanger!")
         else:
             st.warning("Je moet eerst een start-team berekenen of inladen.")
 
@@ -516,6 +533,7 @@ with st.sidebar:
                     ld = json.load(uploaded_file)
                     oude_selectie = ld.get("selected_riders", [])
                     oud_plan = ld.get("transfer_plan", [])
+                    
                     huidige_renners = df['Renner'].tolist()
                     def update_naam(naam):
                         if naam in huidige_renners: return naam
@@ -523,6 +541,7 @@ with st.sidebar:
                         return match[0] if match and match[1] > 80 else naam
 
                     st.session_state.selected_riders = [update_naam(r) for r in oude_selectie if update_naam(r) in huidige_renners]
+                    
                     nieuw_plan = []
                     if isinstance(oud_plan, dict) and "uit" in oud_plan and "in" in oud_plan:
                         for r_uit, r_in in zip(oud_plan["uit"], oud_plan["in"]):
@@ -540,12 +559,16 @@ st.title("🏆 Voorjaarsklassiekers: Scorito")
 st.markdown("**Met dank aan:** [Wielerorakel.nl](https://www.cyclingoracle.com/) | [Kopmanpuzzel](https://kopmanpuzzel.up.railway.app/)")
 st.divider()
 
+# --- TAB STRUCTUUR OPZETTEN ---
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🚀 Jouw Team & Transfers", "🗓️ Startlijst & Uitslagen", "📊 Kopmannen", "📋 Database (Alle)", "ℹ️ Uitleg"])
 
 if not st.session_state.selected_riders:
-    with tab1: st.info("👈 Kies je instellingen in de zijbalk en klik op **Bereken Nieuw Start-Team** of **Oude Teams Inladen** om te beginnen!")
-    with tab2: st.info("👈 Bereken eerst een team om de startlijst matrix te kunnen zien.")
-    with tab3: st.info("👈 Bereken eerst een team voor het kopmannen advies.")
+    with tab1:
+        st.info("👈 Kies je instellingen in de zijbalk en klik op **Bereken Nieuw Start-Team** of **Oude Teams Inladen** om te beginnen!")
+    with tab2:
+        st.info("👈 Bereken eerst een team om de startlijst matrix te kunnen zien.")
+    with tab3:
+        st.info("👈 Bereken eerst een team voor het kopmannen advies.")
 else:
     all_display_riders = list(set(st.session_state.selected_riders + [t['in'] for t in st.session_state.transfer_plan]))
     current_df = df[df['Renner'].isin(all_display_riders)].copy()
@@ -577,13 +600,16 @@ else:
 
     with tab1:
         st.subheader("📊 Dashboard")
+        
         start_team_df = current_df[current_df['Renner'].isin(st.session_state.selected_riders)]
         start_cost = start_team_df['Prijs'].sum()
         
         m1, m2, m3 = st.columns(3)
         m1.metric("💰 Budget over (Start)", f"€ {max_bud - start_cost:,.0f}")
         m2.metric("🚴 Renners (Start)", f"{len(st.session_state.selected_riders)} / {max_ren}")
+        
         totaal_ev = evaluate_plan_ev(df, st.session_state.selected_riders, st.session_state.transfer_plan, available_races)
+                    
         m3.metric("🎯 Team EV (Totaal)", f"{totaal_ev:.0f}")
         st.divider()
         
@@ -609,6 +635,7 @@ else:
                     if t['uit'] in temp_team: temp_team.remove(t['uit'])
                     if t['in'] not in temp_team: temp_team.append(t['in'])
                     budget_now = max_bud - df[df['Renner'].isin(temp_team)]['Prijs'].sum()
+                    
                     st.markdown(f"***Wissel {i+1} (ná {t['moment']} | Resterend budget: €{budget_now/1000000:.2f}M)***")
                     c_uit, c_in = st.columns(2)
                     with c_uit: st.error(f"❌ {t['uit']}")
@@ -616,8 +643,11 @@ else:
                     st.write("")
 
         st.divider()
+        
         with st.container(border=True):
             st.subheader("🛠️ Team Finetuner (Start-Team aanpassen)")
+            st.markdown("Vervang vóór de start van het spel een renner in je team. De AI past je toekomstige transfers volautomatisch aan als dat nodig is om binnen budget te blijven.")
+            
             c_fine1, c_fine2 = st.columns(2)
             with c_fine1: 
                 to_replace = st.multiselect("❌ Selecteer renner(s) om te verwijderen:", options=st.session_state.selected_riders)
@@ -626,11 +656,13 @@ else:
             if to_replace:
                 freed_budget = df[df['Renner'].isin(to_replace)]['Prijs'].sum()
                 max_affordable = freed_budget + (max_bud - start_cost)
+                
                 with c_fine2: 
                     available_replacements = [r for r in df['Renner'].tolist() if r not in st.session_state.selected_riders]
                     to_add_manual = st.multiselect("📥 Handmatige vervanger(s):", options=available_replacements)
                     
                 sugg_df = df[~df['Renner'].isin(st.session_state.selected_riders)][df['Prijs'] <= max_affordable].sort_values(by='Scorito_EV', ascending=False).head(5)
+                
                 sugg_keuze = []
                 if not sugg_df.empty:
                     st.info(f"💡 **Top Suggesties (Budget per renner: € {max_affordable/1000000:.1f}M):**")
@@ -664,8 +696,10 @@ else:
 
                     if st.button("🚀 VOER WIJZIGING DOOR", type="primary", use_container_width=True):
                         new_force_base = [r for r in st.session_state.selected_riders if r not in to_replace] + to_add
+                        
                         if len(new_force_base) == max_ren:
                             new_res, new_plan = rebuild_team_and_transfers(df, max_bud, min_bud, max_ren, new_force_base, t_moments, use_transfers)
+                            
                             if new_res:
                                 st.session_state.selected_riders = new_res
                                 st.session_state.transfer_plan = new_plan
@@ -688,30 +722,28 @@ else:
     with tab2:
         st.header("🗓️ Startlijst & Uitslagen")
         
+        display_matrix = active_matrix[available_races].applymap(lambda x: '✅' if x == 1 else '-')
+        
         if toon_uitslagen:
-            st.success("✅ Actuele uitslagen ingeladen! Top 20 finishes worden beloond met een medaille (🏅). Tabel blijft perfect sorteerbaar.")
+            st.success("✅ Actuele uitslagen ingeladen! Top 20 finishes worden beloond met een medaille (🏅).")
             u_time = get_file_mod_time("uitslagen.csv")
             df_uitslagen = get_uitslagen(u_time, df['Renner'].tolist())
             verreden_koersen = df_uitslagen['Race'].unique() if not df_uitslagen.empty else []
-        else:
-            df_uitslagen = pd.DataFrame()
-            verreden_koersen = []
-
-        display_matrix = active_matrix[available_races].copy()
-        
-        for c in available_races:
-            is_verreden = c in verreden_koersen
-            df_k = df_uitslagen[df_uitslagen['Race'] == c] if is_verreden else pd.DataFrame()
             
-            for r in display_matrix.index:
-                is_on_list = (active_matrix.loc[r, c] == 1)
-                rank_str = None
-                if is_verreden:
-                    res = df_k[df_k['Renner'] == r]
-                    if not res.empty: rank_str = res['Rnk'].values[0]
-                
-                display_matrix.loc[r, c] = get_numeric_status(is_on_list, is_on_list, is_verreden, rank_str)
-            display_matrix[c] = pd.to_numeric(display_matrix[c])
+            for c in available_races:
+                if c in verreden_koersen:
+                    df_k = df_uitslagen[df_uitslagen['Race'] == c]
+                    for r in display_matrix.index:
+                        if display_matrix.loc[r, c] == '✅':
+                            res = df_k[df_k['Renner'] == r]
+                            if not res.empty:
+                                rank_str = res['Rnk'].values[0]
+                                if str(rank_str).isdigit() and int(rank_str) <= 20:
+                                    display_matrix.loc[r, c] = f"🏅 {rank_str}"
+                                else:
+                                    display_matrix.loc[r, c] = str(rank_str)
+                            else:
+                                display_matrix.loc[r, c] = "❌ DNF"
 
         display_matrix.insert(0, 'Rol', matrix_df['Rol'])
         display_matrix.insert(1, 'Type', matrix_df['Type'])
@@ -727,9 +759,7 @@ else:
             if 'Gekocht' in row['Rol']: return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
             return [''] * len(row)
 
-        # De formatter die de getallen onzichtbaar terugzet naar Emoji's voor de gebruiker
-        format_dict = {c: lambda x: format_race_status(x, 20) for c in available_races}
-        st.dataframe(display_matrix.style.apply(color_rows, axis=1).format(format_dict), use_container_width=True)
+        st.dataframe(display_matrix.style.apply(color_rows, axis=1), use_container_width=True)
 
     with tab3:
         st.header("📊 Kopmannen Advies")
@@ -764,32 +794,10 @@ with tab4:
     if race_filter: f_df = f_df[f_df[race_filter].sum(axis=1) == len(race_filter)]
 
     d_df = f_df[['Renner', 'Team', 'Prijs', 'Waarde (EV/M)', 'Type', 'Scorito_EV'] + available_races].copy()
+    d_df['Prijs'] = d_df['Prijs'].apply(lambda x: f"€ {x/1000000:.2f}M")
+    d_df[available_races] = d_df[available_races].applymap(lambda x: '✅' if x == 1 else '-')
     
-    if toon_uitslagen:
-        u_time = get_file_mod_time("uitslagen.csv")
-        df_uitslagen_db = get_uitslagen(u_time, df['Renner'].tolist())
-        verreden_koersen_db = df_uitslagen_db['Race'].unique() if not df_uitslagen_db.empty else []
-    else:
-        df_uitslagen_db = pd.DataFrame()
-        verreden_koersen_db = []
-
-    for c in available_races:
-        is_verreden = c in verreden_koersen_db
-        df_k = df_uitslagen_db[df_uitslagen_db['Race'] == c] if is_verreden else pd.DataFrame()
-        
-        new_col = []
-        for r, val in zip(d_df['Renner'], d_df[c]):
-            is_on_list = (val == 1)
-            rank_str = None
-            if is_verreden:
-                res = df_k[df_k['Renner'] == r]
-                if not res.empty: rank_str = res['Rnk'].values[0]
-            new_col.append(get_numeric_status(is_on_list, is_on_list, is_verreden, rank_str))
-        d_df[c] = pd.to_numeric(new_col)
-    
-    format_dict = {c: lambda x: format_race_status(x, 20) for c in available_races}
-    format_dict['Prijs'] = lambda x: f"€ {x/1000000:.2f}M"
-    st.dataframe(d_df.sort_values(by='Scorito_EV', ascending=False).style.format(format_dict), use_container_width=True, hide_index=True)
+    st.dataframe(d_df.sort_values(by='Scorito_EV', ascending=False), use_container_width=True, hide_index=True)
 
 with tab5:
     st.header("ℹ️ Uitgebreide Handleiding & AI Uitleg")
