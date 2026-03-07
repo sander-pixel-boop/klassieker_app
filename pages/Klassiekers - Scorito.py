@@ -83,7 +83,9 @@ def evaluate_plan_ev(df_eval, base_team, plan, available_races):
                 if t['uit'] in current_active: current_active.remove(t['uit'])
                 current_active.add(t['in'])
         for r in current_active:
-            totaal += df_eval.loc[df_eval['Renner'] == r, f'EV_{race}'].values[0]
+            res = df_eval.loc[df_eval['Renner'] == r, f'EV_{race}']
+            if not res.empty: 
+                totaal += res.values[0]
     return totaal
 
 # --- OPMAAK & SORTEER LOGICA ---
