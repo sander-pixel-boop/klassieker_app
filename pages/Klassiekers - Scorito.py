@@ -8,17 +8,9 @@ import unicodedata
 import os
 import itertools
 from thefuzz import process, fuzz
-from datetime import datetime
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Scorito Klassiekers AI", layout="wide", page_icon="🏆")
-
-# --- CHECK INLOG ---
-if "ingelogde_speler" not in st.session_state:
-    st.warning("⚠️ Je bent niet ingelogd. Ga terug naar de Home pagina om in te loggen.")
-    st.stop()
-
-speler_naam = st.session_state["ingelogde_speler"]
 
 # --- HULPFUNCTIE: NORMALISATIE ---
 def normalize_name_logic(text):
@@ -251,14 +243,13 @@ if "selected_riders" not in st.session_state: st.session_state.selected_riders =
 if "transfer_plan" not in st.session_state: st.session_state.transfer_plan = []
 
 with st.sidebar:
-    st.header(f"👤 Profiel: {speler_naam.capitalize()}")
-    
+    st.header("👤 Jouw Team")
     st.divider()
     st.write("📁 **Lokale Backup (.json)**")
     
     # Exporteren
     save_data = {"selected_riders": st.session_state.selected_riders, "transfer_plan": st.session_state.transfer_plan}
-    st.download_button("📥 Download als .JSON", data=json.dumps(save_data), file_name=f"{speler_naam}_scorito_team.json", mime="application/json", use_container_width=True)
+    st.download_button("📥 Download als .JSON", data=json.dumps(save_data), file_name="mijn_scorito_team.json", mime="application/json", use_container_width=True)
     
     # Importeren
     uploaded_file = st.file_uploader("📂 Upload Team (.json)", type="json")
