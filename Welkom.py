@@ -87,7 +87,7 @@ sporza_evaluator = st.Page("pages/Sporza_Evaluator.py", title="Evaluator", icon=
 # LET OP: Het Giro bestand moet exact 'Sporza_Giro.py' heten in je map 'pages'!
 sporza_giro = st.Page("pages/Sporza_Giro.py", title="Giro d'Italia", icon="🇮🇹")
 
-eigen_spel = st.Page("pages/Het_Spel.py", title="Custom Klassiekers Spel", icon="🎮")
+# eigen_spel = st.Page("pages/Het_Spel.py", title="Custom Klassiekers Spel", icon="🎮")
 
 pg = st.navigation({
     "Info": [home],
