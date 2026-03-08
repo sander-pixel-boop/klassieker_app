@@ -68,6 +68,7 @@ if "ingelogde_speler" not in st.session_state:
 def home_page():
     speler = st.session_state.get("ingelogde_speler", "bezoeker").capitalize()
     st.write(f"# Welkom bij de Wieler Spellen Solver, {speler}! 🚴‍♂️")
+    st.markdown("*Statistieken en data door [Wielerorakel.nl](https://wielerorakel.nl/)*")
     st.markdown("👈 **Kies een spel in het menu aan de linkerkant om te beginnen!**")
     
     if st.button("Uitloggen"):
