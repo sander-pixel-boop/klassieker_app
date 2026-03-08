@@ -20,7 +20,7 @@ def hash_wachtwoord(wachtwoord):
 # --- AUTHENTICATIE ---
 if "ingelogde_speler" not in st.session_state:
     st.title("🔒 Welkom! Log in of maak een account")
-    st.markdown("*Statistieken en data door [Wielerorakel.nl](https://wielerorakel.nl/)*")
+    st.markdown("*Data en Statistieken van [Wielerorakel.nl](https://wielerorakel.nl/)*")
     tab1, tab2 = st.tabs(["Inloggen", "Account Aanmaken"])
     
     with tab1:
@@ -68,7 +68,8 @@ if "ingelogde_speler" not in st.session_state:
 def home_page():
     speler = st.session_state.get("ingelogde_speler", "bezoeker").capitalize()
     st.write(f"# Welkom bij de Wieler Spellen Solver, {speler}! 🚴‍♂️")
-    st.markdown("*Statistieken en data door [Wielerorakel.nl](https://wielerorakel.nl/)*")
+    st.markdown("*Data en Statistieken van [Wielerorakel.nl](https://wielerorakel.nl/)*")
+    st.divider()
     st.markdown("👈 **Kies een spel in het menu aan de linkerkant om te beginnen!**")
     
     if st.button("Uitloggen"):
@@ -81,15 +82,15 @@ cf_pagina = st.Page("pages/Cycling_Fantasy.py", title="CF Dashboard", icon="🚴
 # Scorito pagina's
 scorito_klassiekers = st.Page("pages/Klassiekers - Scorito.py", title="Klassiekers", icon="🏆")
 scorito_evaluator = st.Page("pages/Model_Evaluator_(Scorito).py", title="Evaluator", icon="📊")
-scorito_giro = st.Page("pages/Scorito_Grand_Tour.py", title="[Binnekort] Giro d'Italia", icon="🇮🇹")
+scorito_giro = st.Page("pages/Scorito_Grand_Tour.py", title="[Binnenkort] Giro d'Italia", icon="🇮🇹")
 
 # Sporza pagina's
 sporza_klassiekers = st.Page("pages/Klassiekers - Sporza.py", title="Klassiekers", icon="🏁")
 sporza_evaluator = st.Page("pages/Sporza_Evaluator.py", title="Evaluator", icon="📊")
-# LET OP: Het Giro bestand moet exact 'Sporza_Giro.py' heten in je map 'pages'!
-sporza_giro = st.Page("pages/Sporza_Giro.py", title="[Beta] Giro d'Italia", icon="🇮🇹")
 
-# eigen_spel = st.Page("pages/Het_Spel.py", title="Custom Klassiekers Spel", icon="🎮")
+# Sporza Grand Tour opties (Versie 1: AI Solver, Versie 2: Handmatige Bouwer)
+sporza_giro_ai = st.Page("pages/Sporza_Giro.py", title="Giro: AI Solver", icon="🤖")
+sporza_giro_bouwer = st.Page("pages/Sporza_Giro_Bouwer.py", title="Giro: Team Bouwer", icon="🛠️")
 
 pg = st.navigation({
     "Info": [home],
@@ -97,8 +98,7 @@ pg = st.navigation({
     "Scorito - Klassiekers": [scorito_klassiekers, scorito_evaluator],
     "Scorito - Grand Tours": [scorito_giro],
     "Sporza - Klassiekers": [sporza_klassiekers, sporza_evaluator],
-    "Sporza - Grand Tours": [sporza_giro],
-  #  "Eigen Competitie": [eigen_spel]
+    "Sporza - Grand Tours": [sporza_giro_ai, sporza_giro_bouwer]
 })
 
 pg.run()
