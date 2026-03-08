@@ -96,7 +96,7 @@ pg = st.navigation({
     "Scorito - Grand Tours": [scorito_giro],
     "Sporza - Klassiekers": [sporza_klassiekers, sporza_evaluator],
     "Sporza - Grand Tours": [sporza_giro],
-    "Eigen Competitie": [eigen_spel]
+  #  "Eigen Competitie": [eigen_spel]
 })
 
 pg.run()
