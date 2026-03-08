@@ -20,6 +20,7 @@ def hash_wachtwoord(wachtwoord):
 # --- AUTHENTICATIE ---
 if "ingelogde_speler" not in st.session_state:
     st.title("🔒 Welkom! Log in of maak een account")
+    st.markdown("*Statistieken en data door [Wielerorakel.nl](https://wielerorakel.nl/)*")
     tab1, tab2 = st.tabs(["Inloggen", "Account Aanmaken"])
     
     with tab1:
