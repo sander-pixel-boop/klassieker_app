@@ -89,8 +89,8 @@ sporza_klassiekers = st.Page("pages/Klassiekers - Sporza.py", title="Klassiekers
 sporza_evaluator = st.Page("pages/Sporza_Evaluator.py", title="Evaluator", icon="📊")
 
 # Sporza Grand Tour opties (Versie 1: AI Solver, Versie 2: Handmatige Bouwer)
-sporza_giro_ai = st.Page("pages/Sporza_Giro.py", title="Giro: AI Solver", icon="🤖")
-sporza_giro_bouwer = st.Page("pages/Sporza_Giro_Bouwer.py", title="Giro: Team Bouwer", icon="🛠️")
+sporza_giro_ai = st.Page("pages/Sporza_Giro.py", title="[Beta] Giro: AI Solver", icon="🤖")
+sporza_giro_bouwer = st.Page("pages/Sporza_Giro_Bouwer.py", title="[Beta] Giro: Team Bouwer", icon="🛠️")
 
 pg = st.navigation({
     "Info": [home],
