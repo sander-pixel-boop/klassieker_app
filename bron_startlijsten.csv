@@ -1,4 +1,4 @@
-Renner	Prijs	OHN	KBK	SB	PN	TA	MSR	RvB	E3	IFF	DDV	RVV	SP	PR	BP	AGR	WP	LBL
+Renner	Prijs	OHN	KBK	SB	PN	TA	MSR	BDP	E3	GW	DDV	RVV	SP	PR	BP	AGR	WP	LBL
 Pogacar	7000000	0	0	1	0	0	1	0	0	0	0	1	0	1	0	0	0	1
 Poel	6000000	1	0	0	0	1	1	0	1	1	0	1	0	1	0	0	0	0
 Philipsen	5000000	1	1	0	0	0	1	1	0	1	1	0	1	1	0	0	0	0
@@ -32,7 +32,7 @@ Matthews	1500000	0	0	0	1	0	1	0	1	1	0	1	0	0	0	1	0	1
 Mohoric	1500000	1	1	1	0	0	1	0	1	1	1	1	0	1	0	0	0	0
 Politt	1500000	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
 Powless	1500000	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-Skjelmose	1500000	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	1	1
+Skjelmose	1500000	0	0	0	1	0	0	0	0	0	0	0	0	0	0	1	1	1
 Stuyven	1500000	0	0	0	1	0	1	0	1	1	0	1	0	1	0	0	0	0
 Vacek	1500000	1	0	0	1	0	1	0	1	1	1	1	0	1	0	0	0	0
 Florian Vermeersch	1500000	1	1	1	0	0	1	1	1	1	1	1	0	1	0	0	0	0
