@@ -8,9 +8,27 @@ import unicodedata
 import os
 import itertools
 from thefuzz import process, fuzz
+from supabase import create_client, Client
+from datetime import datetime
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Scorito Klassiekers AI", layout="wide", page_icon="🏆")
+
+# --- CHECK INLOG & DATABASE SETUP ---
+if "ingelogde_speler" not in st.session_state:
+    st.warning("⚠️ Je bent niet ingelogd. Ga terug naar de Home pagina om in te loggen.")
+    st.stop()
+
+speler_naam = st.session_state["ingelogde_speler"]
+
+@st.cache_resource
+def init_connection():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
+
+supabase = init_connection()
+TABEL_NAAM = "gebruikers_data_test"
 
 # --- HULPFUNCTIES ---
 def normalize_name_logic(text):
@@ -19,6 +37,67 @@ def normalize_name_logic(text):
     text = text.lower().strip()
     nfkd_form = unicodedata.normalize('NFKD', text)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+
+def match_naam_slim(naam, dict_met_namen):
+    naam_norm = normalize_name_logic(naam)
+    lijst_met_namen = list(dict_met_namen.keys())
+    
+    # 1. Exacte mapping voor afkortingen en probleemgevallen (Geen endswith meer!)
+    bekende_gevallen = {
+        "philipsen": "jasper philipsen", "j. philipsen": "jasper philipsen", "j philipsen": "jasper philipsen",
+        "pedersen": "mads pedersen", "m. pedersen": "mads pedersen", "m pedersen": "mads pedersen",
+        "pidcock": "thomas pidcock", "t. pidcock": "thomas pidcock", "tom pidcock": "thomas pidcock",
+        "van aert": "wout van aert", "w. van aert": "wout van aert", 
+        "van der poel": "mathieu van der poel", "m. van der poel": "mathieu van der poel",
+        "pogacar": "tadej pogacar", "t. pogacar": "tadej pogacar",
+        "de lie": "arnaud de lie", "a. de lie": "arnaud de lie"
+    }
+    
+    if naam_norm in bekende_gevallen:
+        correct = bekende_gevallen[naam_norm]
+        for target in lijst_met_namen:
+            if correct in target:
+                return dict_met_namen[target]
+                    
+    # 2. Exacte match
+    if naam_norm in lijst_met_namen:
+        return dict_met_namen[naam_norm]
+        
+    # 3. Fuzzy Match met de slimme Tie-Breaker
+    bests = process.extractBests(naam_norm, lijst_met_namen, scorer=fuzz.token_set_ratio, limit=5)
+    if bests and bests[0][1] >= 75:
+        top_score = bests[0][1]
+        candidates = [b[0] for b in bests if b[1] >= top_score - 3]
+        candidates.sort(key=lambda x: (abs(len(x) - len(naam_norm)), -fuzz.ratio(naam_norm, x)))
+        return dict_met_namen[candidates[0]]
+        
+    return naam
+
+def match_uitslag_naam(naam, alle_renners):
+    naam_norm = normalize_name_logic(naam)
+    bekende_gevallen = {
+        "philipsen": "jasper philipsen", "j. philipsen": "jasper philipsen", "j philipsen": "jasper philipsen",
+        "pedersen": "mads pedersen", "m. pedersen": "mads pedersen", "m pedersen": "mads pedersen",
+        "pidcock": "thomas pidcock", "t. pidcock": "thomas pidcock", "tom pidcock": "thomas pidcock",
+        "van aert": "wout van aert", "w. van aert": "wout van aert", 
+        "van der poel": "mathieu van der poel", "m. van der poel": "mathieu van der poel",
+        "pogacar": "tadej pogacar", "t. pogacar": "tadej pogacar",
+        "de lie": "arnaud de lie", "a. de lie": "arnaud de lie"
+    }
+    
+    if naam_norm in bekende_gevallen:
+        correct = bekende_gevallen[naam_norm]
+        for target in alle_renners:
+            if correct in normalize_name_logic(target):
+                return target
+                
+    bests = process.extractBests(naam_norm, alle_renners, scorer=fuzz.token_set_ratio, limit=5)
+    if bests and bests[0][1] >= 75:
+        top_score = bests[0][1]
+        candidates = [b[0] for b in bests if b[1] >= top_score - 3]
+        candidates.sort(key=lambda x: (abs(len(normalize_name_logic(x)) - len(naam_norm)), -fuzz.ratio(naam_norm, normalize_name_logic(x))))
+        return candidates[0]
+    return naam
 
 def get_file_mod_time(filepath):
     return os.path.getmtime(filepath) if os.path.exists(filepath) else 0
@@ -63,13 +142,13 @@ def get_uitslagen(file_mod_time, alle_renners):
                 continue
             
             rider_name = str(row['Rider']).strip()
-            match = process.extractOne(rider_name, alle_renners, scorer=fuzz.token_set_ratio)
-            if match and match[1] > 70:
-                uitslag_parsed.append({
-                    "Race": koers,
-                    "Rnk": rank_str,
-                    "Renner": match[0]
-                })
+            gekoppelde_naam = match_uitslag_naam(rider_name, alle_renners)
+            
+            uitslag_parsed.append({
+                "Race": koers,
+                "Rnk": rank_str,
+                "Renner": gekoppelde_naam
+            })
         return pd.DataFrame(uitslag_parsed)
     except:
         return pd.DataFrame()
@@ -87,6 +166,19 @@ def evaluate_plan_ev(df_eval, base_team, plan, available_races):
             if not res.empty: 
                 totaal += res.values[0]
     return totaal
+
+def bepaal_klassieker_type(row):
+    cob, hll, spr = row.get('COB', 0), row.get('HLL', 0), row.get('SPR', 0)
+    elite = []
+    if cob >= 85: elite.append('Kassei')
+    if hll >= 85: elite.append('Heuvel')
+    if spr >= 85: elite.append('Sprint')
+    if len(elite) == 3: return 'Allround / Multispecialist'
+    elif len(elite) == 2: return ' / '.join(elite)
+    elif len(elite) == 1: return elite[0]
+    else:
+        s = {'Kassei': cob, 'Heuvel': hll, 'Sprint': spr, 'Klimmer': row.get('MTN', 0), 'Tijdrit': row.get('ITT', 0), 'Klassement': row.get('GC', 0)}
+        return max(s, key=s.get) if sum(s.values()) > 0 else 'Onbekend'
 
 # --- OPMAAK & SORTEER LOGICA ---
 def get_numeric_status(is_on_startlist, is_starter, is_verreden=False, rank_str=None):
@@ -117,67 +209,58 @@ def format_race_status(val, limit):
     if v <= limit: return f"🏅 {v}"
     return str(v)
 
-# --- DATA LADEN (ALLEEN SCORITO STARTLIJST) ---
+# --- DATA LADEN ---
 @st.cache_data
-def load_and_merge_data(scorito_mod_time, stats_mod_time):
+def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
     try:
+        df_prog = pd.read_csv("sporza_prijzen_startlijst.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
+        df_prog.columns = df_prog.columns.str.strip()
+        if 'Naam' in df_prog.columns: df_prog = df_prog.rename(columns={'Naam': 'Renner'})
+        if 'Prijs' in df_prog.columns: df_prog = df_prog.drop(columns=['Prijs'])
+        sporza_to_scorito = {'OML': 'OHN', 'STR': 'SB', 'RVB': 'BDP', 'IFF': 'GW', 'BRP': 'BP', 'AGT': 'AGR', 'WAP': 'WP'}
+        df_prog = df_prog.rename(columns=sporza_to_scorito)
+        
         df_scorito = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
         df_scorito.columns = df_scorito.columns.str.strip()
-        if 'Naam' in df_scorito.columns and 'Renner' not in df_scorito.columns:
-            df_scorito = df_scorito.rename(columns={'Naam': 'Renner'})
-            
+        if 'Naam' in df_scorito.columns: df_scorito = df_scorito.rename(columns={'Naam': 'Renner'})
         if 'Prijs' not in df_scorito.columns and df_scorito['Renner'].astype(str).str.contains(r'\(.*\)', regex=True).any():
             extracted = df_scorito['Renner'].str.extract(r'^(.*?)\s*\(([\d\.]+)[Mm]\)')
             df_scorito['Renner'] = extracted[0].str.strip()
             df_scorito['Prijs'] = pd.to_numeric(extracted[1], errors='coerce') * 1000000
-
         if 'Prijs' in df_scorito.columns:
             df_scorito['Prijs'] = df_scorito['Prijs'].fillna(0)
             df_scorito.loc[df_scorito['Prijs'] == 800000, 'Prijs'] = 750000
+        df_prijzen = df_scorito[['Renner', 'Prijs']].drop_duplicates(subset=['Renner'])
 
         df_stats = pd.read_csv("renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip') 
         df_stats.columns = df_stats.columns.str.strip()
-        if 'Naam' in df_stats.columns and 'Renner' not in df_stats.columns:
-            df_stats = df_stats.rename(columns={'Naam': 'Renner'})
-        if 'Team' not in df_stats.columns and 'Ploeg' in df_stats.columns:
-            df_stats = df_stats.rename(columns={'Ploeg': 'Team'})
+        if 'Naam' in df_stats.columns: df_stats = df_stats.rename(columns={'Naam': 'Renner'})
+        if 'Team' not in df_stats.columns and 'Ploeg' in df_stats.columns: df_stats = df_stats.rename(columns={'Ploeg': 'Team'})
         df_stats = df_stats.drop_duplicates(subset=['Renner'], keep='first')
         
+        scorito_names = df_prijzen['Renner'].unique()
         stats_names = df_stats['Renner'].unique()
+        norm_to_scorito = {normalize_name_logic(n): n for n in scorito_names}
         norm_to_stats = {normalize_name_logic(n): n for n in stats_names}
-        norm_stats_list = list(norm_to_stats.keys())
 
-        df_scorito['Renner_Stats'] = df_scorito['Renner']
-
-        for i, row in df_scorito.iterrows():
-            short = row['Renner']
-            best_stats = process.extractOne(normalize_name_logic(short), norm_stats_list, scorer=fuzz.token_set_ratio)
-            if best_stats and best_stats[1] > 75:
-                df_scorito.at[i, 'Renner_Stats'] = norm_to_stats[best_stats[0]]
+        df_prog['Renner_Scorito'] = df_prog['Renner'].apply(lambda x: match_naam_slim(x, norm_to_scorito))
+        df_prog['Renner_Stats'] = df_prog['Renner'].apply(lambda x: match_naam_slim(x, norm_to_stats))
                 
-        merged_df = pd.merge(df_scorito, df_stats, left_on='Renner_Stats', right_on='Renner', how='left', suffixes=('', '_drop'))
-        
-        drop_cols = [c for c in merged_df.columns if '_drop' in c or c == 'Renner_Stats']
-        merged_df = merged_df.drop(columns=drop_cols)
-        
+        merged_df = pd.merge(df_prog, df_prijzen, left_on='Renner_Scorito', right_on='Renner', how='left', suffixes=('', '_drop1'))
+        merged_df = pd.merge(merged_df, df_stats, left_on='Renner_Stats', right_on='Renner', how='left', suffixes=('', '_drop2'))
+        merged_df = merged_df.drop(columns=[c for c in merged_df.columns if '_drop' in c or 'Renner_' in c])
         merged_df['Prijs'] = pd.to_numeric(merged_df['Prijs'], errors='coerce').fillna(0).astype(int)
-        merged_df = merged_df[merged_df['Prijs'] > 0]
         
-        merged_df = merged_df.sort_values(by='Prijs', ascending=False)
-        merged_df = merged_df.drop_duplicates(subset=['Renner'], keep='first')
+        merged_df = merged_df[merged_df['Prijs'] > 0].sort_values(by='Prijs', ascending=False).drop_duplicates(subset=['Renner'])
         
         ALLE_KOERSEN = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'BDP', 'E3', 'GW', 'DDV', 'RVV', 'SP', 'PR', 'BP', 'AGR', 'WP', 'LBL']
         available_races = [k for k in ALLE_KOERSEN if k in merged_df.columns]
-        
-        all_stats_cols = ['COB', 'HLL', 'SPR', 'AVG', 'FLT', 'MTN', 'ITT', 'GC', 'OR', 'TTL']
-        for col in available_races + all_stats_cols:
+        for col in available_races + ['COB', 'HLL', 'SPR', 'AVG', 'MTN', 'ITT']:
             if col not in merged_df.columns: merged_df[col] = 0
             merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0).astype(int)
-            
-        merged_df['HLL/MTN'] = merged_df[['HLL', 'MTN']].max(axis=1).astype(int)
+        merged_df['HLL/MTN'] = merged_df[['HLL', 'MTN']].max(axis=1)
+        merged_df['Total_Races'] = merged_df[available_races].sum(axis=1)
         merged_df['Team'] = merged_df.get('Team', pd.Series(['Onbekend']*len(merged_df))).fillna('Onbekend')
-        merged_df['Total_Races'] = merged_df[available_races].sum(axis=1).astype(int)
-        
         koers_stat_map = {'OHN':'COB','KBK':'SPR','SB':'HLL','PN':'HLL/MTN','TA':'SPR','MSR':'AVG','BDP':'SPR','E3':'COB','GW':'SPR','DDV':'COB','RVV':'COB','SP':'SPR','PR':'COB','BP':'HLL','AGR':'HLL','WP':'HLL','LBL':'HLL'}
         return merged_df, available_races, koers_stat_map
     except Exception as e:
@@ -222,20 +305,7 @@ def calculate_dynamic_ev(df, available_races, koers_stat_map, method, skip_races
     df['Waarde (EV/M)'] = (df['Scorito_EV'] / (df['Prijs'] / 1000000)).replace([float('inf'), -float('inf')], 0).fillna(0).round(1)
     return df
 
-def bepaal_klassieker_type(row):
-    cob, hll, spr = row.get('COB', 0), row.get('HLL', 0), row.get('SPR', 0)
-    elite = []
-    if cob >= 85: elite.append('Kassei')
-    if hll >= 85: elite.append('Heuvel')
-    if spr >= 85: elite.append('Sprint')
-    if len(elite) == 3: return 'Allround / Multispecialist'
-    elif len(elite) == 2: return ' / '.join(elite)
-    elif len(elite) == 1: return elite[0]
-    else:
-        s = {'Kassei': cob, 'Heuvel': hll, 'Sprint': spr, 'Klimmer': row.get('MTN', 0), 'Tijdrit': row.get('ITT', 0), 'Klassement': row.get('GC', 0)}
-        return max(s, key=s.get) if sum(s.values()) > 0 else 'Onbekend'
-
-# --- HOOFD SOLVER ---
+# --- SOLVERS ---
 def solve_knapsack_dynamic(df, total_budget, min_budget, max_riders, force_base, ban_base, exclude_list):
     prob = pulp.LpProblem("Scorito_Solver", pulp.LpMaximize)
     x = pulp.LpVariable.dicts("Base", df.index, cat='Binary')
@@ -256,7 +326,6 @@ def solve_knapsack_dynamic(df, total_budget, min_budget, max_riders, force_base,
         return [df.loc[i, 'Renner'] for i in df.index if x[i].varValue > 0.5]
     return []
 
-# --- NOODWISSEL SOLVER ---
 def find_emergency_replacements(df_eval, base_team, transfer_plan, injured_riders, last_race, max_budget, available_races):
     all_historical_riders = set(base_team + [t['in'] for t in transfer_plan])
     candidates = df_eval[~df_eval['Renner'].isin(all_historical_riders)].copy()
@@ -300,63 +369,60 @@ def find_emergency_replacements(df_eval, base_team, transfer_plan, injured_rider
         return [candidates.loc[i, 'Renner'] for i in candidates.index if vars[i].varValue > 0.5]
     return []
 
-# --- TEAM REBUILDER ---
 def rebuild_team_and_transfers(df, max_bud, min_bud, max_ren, new_base_team, t_moments, use_transfers):
+    if not use_transfers: return new_base_team, []
     prob = pulp.LpProblem("Scorito_Rebuild_Solver", pulp.LpMaximize)
     x = pulp.LpVariable.dicts("Base", df.index, cat='Binary')
     
-    if use_transfers:
-        y_vars = [pulp.LpVariable.dicts(f"Y{k}", df.index, cat='Binary') for k in range(3)]
-        z_vars = [pulp.LpVariable.dicts(f"Z{k}", df.index, cat='Binary') for k in range(3)]
+    y_vars = [pulp.LpVariable.dicts(f"Y{k}", df.index, cat='Binary') for k in range(3)]
+    z_vars = [pulp.LpVariable.dicts(f"Z{k}", df.index, cat='Binary') for k in range(3)]
+    
+    obj = pulp.lpSum([x[i] * df.loc[i, 'EV_all'] for i in df.index])
+    for k in range(3):
+        split_idx = available_races.index(t_moments[k]) + 1 if t_moments[k] != 'GEEN' else len(available_races)
+        races_before = available_races[:split_idx]
+        races_after = available_races[split_idx:]
+        df[f'EV_y{k}'] = df[[f'EV_{r}' for r in races_before]].sum(axis=1) if races_before else 0.0
+        df[f'EV_z{k}'] = df[[f'EV_{r}' for r in races_after]].sum(axis=1) if races_after else 0.0
+        obj += pulp.lpSum([y_vars[k][i] * df.loc[i, f'EV_y{k}'] + z_vars[k][i] * df.loc[i, f'EV_z{k}'] for i in df.index])
         
-        obj = pulp.lpSum([x[i] * df.loc[i, 'EV_all'] for i in df.index])
-        for k in range(3):
-            split_idx = available_races.index(t_moments[k]) + 1 if t_moments[k] != 'GEEN' else len(available_races)
-            races_before = available_races[:split_idx]
-            races_after = available_races[split_idx:]
-            df[f'EV_y{k}'] = df[[f'EV_{r}' for r in races_before]].sum(axis=1) if races_before else 0.0
-            df[f'EV_z{k}'] = df[[f'EV_{r}' for r in races_after]].sum(axis=1) if races_after else 0.0
-            obj += pulp.lpSum([y_vars[k][i] * df.loc[i, f'EV_y{k}'] + z_vars[k][i] * df.loc[i, f'EV_z{k}'] for i in df.index])
-            
-        prob += obj
-        for i in df.index:
-            prob += x[i] + y_vars[0][i] + y_vars[1][i] + y_vars[2][i] + z_vars[0][i] + z_vars[1][i] + z_vars[2][i] <= 1
-            renner = df.loc[i, 'Renner']
-            if renner in new_base_team:
-                prob += x[i] + sum([y_vars[k][i] for k in range(3)]) == 1
-            else:
-                prob += x[i] + sum([y_vars[k][i] for k in range(3)]) == 0
+    prob += obj
+    for i in df.index:
+        prob += x[i] + y_vars[0][i] + y_vars[1][i] + y_vars[2][i] + z_vars[0][i] + z_vars[1][i] + z_vars[2][i] <= 1
+        renner = df.loc[i, 'Renner']
+        if renner in new_base_team:
+            prob += x[i] + sum([y_vars[k][i] for k in range(3)]) == 1
+        else:
+            prob += x[i] + sum([y_vars[k][i] for k in range(3)]) == 0
 
-        for k in range(3):
-            prob += pulp.lpSum([y_vars[k][i] for i in df.index]) <= 1  
-            prob += pulp.lpSum([y_vars[k][i] for i in df.index]) == pulp.lpSum([z_vars[k][i] for i in df.index]) 
-            
-        prob += pulp.lpSum([x[i] for i in df.index]) + pulp.lpSum([y_vars[0][i] for i in df.index]) + pulp.lpSum([y_vars[1][i] for i in df.index]) + pulp.lpSum([y_vars[2][i] for i in df.index]) == max_ren
-        prob += pulp.lpSum([(x[i] + y_vars[0][i] + y_vars[1][i] + y_vars[2][i]) * df.loc[i, 'Prijs'] for i in df.index]) <= max_bud
-        prob += pulp.lpSum([(x[i] + z_vars[0][i] + y_vars[1][i] + y_vars[2][i]) * df.loc[i, 'Prijs'] for i in df.index]) <= max_bud
-        prob += pulp.lpSum([(x[i] + z_vars[0][i] + z_vars[1][i] + y_vars[2][i]) * df.loc[i, 'Prijs'] for i in df.index]) <= max_bud
-        prob += pulp.lpSum([(x[i] + z_vars[0][i] + z_vars[1][i] + z_vars[2][i]) * df.loc[i, 'Prijs'] for i in df.index]) <= max_bud
+    for k in range(3):
+        prob += pulp.lpSum([y_vars[k][i] for i in df.index]) <= 1  
+        prob += pulp.lpSum([y_vars[k][i] for i in df.index]) == pulp.lpSum([z_vars[k][i] for i in df.index]) 
+        
+    prob += pulp.lpSum([x[i] for i in df.index]) + pulp.lpSum([y_vars[0][i] for i in df.index]) + pulp.lpSum([y_vars[1][i] for i in df.index]) + pulp.lpSum([y_vars[2][i] for i in df.index]) == max_ren
+    prob += pulp.lpSum([(x[i] + y_vars[0][i] + y_vars[1][i] + y_vars[2][i]) * df.loc[i, 'Prijs'] for i in df.index]) <= max_bud
+    prob += pulp.lpSum([(x[i] + z_vars[0][i] + y_vars[1][i] + y_vars[2][i]) * df.loc[i, 'Prijs'] for i in df.index]) <= max_bud
+    prob += pulp.lpSum([(x[i] + z_vars[0][i] + z_vars[1][i] + y_vars[2][i]) * df.loc[i, 'Prijs'] for i in df.index]) <= max_bud
+    prob += pulp.lpSum([(x[i] + z_vars[0][i] + z_vars[1][i] + z_vars[2][i]) * df.loc[i, 'Prijs'] for i in df.index]) <= max_bud
 
-        prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=15))
-        if pulp.LpStatus[prob.status] == 'Optimal':
-            base_team_res = [df.loc[i, 'Renner'] for i in df.index if x[i].varValue > 0.5]
-            transfer_plan_res = []
-            for k in range(3):
-                uit = [df.loc[i, 'Renner'] for i in df.index if y_vars[k][i].varValue > 0.5]
-                erin = [df.loc[i, 'Renner'] for i in df.index if z_vars[k][i].varValue > 0.5]
-                if uit and erin:
-                    transfer_plan_res.append({"uit": uit[0], "in": erin[0], "moment": t_moments[k]})
-                    base_team_res.append(uit[0])
-            return base_team_res, transfer_plan_res
-        return None, None
-    else:
-        return new_base_team, []
+    prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=15))
+    if pulp.LpStatus[prob.status] == 'Optimal':
+        base_team_res = [df.loc[i, 'Renner'] for i in df.index if x[i].varValue > 0.5]
+        transfer_plan_res = []
+        for k in range(3):
+            uit = [df.loc[i, 'Renner'] for i in df.index if y_vars[k][i].varValue > 0.5]
+            erin = [df.loc[i, 'Renner'] for i in df.index if z_vars[k][i].varValue > 0.5]
+            if uit and erin:
+                transfer_plan_res.append({"uit": uit[0], "in": erin[0], "moment": t_moments[k]})
+                base_team_res.append(uit[0])
+        return base_team_res, transfer_plan_res
+    return None, None
 
 # --- HOOFDCODE ---
-scorito_time = get_file_mod_time("bron_startlijsten.csv")
-stats_time = get_file_mod_time("renners_stats.csv")
-
-df_raw, available_races, koers_mapping = load_and_merge_data(scorito_time, stats_time)
+prog_t = get_file_mod_time("sporza_prijzen_startlijst.csv")
+scor_t = get_file_mod_time("bron_startlijsten.csv")
+stat_t = get_file_mod_time("renners_stats.csv")
+df_raw, available_races, koers_mapping = load_and_merge_data(prog_t, scor_t, stat_t)
 
 if df_raw.empty:
     st.warning("Data is leeg of kon niet worden geladen.")
@@ -366,8 +432,67 @@ if "selected_riders" not in st.session_state: st.session_state.selected_riders =
 if "transfer_plan" not in st.session_state: st.session_state.transfer_plan = []
 
 with st.sidebar:
-    st.title("🏆 AI Coach")
+    st.header(f"👤 Profiel: {speler_naam.capitalize()}")
     
+    st.write("☁️ **Cloud Database**")
+    if speler_naam != "gast":
+        c_cloud1, c_cloud2 = st.columns(2)
+        with c_cloud1:
+            if st.button("💾 Opslaan", type="primary", use_container_width=True):
+                try:
+                    team_data = {"selected_riders": st.session_state.selected_riders, "transfer_plan": st.session_state.transfer_plan, "ts": datetime.now().strftime("%Y-%m-%d %H:%M")}
+                    supabase.table(TABEL_NAAM).update({"scorito_team": team_data}).eq("username", speler_naam).execute()
+                    st.success("Cloud-backup geslaagd!")
+                except Exception as e: st.error(f"Fout: {e}")
+        with c_cloud2:
+            if st.button("🔄 Inladen", use_container_width=True):
+                try:
+                    res = supabase.table(TABEL_NAAM).select("scorito_team").eq("username", speler_naam).execute()
+                    if res.data and res.data[0].get('scorito_team'):
+                        d = res.data[0]['scorito_team']
+                        st.session_state.selected_riders = d.get("selected_riders", [])
+                        st.session_state.transfer_plan = d.get("transfer_plan", [])
+                        st.success(f"Team geladen (van {d.get('ts', '?')})")
+                        st.rerun()
+                    else: st.warning("Geen team gevonden in de cloud.")
+                except Exception as e: st.error(f"Fout: {e}")
+    else:
+        st.info("Log in met een account om cloud-opslag te gebruiken.")
+
+    st.divider()
+    st.write("📁 **Lokale Backup (.json)**")
+    
+    save_data = {"selected_riders": st.session_state.selected_riders, "transfer_plan": st.session_state.transfer_plan}
+    st.download_button("📥 Download als .JSON", data=json.dumps(save_data), file_name=f"{speler_naam}_scorito_team.json", mime="application/json", use_container_width=True)
+    
+    uploaded_file = st.file_uploader("📂 Upload Team (.json)", type="json")
+    if uploaded_file is not None and st.button("Laad .json in", use_container_width=True):
+        try:
+            ld = json.load(uploaded_file)
+            oude_selectie = ld.get("selected_riders", [])
+            oud_plan = ld.get("transfer_plan", [])
+            
+            huidige_renners = df_raw['Renner'].tolist()
+            def update_naam(naam):
+                return match_uitslag_naam(naam, huidige_renners)
+
+            st.session_state.selected_riders = [update_naam(r) for r in oude_selectie if update_naam(r) in huidige_renners]
+            
+            nieuw_plan = []
+            if isinstance(oud_plan, dict) and "uit" in oud_plan and "in" in oud_plan:
+                for r_uit, r_in in zip(oud_plan["uit"], oud_plan["in"]):
+                    nieuw_plan.append({"uit": update_naam(r_uit), "in": update_naam(r_in), "moment": "PR"})
+            elif isinstance(oud_plan, list):
+                for t in oud_plan:
+                    nieuw_plan.append({"uit": update_naam(t["uit"]), "in": update_naam(t["in"]), "moment": t["moment"]})
+
+            st.session_state.transfer_plan = nieuw_plan
+            st.success("✅ Lokaal bestand geladen!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Fout bij inladen: {e}")
+
+    st.divider()
     verreden_races = get_verreden_koersen()
     actieve_koersen = [k for k in available_races if k in verreden_races]
     skip_races = []
@@ -486,35 +611,6 @@ with st.sidebar:
         else:
             st.error("Geen oplossing mogelijk met deze eisen.")
 
-    st.divider()
-    with st.expander("📂 Oude Teams Inladen", expanded=False):
-        uploaded_file = st.file_uploader("Upload een JSON backup:", type="json")
-        if uploaded_file is not None:
-            if st.button("Laad Backup in", use_container_width=True):
-                try:
-                    ld = json.load(uploaded_file)
-                    oude_selectie = ld.get("selected_riders", [])
-                    oud_plan = ld.get("transfer_plan", [])
-                    huidige_renners = df['Renner'].tolist()
-                    def update_naam(naam):
-                        if naam in huidige_renners: return naam
-                        match = process.extractOne(naam, huidige_renners, scorer=fuzz.token_set_ratio)
-                        return match[0] if match and match[1] > 80 else naam
-
-                    st.session_state.selected_riders = [update_naam(r) for r in oude_selectie if update_naam(r) in huidige_renners]
-                    nieuw_plan = []
-                    if isinstance(oud_plan, dict) and "uit" in oud_plan and "in" in oud_plan:
-                        for r_uit, r_in in zip(oud_plan["uit"], oud_plan["in"]):
-                            nieuw_plan.append({"uit": update_naam(r_uit), "in": update_naam(r_in), "moment": "PR"})
-                    elif isinstance(oud_plan, list):
-                        for t in oud_plan:
-                            nieuw_plan.append({"uit": update_naam(t["uit"]), "in": update_naam(t["in"]), "moment": t["moment"]})
-
-                    st.session_state.transfer_plan = nieuw_plan
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Fout bij inladen: {e}")
-
 st.title("🏆 Voorjaarsklassiekers: Scorito")
 st.markdown("**Met dank aan:** [Wielerorakel.nl](https://www.cyclingoracle.com/) | [Kopmanpuzzel](https://kopmanpuzzel.up.railway.app/)")
 st.divider()
@@ -522,7 +618,7 @@ st.divider()
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🚀 Jouw Team & Transfers", "🗓️ Startlijst & Uitslagen", "📊 Kopmannen", "📋 Database (Alle)", "ℹ️ Uitleg"])
 
 if not st.session_state.selected_riders:
-    with tab1: st.info("👈 Kies je instellingen in de zijbalk en klik op **Bereken Nieuw Start-Team** of **Oude Teams Inladen** om te beginnen!")
+    with tab1: st.info("👈 Kies je instellingen in de zijbalk en klik op **Bereken Nieuw Start-Team** of laad een team in om te beginnen!")
     with tab2: st.info("👈 Bereken eerst een team om de startlijst matrix te kunnen zien.")
     with tab3: st.info("👈 Bereken eerst een team voor het kopmannen advies.")
 else:
@@ -653,22 +749,17 @@ else:
                                 st.error("Budget overschreden of niet passend met geplande wisselmomenten.")
                         else:
                             st.error(f"Selecteer exact {len(to_replace)} vervanger(s).")
-        
+
         st.divider()
         st.subheader("💾 Exporteer Team")
-        c_dl1, c_dl2 = st.columns(2)
-        with c_dl1:
-            save_data = {"selected_riders": st.session_state.selected_riders, "transfer_plan": st.session_state.transfer_plan}
-            st.download_button("📥 Download als .JSON (Backup)", data=json.dumps(save_data), file_name="scorito_team.json", mime="application/json", use_container_width=True)
-        with c_dl2:
-            export_df = current_df[['Renner', 'Rol', 'Prijs', 'Team', 'Type', 'Waarde (EV/M)', 'Scorito_EV']].copy()
-            st.download_button("📊 Download als .CSV (Excel)", data=export_df.to_csv(index=False).encode('utf-8'), file_name="scorito_team.csv", mime="text/csv", use_container_width=True)
+        export_df = current_df[['Renner', 'Rol', 'Prijs', 'Team', 'Type', 'Waarde (EV/M)', 'Scorito_EV']].copy()
+        st.download_button("📊 Download als .CSV (Excel)", data=export_df.to_csv(index=False).encode('utf-8'), file_name="scorito_team.csv", mime="text/csv", use_container_width=True)
 
     with tab2:
         st.header("🗓️ Startlijst & Uitslagen")
         
         if toon_uitslagen:
-            st.success("✅ Actuele uitslagen ingeladen! Top 20 finishes worden beloond met een medaille (🏅). Tabel blijft perfect sorteerbaar.")
+            st.success("✅ Actuele uitslagen ingeladen! Top 20 finishes worden beloond met medailles (🏅). Tabel blijft perfect sorteerbaar.")
             u_time = get_file_mod_time("uitslagen.csv")
             df_uitslagen = get_uitslagen(u_time, df['Renner'].tolist())
             verreden_koersen = df_uitslagen['Race'].unique() if not df_uitslagen.empty else []
@@ -828,7 +919,6 @@ with tab5:
     
     **Inladen (Team terughalen):**
     Wil je de volgende dag verder werken aan je team? 
-    1. Ga in de linker zijbalk naar **📂 Oude Teams Inladen**.
-    2. Upload hier je bewaarde `.json` bestand.
-    3. Het systeem plaatst direct je basis-20 terug in het geheugen en zet eventuele wissels klaar in je Transfer Plan. Het script controleert zelfs volautomatisch of oude namen nog steeds (zonder spelfouten) in de actuele database staan via *Fuzzy Matching*!
+    1. Gebruik de cloud opslag bovenin de zijbalk of upload je bewaarde `.json` bestand.
+    2. Het systeem plaatst direct je basis-20 terug in het geheugen en zet eventuele wissels klaar in je Transfer Plan. Het script controleert zelfs volautomatisch of oude namen nog steeds (zonder spelfouten) in de actuele database staan via *Fuzzy Matching*!
     """)

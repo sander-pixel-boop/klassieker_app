@@ -5,9 +5,27 @@ import json
 import unicodedata
 import os
 from thefuzz import process, fuzz
+from supabase import create_client
+from datetime import datetime
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Sporza Klassiekers AI", layout="wide", page_icon="🚴")
+
+# --- CHECK INLOG & DATABASE SETUP ---
+if "ingelogde_speler" not in st.session_state:
+    st.warning("⚠️ Je bent niet ingelogd. Ga terug naar de Home pagina om in te loggen.")
+    st.stop()
+
+speler_naam = st.session_state["ingelogde_speler"]
+
+@st.cache_resource
+def init_connection():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
+
+supabase = init_connection()
+TABEL_NAAM = "gebruikers_data_test"
 
 # --- HULPFUNCTIES ---
 def normalize_name_logic(text):
@@ -19,35 +37,6 @@ def normalize_name_logic(text):
 
 def get_file_mod_time(filepath):
     return os.path.getmtime(filepath) if os.path.exists(filepath) else 0
-
-# --- OPMAAK & SORTEER LOGICA ---
-def get_numeric_status(is_on_startlist, is_starter, is_verreden=False, rank_str=None):
-    if is_verreden:
-        if rank_str and str(rank_str) not in ['nan', 'None', 'DNS', '']:
-            if str(rank_str).isdigit():
-                return int(rank_str)
-            else:
-                return 996 # DNF
-        else:
-            return 996 if is_on_startlist else 999
-    else:
-        if is_on_startlist:
-            return 997 if is_starter else 998
-        return 999
-
-def format_race_status(val, limit):
-    if pd.isna(val): return ""
-    try:
-        v = int(float(val))
-    except:
-        return str(val)
-        
-    if v == 999: return "-"
-    if v == 998: return "🪑"
-    if v == 997: return "✅"
-    if v == 996: return "❌ DNF"
-    if v <= limit: return f"🏅 {v}"
-    return str(v)
 
 # --- DATA LADEN (SPORZA SPECIFIEK) ---
 @st.cache_data
@@ -310,8 +299,61 @@ if "sporza_transfer_plan" not in st.session_state: st.session_state.sporza_trans
 
 with st.sidebar:
     st.title("🚴 Sporza AI Coach")
+    st.header(f"👤 Profiel: {speler_naam.capitalize()}")
+    
+    st.write("☁️ **Cloud Database**")
+    if speler_naam != "gast":
+        c_cloud1, c_cloud2 = st.columns(2)
+        with c_cloud1:
+            if st.button("💾 Opslaan", type="primary", use_container_width=True, key="sporza_opslaan"):
+                try:
+                    team_data = {
+                        "selected_riders": st.session_state.sporza_selected_riders, 
+                        "transfer_plan": st.session_state.sporza_transfer_plan, 
+                        "ts": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    }
+                    supabase.table(TABEL_NAAM).update({"sporza_team": team_data}).eq("username", speler_naam).execute()
+                    st.success("Cloud-backup geslaagd!")
+                except Exception as e: 
+                    st.error(f"Fout: {e}")
+        with c_cloud2:
+            if st.button("🔄 Inladen", use_container_width=True, key="sporza_inladen"):
+                try:
+                    res = supabase.table(TABEL_NAAM).select("sporza_team").eq("username", speler_naam).execute()
+                    if res.data and res.data[0].get('sporza_team'):
+                        d = res.data[0]['sporza_team']
+                        st.session_state.sporza_selected_riders = d.get("selected_riders", [])
+                        st.session_state.sporza_transfer_plan = d.get("transfer_plan", [])
+                        st.success(f"Team geladen (van {d.get('ts', '?')})")
+                        st.rerun()
+                    else: 
+                        st.warning("Geen team gevonden in de cloud.")
+                except Exception as e: 
+                    st.error(f"Fout: {e}")
+    else:
+        st.info("Log in met een account om cloud-opslag te gebruiken.")
+
+    st.divider()
+    st.write("📁 **Lokale Backup (.json)**")
+    
+    save_data = {"selected_riders": st.session_state.sporza_selected_riders, "transfer_plan": st.session_state.sporza_transfer_plan}
+    st.download_button("📥 Download Team als .JSON", data=json.dumps(save_data), file_name=f"{speler_naam}_sporza_team.json", mime="application/json", use_container_width=True)
+    
+    uploaded_file = st.file_uploader("📂 Upload Team (.json)", type="json")
+    if uploaded_file is not None and st.button("Laad .json in", use_container_width=True):
+        try:
+            ld = json.load(uploaded_file)
+            st.session_state.sporza_selected_riders = ld.get("selected_riders", [])
+            st.session_state.sporza_transfer_plan = ld.get("transfer_plan", [])
+            st.success("✅ Lokaal bestand geladen!")
+            st.rerun()
+        except Exception as e:
+            st.error("Fout bij inladen.")
+            
+    st.divider()
+    
     ev_method = st.selectbox("🧮 Rekenmodel (EV)", ["1. Sporza Ranking (Dynamisch)", "2. Originele Curve (Macht 4)"])
-    toon_uitslagen = st.checkbox("🏁 Koersen zijn begonnen (Toon uitslagen)", value=True)
+    toon_uitslagen = st.checkbox("🏁 Koersen zijn begonnen (Toon uitslagen in Matrix)", value=False)
     
     st.divider()
     st.markdown("### 🔁 Transfer Strategie")
@@ -352,19 +394,6 @@ with st.sidebar:
                 st.rerun()
             else:
                 st.error("Geen geldige combinatie mogelijk binnen budget (120M) en ploegrestricties (Max 4 per ploeg).")
-
-    st.divider()
-    with st.expander("📂 Oude Teams Inladen", expanded=False):
-        uploaded_file = st.file_uploader("Upload een JSON backup:", type="json")
-        if uploaded_file is not None:
-            if st.button("Laad Backup in", use_container_width=True):
-                try:
-                    ld = json.load(uploaded_file)
-                    st.session_state.sporza_selected_riders = ld.get("selected_riders", [])
-                    st.session_state.sporza_transfer_plan = ld.get("transfer_plan", [])
-                    st.rerun()
-                except Exception as e:
-                    st.error("Fout bij inladen.")
 
 st.title("🚴 Voorjaarsklassiekers: Sporza Wielermanager")
 st.markdown("**Met dank aan:** [Wielerorakel.nl](https://www.cyclingoracle.com/)")
@@ -425,6 +454,8 @@ else:
 
         with st.container(border=True):
             st.subheader("🛠️ Team Finetuner (Start-Team aanpassen)")
+            st.markdown("Vervang renners in je team. De AI zoekt direct naar passend budget en repareert je geplande transfers en 12-starters logica.")
+            
             c_fine1, c_fine2 = st.columns(2)
             with c_fine1: 
                 to_replace = st.multiselect("❌ Selecteer renner(s) om te verwijderen:", options=st.session_state.sporza_selected_riders)
@@ -488,24 +519,13 @@ else:
                         else:
                             st.error(f"Selecteer exact {len(to_replace)} vervanger(s). Je hebt er nu {len(to_add)} gekozen.")
 
-        st.divider()
-        c_dl1, c_dl2 = st.columns(2)
-        with c_dl1:
-            save_data = {"selected_riders": st.session_state.sporza_selected_riders, "transfer_plan": st.session_state.sporza_transfer_plan}
-            st.download_button("📥 Download Team als .JSON (Backup)", data=json.dumps(save_data), file_name="sporza_team.json", mime="application/json", use_container_width=True)
-
     with tab2:
         st.header("🗓️ Startlijst & Uitslagen")
-        
         if toon_uitslagen:
-            st.success("✅ Actuele uitslagen ingeladen! Top 30 finishes worden beloond met een medaille (🏅). De tabel blijft perfect sorteerbaar.")
-            u_time = get_file_mod_time("uitslagen.csv")
-            df_uitslagen = get_uitslagen(u_time, df['Renner'].tolist())
-            verreden_koersen = df_uitslagen['Race'].unique() if not df_uitslagen.empty else []
+            st.success("✅ Actuele uitslagen ingeladen! Top 20 finishes worden beloond met een medaille (🏅).")
         else:
-            df_uitslagen = pd.DataFrame()
-            verreden_koersen = []
-
+            st.write("De AI selecteert per koers maximaal 12 renners als 'Starter' (✅). De rest zit op de 'Bank' (🪑).")
+        
         matrix_df = current_df[['Renner', 'Prijs', 'Rol'] + available_races].set_index('Renner')
         active_matrix = matrix_df.copy()
 
@@ -522,8 +542,16 @@ else:
                     idx = available_races.index(moment) + 1
                     active_matrix.loc[r, available_races[:idx]] = 0
 
-        display_matrix = active_matrix[available_races].copy()
+        display_matrix = active_matrix[available_races].applymap(lambda x: ' ' if x == 0 else x)
+        display_matrix.insert(0, 'Rol', matrix_df['Rol'])
         
+        df_uitslagen = pd.DataFrame()
+        if toon_uitslagen:
+            u_time = get_file_mod_time("uitslagen.csv")
+            df_uitslagen = get_uitslagen(u_time, df['Renner'].tolist())
+            
+        verreden_koersen = df_uitslagen['Race'].unique() if not df_uitslagen.empty else []
+
         totals_dict = {}
         kopmannen_dict = {}
         for c in available_races:
@@ -538,19 +566,21 @@ else:
             is_verreden = c in verreden_koersen
             df_k = df_uitslagen[df_uitslagen['Race'] == c] if is_verreden else pd.DataFrame()
             
-            for r in display_matrix.index:
-                is_on_list = (active_matrix.loc[r, c] == 1)
-                is_starter = r in starters_names
-                rank_str = None
+            for r in active_riders_in_race:
                 if is_verreden:
                     res = df_k[df_k['Renner'] == r]
-                    if not res.empty: rank_str = res['Rnk'].values[0]
-                
-                display_matrix.loc[r, c] = get_numeric_status(is_on_list, is_starter, is_verreden, rank_str)
-            display_matrix[c] = pd.to_numeric(display_matrix[c])
+                    if not res.empty:
+                        rank_str = res['Rnk'].values[0]
+                        if str(rank_str).isdigit() and int(rank_str) <= 20:
+                            display_matrix.loc[r, c] = f"🏅 {rank_str}"
+                        else:
+                            display_matrix.loc[r, c] = str(rank_str)
+                    else:
+                        display_matrix.loc[r, c] = "❌ DNF"
+                else:
+                    if r in starters_names: display_matrix.loc[r, c] = '✅'
+                    else: display_matrix.loc[r, c] = '🪑'
 
-        display_matrix.insert(0, 'Rol', matrix_df['Rol'])
-        
         for t in st.session_state.sporza_transfer_plan:
             moment = t['moment']
             if moment in display_matrix.columns and f'🔁 {moment}' not in display_matrix.columns:
@@ -562,8 +592,9 @@ else:
             if 'Gekocht' in row['Rol']: return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
             return [''] * len(row)
 
-        format_dict = {c: lambda x: format_race_status(x, 30) for c in available_races}
-        st.dataframe(display_matrix.style.apply(color_rows, axis=1).format(format_dict), use_container_width=True)
+        totals_df = pd.DataFrame([totals_dict], index=['🚀 AANTAL STARTERS (Max 12)'])
+        st.dataframe(totals_df, use_container_width=True)
+        st.dataframe(display_matrix.style.apply(color_rows, axis=1), use_container_width=True)
 
     with tab3:
         st.header("👑 Kopmannen Advies")
@@ -596,32 +627,10 @@ with tab4:
     if race_filter: f_df = f_df[f_df[race_filter].sum(axis=1) == len(race_filter)]
 
     d_df = f_df[['Renner', 'Team', 'Prijs', 'Waarde (EV/M)', 'Type', 'Sporza_EV'] + available_races].copy()
+    d_df['Prijs'] = d_df['Prijs'].apply(lambda x: f"€ {x}M")
+    d_df[available_races] = d_df[available_races].applymap(lambda x: '✅' if x == 1 else '-')
     
-    if toon_uitslagen:
-        u_time = get_file_mod_time("uitslagen.csv")
-        df_uitslagen_db = get_uitslagen(u_time, df['Renner'].tolist())
-        verreden_koersen_db = df_uitslagen_db['Race'].unique() if not df_uitslagen_db.empty else []
-    else:
-        df_uitslagen_db = pd.DataFrame()
-        verreden_koersen_db = []
-
-    for c in available_races:
-        is_verreden = c in verreden_koersen_db
-        df_k = df_uitslagen_db[df_uitslagen_db['Race'] == c] if is_verreden else pd.DataFrame()
-        
-        new_col = []
-        for r, val in zip(d_df['Renner'], d_df[c]):
-            is_on_list = (val == 1)
-            rank_str = None
-            if is_verreden:
-                res = df_k[df_k['Renner'] == r]
-                if not res.empty: rank_str = res['Rnk'].values[0]
-            new_col.append(get_numeric_status(is_on_list, is_on_list, is_verreden, rank_str))
-        d_df[c] = pd.to_numeric(new_col)
-    
-    format_dict = {c: lambda x: format_race_status(x, 30) for c in available_races}
-    format_dict['Prijs'] = lambda x: f"€ {int(x)}M"
-    st.dataframe(d_df.sort_values(by='Sporza_EV', ascending=False).style.format(format_dict), use_container_width=True, hide_index=True)
+    st.dataframe(d_df.sort_values(by='Sporza_EV', ascending=False), use_container_width=True, hide_index=True)
 
 with tab5:
     st.header("ℹ️ Uitgebreide Handleiding & AI Uitleg")
@@ -654,7 +663,7 @@ with tab5:
     * **Transfer 4:** Kost 1 Miljoen (Totaalbudget zakt naar 119 Miljoen)
     * **Transfer 5:** Kost nog eens 2 Miljoen extra (Totaalbudget zakt naar 117 Miljoen)
     
-    De AI berekent tegelijkertijd je start-team én al je geplande wissels in de toekomst. Hij weegt af of het rendabel is om budget in te leveren voor een extra transfer, en zorgt dat je na *elke* wissel altijd een geldig team overhoudt.
+    De AI berekent tegelijkertijd je start-team én al je geplande wissels in de toekomst. Hij weegt af of het rendabel is om budget in leveren voor een extra transfer, en zorgt dat je na *elke* wissel altijd een geldig team overhoudt.
 
     ---
 
@@ -672,6 +681,6 @@ with tab5:
     ---
 
     ### 💾 6. Back-ups & Data Exporteren (Inladen en Opslaan)
-    * **Opslaan (Back-up maken):** Onderaan Tab 1 vind je 'Exporteer Team'. Download je bestand als `.json`. Dit bevat de exacte 20 renners én je wisselmomenten.
-    * **Inladen (Team terughalen):** Ga in de linker zijbalk naar **📂 Oude Teams Inladen**. Upload je `.json` bestand. Het script controleert automatisch via *Fuzzy Matching* of oude namen nog correct in de database staan.
+    * **Opslaan (Back-up maken):** Sla je team op in de cloud via de knop linksboven in de zijbalk, of download lokaal via '.JSON'. 
+    * **Inladen (Team terughalen):** Laad je team in via de cloud-knop of upload een `.json` bestand. Het script controleert automatisch via *Fuzzy Matching* of oude namen nog correct in de database staan.
     """)
