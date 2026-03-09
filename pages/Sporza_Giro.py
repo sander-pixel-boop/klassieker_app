@@ -127,11 +127,18 @@ def genereer_ai_etappe_voorspellingen(df, etappes, top_x, custom_weights):
         df_temp = df.copy()
         w = custom_weights[str(etappe["id"])]
         
+        # Zorg dat de wegingen altijd op 100% uitkomen voor een eerlijke berekening
+        som = sum(w.values())
+        if som == 0:
+            w_norm = {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+        else:
+            w_norm = {k: v / som for k, v in w.items()}
+            
         df_temp['stage_score'] = (
-            (df_temp['SPR'] * w['SPR']) + 
-            (df_temp['GC'] * w['GC']) + 
-            (df_temp['ITT'] * w['ITT']) + 
-            (df_temp['MTN'] * w['MTN'])
+            (df_temp['SPR'] * w_norm['SPR']) + 
+            (df_temp['GC'] * w_norm['GC']) + 
+            (df_temp['ITT'] * w_norm['ITT']) + 
+            (df_temp['MTN'] * w_norm['MTN'])
         )
         
         top_renners = df_temp.sort_values(by=['stage_score', 'Giro_EV'], ascending=[False, False])['Renner'].head(top_x).tolist()
@@ -359,7 +366,10 @@ with tab2:
         stage_id = str(etappe["id"])
         
         cw = st.session_state.giro_weights[stage_id]
-        weight_str = f"SPR:{int(cw['SPR']*100)}% GC:{int(cw['GC']*100)}% ITT:{int(cw['ITT']*100)}% MTN:{int(cw['MTN']*100)}%"
+        
+        # Normaliseer voor weergave in de header
+        som_header = sum(cw.values()) if sum(cw.values()) > 0 else 1.0
+        weight_str = f"SPR:{int((cw['SPR']/som_header)*100)}% GC:{int((cw['GC']/som_header)*100)}% ITT:{int((cw['ITT']/som_header)*100)}% MTN:{int((cw['MTN']/som_header)*100)}%"
         
         with st.expander(f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']}) | 🤖 {weight_str}"):
             
@@ -374,7 +384,6 @@ with tab2:
             
             st.divider()
             
-            # --- START AANPASSING AI SUGGESTIES ---
             st.markdown("###### ⚙️ Pas de weging aan voor andere suggesties:")
             wc1, wc2, wc3, wc4 = st.columns(4)
             new_spr = wc1.number_input("Sprint (SPR)", 0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{stage_id}")
@@ -383,9 +392,21 @@ with tab2:
             new_mtn = wc4.number_input("Klim/Aanval (MTN)", 0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{stage_id}")
             
             st.session_state.giro_weights[stage_id] = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
-            active_weights = st.session_state.giro_weights[stage_id]
             
-            # Bepaal dynamische suggesties
+            # --- NORMALISATIE LOGICA ---
+            som_input = new_spr + new_gc + new_itt + new_mtn
+            
+            if abs(som_input - 1.0) > 0.01 and som_input > 0:
+                st.warning(f"⚠️ Jouw weging telt op tot **{som_input*100:.0f}%**. Dit wordt op de achtergrond teruggeschaald naar exact 100% "
+                           f"(SPR: {new_spr/som_input*100:.0f}%, GC: {new_gc/som_input*100:.0f}%, ITT: {new_itt/som_input*100:.0f}%, MTN: {new_mtn/som_input*100:.0f}%).")
+                active_weights = {"SPR": new_spr/som_input, "GC": new_gc/som_input, "ITT": new_itt/som_input, "MTN": new_mtn/som_input}
+            elif som_input == 0:
+                st.error("⚠️ Weging mag niet 0% zijn. Er wordt tijdelijk een standaardverdeling gebruikt.")
+                active_weights = {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+            else:
+                active_weights = st.session_state.giro_weights[stage_id]
+            
+            # Bepaal dynamische suggesties o.b.v. genormaliseerde weging
             df_stage = df.copy()
             df_stage['StageScore'] = (df_stage['SPR'] * active_weights['SPR'] + 
                                       df_stage['GC'] * active_weights['GC'] + 
@@ -396,7 +417,6 @@ with tab2:
             
             st.info(f"💡 **AI Top 5 Suggesties:** {', '.join(top_5_namen)}")
             st.divider()
-            # --- EINDE AANPASSING AI SUGGESTIES ---
             
             st.markdown("###### Jouw Voorspelling:")
             for i in range(0, top_x_voorspellingen, 5):
@@ -433,13 +453,13 @@ with tab4:
     * Renners die je vaker voorspelt worden als "waardevoller" beschouwd. De rest van het budget wordt door de AI optimaal opgevuld.
     
     ### ⚙️ Wat doen de wegingen per etappe?
-    Elke etappe is vooraf ingesteld met een weging die samen `1.0` (100%) vormt. 
+    Elke etappe is vooraf ingesteld met een weging die idealiter `1.0` (100%) vormt. 
     * **SPR (Sprint):** Bepaalt of typische sprinters hier makkelijk punten scoren.
     * **GC (Klassement):** Bepaalt of de rit zo zwaar is dat alleen de échte topklimmers voor de zege strijden.
     * **ITT (Tijdrit):** Tijdrijdersvoordeel.
     * **MTN (Aanval/Klim):** Bepaalt of vluchters en punchers hier een kans maken.
     
-    *Voorbeeld: Een weging van `SPR: 0.8` en `MTN: 0.2` betekent dat de AI er vanuit gaat dat sprinters 80% kans hebben om het hier uit te vechten, maar dat ontsnappingen (20%) niet ondenkbaar zijn wegens een vroege heuvel.* Je kunt deze wegingen naar eigen inzicht via de schuifjes aanpassen!
+    *Voorbeeld: Een weging van `SPR: 0.8` en `MTN: 0.2` betekent dat de AI er vanuit gaat dat sprinters 80% kans hebben om het hier uit te vechten, maar dat ontsnappingen (20%) niet ondenkbaar zijn wegens een vroege heuvel.* Je kunt deze wegingen naar eigen inzicht via de schuifjes aanpassen. De app schaalt je keuzes op de achtergrond altijd automatisch naar 100% om berekeningsfouten te voorkomen!
     
     ### 💾 Data opslaan en delen
     Je profiel slaat je team, voorspellingen en je aangepaste wegingen op in een cloud-database. Via de knoppen links onderin kun je je selectie bovendien downloaden als CSV (voor Excel) of als JSON-bestand.
