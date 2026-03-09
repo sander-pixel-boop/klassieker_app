@@ -200,8 +200,13 @@ with tab1:
 
     for etappe in GIRO_ETAPPES:
         eid = str(etappe["id"])
+        cw = st.session_state.giro_weights_v2[eid]
         
-        with st.expander(f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']})"):
+        # Normaliseer voor weergave in de header van de expander
+        som_header = sum(cw.values()) if sum(cw.values()) > 0 else 1.0
+        weight_str = f"SPR:{int((cw['SPR']/som_header)*100)}% GC:{int((cw['GC']/som_header)*100)}% ITT:{int((cw['ITT']/som_header)*100)}% MTN:{int((cw['MTN']/som_header)*100)}%"
+        
+        with st.expander(f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']}) | 🤖 {weight_str}"):
             giro_link = "https://www.giroditalia.it/en/the-route/"
             map_path = f"giro262/giro26-{etappe['id']}-map.jpg"
             prof_path = f"giro262/giro26-{etappe['id']}-hp.jpg" 
@@ -212,20 +217,29 @@ with tab1:
             
             st.divider()
             
-            # Aanpassen weging
+            # --- AANPASSEN WEGING (Met normalisatie) ---
             st.markdown("###### ⚙️ Pas de weging aan voor andere suggesties:")
-            cw = st.session_state.giro_weights_v2[eid]
             wc1, wc2, wc3, wc4 = st.columns(4)
             new_spr = wc1.number_input("Sprint (SPR)", 0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{eid}")
             new_gc  = wc2.number_input("Klassement (GC)", 0.0, 1.0, float(cw["GC"]), 0.1, key=f"wgc_{eid}")
             new_itt = wc3.number_input("Tijdrit (ITT)", 0.0, 1.0, float(cw["ITT"]), 0.1, key=f"witt_{eid}")
             new_mtn = wc4.number_input("Klim/Aanval (MTN)", 0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{eid}")
             
-            # Sla direct de nieuwe weging op
             st.session_state.giro_weights_v2[eid] = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
-            active_weights = st.session_state.giro_weights_v2[eid]
             
-            # Bereken top 5 suggesties op basis van (nieuwe) weging
+            # Normalisatie Logica
+            som_input = new_spr + new_gc + new_itt + new_mtn
+            if abs(som_input - 1.0) > 0.01 and som_input > 0:
+                st.warning(f"⚠️ Jouw weging telt op tot **{som_input*100:.0f}%**. Dit wordt op de achtergrond teruggeschaald naar exact 100% "
+                           f"(SPR: {new_spr/som_input*100:.0f}%, GC: {new_gc/som_input*100:.0f}%, ITT: {new_itt/som_input*100:.0f}%, MTN: {new_mtn/som_input*100:.0f}%).")
+                active_weights = {"SPR": new_spr/som_input, "GC": new_gc/som_input, "ITT": new_itt/som_input, "MTN": new_mtn/som_input}
+            elif som_input == 0:
+                st.error("⚠️ Weging mag niet 0% zijn. Er wordt tijdelijk een standaardverdeling gebruikt.")
+                active_weights = {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+            else:
+                active_weights = st.session_state.giro_weights_v2[eid]
+            
+            # Bereken top 5 suggesties op basis van genormaliseerde weging
             df_stage = df.copy()
             df_stage['StageScore'] = (df_stage['SPR'] * active_weights['SPR'] + 
                                       df_stage['GC'] * active_weights['GC'] + 
@@ -236,7 +250,7 @@ with tab1:
             
             st.info(f"💡 **AI Top 5 Suggesties:** {', '.join(top_5_namen)}")
             
-            # Voorspelling selecties
+            # --- VOORSPELLING SELECTIES ---
             st.markdown("###### Jouw Voorspelling:")
             c1, c2, c3 = st.columns(3)
             for i, col in enumerate([c1, c2, c3]):
@@ -314,7 +328,7 @@ with tab4:
     Je stelt je team niet samen vanuit een droge lijst, maar **per etappe**. 
     - Klap een etappe uit in het tabblad *Etappe Voorspellingen*.
     - Bekijk het hoogteprofiel en de route.
-    - Speel met de wegingen (bijvoorbeeld meer SPR of meer MTN) om de AI-Suggesties te beïnvloeden.
+    - Speel met de wegingen (bijvoorbeeld meer SPR of meer MTN) om de AI-Suggesties te beïnvloeden. De app schaalt je waarden altijd netjes terug naar 100% voor een correcte weergave.
     - Kies de 3 renners waarvan jij denkt dat ze daar de meeste punten pakken.
 
     **2. Automatische Teamlijst**
