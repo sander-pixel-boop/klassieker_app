@@ -373,14 +373,32 @@ with tab2:
             i2.markdown(get_clickable_image_html(prof_path, f"Profiel+Etappe+{etappe['id']}", giro_link), unsafe_allow_html=True)
             
             st.divider()
+            
+            # --- START AANPASSING AI SUGGESTIES ---
+            st.markdown("###### ⚙️ Pas de weging aan voor andere suggesties:")
             wc1, wc2, wc3, wc4 = st.columns(4)
-            new_spr = wc1.number_input("Sprint (SPR)", 0.0, 1.0, cw["SPR"], 0.1, key=f"wspr_{stage_id}")
-            new_gc  = wc2.number_input("Klassement (GC)", 0.0, 1.0, cw["GC"], 0.1, key=f"wgc_{stage_id}")
-            new_itt = wc3.number_input("Tijdrit (ITT)", 0.0, 1.0, cw["ITT"], 0.1, key=f"witt_{stage_id}")
-            new_mtn = wc4.number_input("Klim/Aanval (MTN)", 0.0, 1.0, cw["MTN"], 0.1, key=f"wmtn_{stage_id}")
+            new_spr = wc1.number_input("Sprint (SPR)", 0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{stage_id}")
+            new_gc  = wc2.number_input("Klassement (GC)", 0.0, 1.0, float(cw["GC"]), 0.1, key=f"wgc_{stage_id}")
+            new_itt = wc3.number_input("Tijdrit (ITT)", 0.0, 1.0, float(cw["ITT"]), 0.1, key=f"witt_{stage_id}")
+            new_mtn = wc4.number_input("Klim/Aanval (MTN)", 0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{stage_id}")
             
             st.session_state.giro_weights[stage_id] = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
+            active_weights = st.session_state.giro_weights[stage_id]
             
+            # Bepaal dynamische suggesties
+            df_stage = df.copy()
+            df_stage['StageScore'] = (df_stage['SPR'] * active_weights['SPR'] + 
+                                      df_stage['GC'] * active_weights['GC'] + 
+                                      df_stage['ITT'] * active_weights['ITT'] + 
+                                      df_stage['MTN'] * active_weights['MTN'])
+            top_5 = df_stage.sort_values(by=['StageScore', 'Giro_EV'], ascending=[False, False]).head(5)
+            top_5_namen = [f"{row['Renner']} ({int(row['StageScore'])})" for _, row in top_5.iterrows()]
+            
+            st.info(f"💡 **AI Top 5 Suggesties:** {', '.join(top_5_namen)}")
+            st.divider()
+            # --- EINDE AANPASSING AI SUGGESTIES ---
+            
+            st.markdown("###### Jouw Voorspelling:")
             for i in range(0, top_x_voorspellingen, 5):
                 cols = st.columns(min(5, top_x_voorspellingen - i))
                 for j, col in enumerate(cols):
