@@ -164,7 +164,7 @@ with st.sidebar:
         st.success("Opgeslagen!")
 
 # --- HOOFDSCHERM ---
-st.title("🇮🇹 Bouw je team per etappe")
+st.title("🇮🇹 Handmatige Team Bouwer")
 st.markdown("*Data en Statistieken van [Wielerorakel](https://wielerorakel.nl/)*")
 
 if df.empty:
@@ -173,11 +173,17 @@ if df.empty:
 
 renners_opties = ["-"] + sorted(df['Naam'].tolist())
 
-col_rit, col_detail = st.columns([2, 1])
+# --- TABS AANMAKEN ---
+tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Etappe Voorspellingen", "🛡️ Jouw Team", "📋 Startlijst", "ℹ️ Uitleg"])
 
-with col_rit:
-    st.info("Kies per etappe de renners waarvan jij denkt dat ze gaan scoren. De app bouwt je team van 16 man automatisch op.")
+# TAB 1: ETAPPE VOORSPELLINGEN
+with tab1:
+    st.info("Kies per etappe de renners waarvan jij denkt dat ze gaan scoren. De app bouwt je team van 16 man automatisch op in de achtergrond.")
     
+    # Waarschuwing als je al op 16 zit
+    if aantal_renners >= 16:
+        st.warning("⚠️ Je hebt 16 of meer unieke renners geselecteerd. Wil je iemand toevoegen, verwijder dan eerst iemand in een andere etappe.")
+
     for etappe in GIRO_ETAPPES:
         eid = str(etappe["id"])
         w = etappe["w"]
@@ -213,15 +219,90 @@ with col_rit:
                 keuze = col.selectbox(f"Positie {i+1}", renners_opties, index=d_idx, key=f"sel_{eid}_{i}")
                 st.session_state.etappe_keuzes[eid][i] = keuze if keuze != "-" else None
 
-with col_detail:
-    st.subheader("Team Analyse")
-    if not huidig_team_df.empty:
-        plot_cols = [c for c in ['GC', 'SPR', 'ITT', 'MTN'] if c in huidig_team_df.columns]
-        if plot_cols:
-            st.write("Gemiddelde team-stats:")
-            st.bar_chart(huidig_team_df[plot_cols].mean())
-        
-        st.write("**Gekozen team:**")
-        st.dataframe(huidig_team_df[['Naam', 'Prijs']].sort_values(by='Prijs', ascending=False), hide_index=True, use_container_width=True)
+# TAB 2: JOUW TEAM
+with tab2:
+    st.subheader("Analyse van jouw gekozen team")
+    if huidig_team_df.empty:
+        st.info("Je hebt nog geen renners gekozen. Ga naar het tabblad 'Etappe Voorspellingen' om te beginnen.")
     else:
-        st.info("Kies renners in de etappes om je team te zien.")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Aantal Renners", f"{aantal_renners} / 16")
+        c2.metric("Budget Besteed", f"€ {totaal_prijs:.2f}M")
+        c3.metric("Budget Over", f"€ {100 - totaal_prijs:.2f}M")
+
+        st.divider()
+        col_grafiek, col_tabel = st.columns([1, 2])
+        
+        with col_grafiek:
+            st.write("**Gemiddelde Team Stats:**")
+            plot_cols = [c for c in ['GC', 'SPR', 'ITT', 'MTN'] if c in huidig_team_df.columns]
+            if plot_cols:
+                st.bar_chart(huidig_team_df[plot_cols].mean())
+
+        with col_tabel:
+            st.write("**Huidige Selectie:**")
+            st.dataframe(
+                huidig_team_df[['Naam', 'Ploeg', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV']].sort_values(by='Prijs', ascending=False), 
+                hide_index=True, 
+                use_container_width=True
+            )
+
+        # Laat zien in hoeveel etappes elke renner is gekozen
+        st.subheader("Inzetbaarheid")
+        renner_etappes = {renner: [] for renner in huidig_team_namen}
+        for eid, keuzes in st.session_state.etappe_keuzes.items():
+            for renner in keuzes:
+                if renner:
+                    renner_etappes[renner].append(eid)
+                    
+        for renner, ritten in renner_etappes.items():
+            if ritten:
+                st.write(f"**{renner}** is ingezet in rit(ten): {', '.join(ritten)}")
+
+# TAB 3: STARTLIJST
+with tab3:
+    st.subheader("Volledige Startlijst & Prijzen")
+    st.write("Blader door alle beschikbare renners. Tip: Klik op een kolomkop om te sorteren.")
+    st.dataframe(
+        df[['Naam', 'Ploeg', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV']].sort_values(by='Prijs', ascending=False),
+        hide_index=True,
+        use_container_width=True
+    )
+
+# TAB 4: UITLEG
+with tab4:
+    st.header("ℹ️ Uitleg & Disclaimer")
+    
+    st.warning("""
+    **⚠️ LET OP: Voorlopige Data!**
+    De huidige startlijst en de daaraan gekoppelde prijzen zijn op dit moment nog **niet compleet en deels een inschatting**. 
+    Zodra de echte Giro d'Italia dichterbij komt en de definitieve prijzen gelanceerd zijn, worden deze bestanden geüpdatet!
+    """)
+    
+    st.markdown("""
+    ### 🛠️ Hoe werkt de 'Handmatige Bouwer'?
+    In tegenstelling tot de AI-Solver, heb je hier zelf de volledige controle over de 16 renners in je team. 
+
+    **1. Bouwen vanuit het parcours**
+    Je stelt je team niet samen vanuit een droge lijst, maar **per etappe**. 
+    - Klap een etappe uit in het tabblad *Etappe Voorspellingen*.
+    - Bekijk het hoogteprofiel en de route.
+    - Kijk naar de *AI Suggesties* voor die specifieke rit.
+    - Kies de 3 renners waarvan jij denkt dat ze daar de meeste punten pakken.
+
+    **2. Automatische Teamlijst**
+    Zodra je een renner kiest in een etappe, wordt deze **automatisch aan je team toegevoegd** (zichtbaar in het tabblad *Jouw Team* en de zijbalk).
+    Kies je dezelfde renner in meerdere etappes? Geen probleem, hij neemt uiteraard maar 1 van de 16 plekjes in.
+
+    **3. Budget & Limieten**
+    Net als in het echte spel ben je gebonden aan regels:
+    - Maximaal **16 renners** in totaal.
+    - Maximaal **€ 100 Miljoen** budget.
+    De balk aan de zijkant kleurt rood als je over je limiet heen gaat. Om weer binnen de limiet te vallen, moet je renners verwijderen (vervang ze door een streepje `-` in de etappes waar je ze had geselecteerd).
+    
+    **Wat betekenen de categorieën?**
+    - **SPR (Sprint):** Typische vlakke aankomsten voor de rappe mannen.
+    - **GC (Klassement):** Zware bergritten waar de klassementsmannen het uitvechten.
+    - **ITT (Tijdrit):** Voordeel voor de pure tijdrijders.
+    - **MTN (Aanval/Klim):** Ritten voor vluchters, punchers en de vroege ontsnapping.
+    """)
