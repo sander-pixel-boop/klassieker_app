@@ -135,6 +135,8 @@ df = load_all_data()
 # --- SESSION STATE INITIALISATIE ---
 if "etappe_keuzes" not in st.session_state:
     st.session_state.etappe_keuzes = {str(e["id"]): [None, None, None] for e in GIRO_ETAPPES}
+if "giro_weights_v2" not in st.session_state:
+    st.session_state.giro_weights_v2 = {str(e["id"]): e["w"].copy() for e in GIRO_ETAPPES}
 
 def get_team_from_etappes():
     gekozen = set()
@@ -159,9 +161,21 @@ with st.sidebar:
 
     st.divider()
     if st.button("💾 Opslaan", type="primary", use_container_width=True):
-        data = {"team": huidig_team_namen, "etappe_keuzes": st.session_state.etappe_keuzes}
+        data = {
+            "team": huidig_team_namen, 
+            "etappe_keuzes": st.session_state.etappe_keuzes,
+            "weights": st.session_state.giro_weights_v2
+        }
         supabase.table(TABEL_NAAM).update({DB_KOLOM: data}).eq("username", speler_naam).execute()
         st.success("Opgeslagen!")
+        
+    if st.button("🔄 Inladen", use_container_width=True):
+        res = supabase.table(TABEL_NAAM).select(DB_KOLOM).eq("username", speler_naam).execute()
+        if res.data and res.data[0].get(DB_KOLOM):
+            db_data = res.data[0][DB_KOLOM]
+            st.session_state.etappe_keuzes = db_data.get("etappe_keuzes", {str(e["id"]): [None]*3 for e in GIRO_ETAPPES})
+            st.session_state.giro_weights_v2 = db_data.get("weights", {str(e["id"]): e["w"].copy() for e in GIRO_ETAPPES})
+            st.rerun()
 
 # --- HOOFDSCHERM ---
 st.title("🇮🇹 Handmatige Team Bouwer")
@@ -178,7 +192,7 @@ tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Etappe Voorspellingen", "🛡️ Jouw
 
 # TAB 1: ETAPPE VOORSPELLINGEN
 with tab1:
-    st.info("Kies per etappe de renners waarvan jij denkt dat ze gaan scoren. De app bouwt je team van 16 man automatisch op in de achtergrond.")
+    st.info("Kies per etappe de renners waarvan jij denkt dat ze gaan scoren. Speel met de weging om de AI-suggesties te beïnvloeden. De app bouwt je team van 16 man automatisch op in de achtergrond.")
     
     # Waarschuwing als je al op 16 zit
     if aantal_renners >= 16:
@@ -186,7 +200,6 @@ with tab1:
 
     for etappe in GIRO_ETAPPES:
         eid = str(etappe["id"])
-        w = etappe["w"]
         
         with st.expander(f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']})"):
             giro_link = "https://www.giroditalia.it/en/the-route/"
@@ -199,11 +212,25 @@ with tab1:
             
             st.divider()
             
-            # Toon Categorie Verdeling en Top 5 Suggesties
-            st.markdown(f"**Verdeling:** SPR: {int(w['SPR']*100)}% | GC: {int(w['GC']*100)}% | ITT: {int(w['ITT']*100)}% | MTN: {int(w['MTN']*100)}%")
+            # Aanpassen weging
+            st.markdown("###### ⚙️ Pas de weging aan voor andere suggesties:")
+            cw = st.session_state.giro_weights_v2[eid]
+            wc1, wc2, wc3, wc4 = st.columns(4)
+            new_spr = wc1.number_input("Sprint (SPR)", 0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{eid}")
+            new_gc  = wc2.number_input("Klassement (GC)", 0.0, 1.0, float(cw["GC"]), 0.1, key=f"wgc_{eid}")
+            new_itt = wc3.number_input("Tijdrit (ITT)", 0.0, 1.0, float(cw["ITT"]), 0.1, key=f"witt_{eid}")
+            new_mtn = wc4.number_input("Klim/Aanval (MTN)", 0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{eid}")
             
+            # Sla direct de nieuwe weging op
+            st.session_state.giro_weights_v2[eid] = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
+            active_weights = st.session_state.giro_weights_v2[eid]
+            
+            # Bereken top 5 suggesties op basis van (nieuwe) weging
             df_stage = df.copy()
-            df_stage['StageScore'] = (df_stage['SPR'] * w['SPR'] + df_stage['GC'] * w['GC'] + df_stage['ITT'] * w['ITT'] + df_stage['MTN'] * w['MTN'])
+            df_stage['StageScore'] = (df_stage['SPR'] * active_weights['SPR'] + 
+                                      df_stage['GC'] * active_weights['GC'] + 
+                                      df_stage['ITT'] * active_weights['ITT'] + 
+                                      df_stage['MTN'] * active_weights['MTN'])
             top_5 = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False]).head(5)
             top_5_namen = [f"{row['Naam']} ({int(row['StageScore'])})" for _, row in top_5.iterrows()]
             
@@ -287,7 +314,7 @@ with tab4:
     Je stelt je team niet samen vanuit een droge lijst, maar **per etappe**. 
     - Klap een etappe uit in het tabblad *Etappe Voorspellingen*.
     - Bekijk het hoogteprofiel en de route.
-    - Kijk naar de *AI Suggesties* voor die specifieke rit.
+    - Speel met de wegingen (bijvoorbeeld meer SPR of meer MTN) om de AI-Suggesties te beïnvloeden.
     - Kies de 3 renners waarvan jij denkt dat ze daar de meeste punten pakken.
 
     **2. Automatische Teamlijst**
