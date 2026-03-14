@@ -42,28 +42,25 @@ def match_naam_slim(naam, dict_met_namen):
     naam_norm = normalize_name_logic(naam)
     lijst_met_namen = list(dict_met_namen.keys())
     
-    # 1. Exacte mapping voor afkortingen en probleemgevallen (Geen endswith meer!)
     bekende_gevallen = {
-        "philipsen": "jasper philipsen", "j. philipsen": "jasper philipsen", "j philipsen": "jasper philipsen",
-        "pedersen": "mads pedersen", "m. pedersen": "mads pedersen", "m pedersen": "mads pedersen",
-        "pidcock": "thomas pidcock", "t. pidcock": "thomas pidcock", "tom pidcock": "thomas pidcock",
-        "van aert": "wout van aert", "w. van aert": "wout van aert", 
-        "van der poel": "mathieu van der poel", "m. van der poel": "mathieu van der poel",
-        "pogacar": "tadej pogacar", "t. pogacar": "tadej pogacar",
-        "de lie": "arnaud de lie", "a. de lie": "arnaud de lie"
+        "philipsen": "jasper philipsen",
+        "pedersen": "mads pedersen",
+        "pidcock": "thomas pidcock",
+        "van aert": "wout van aert", 
+        "van der poel": "mathieu van der poel",
+        "pogacar": "tadej pogacar",
+        "de lie": "arnaud de lie"
     }
     
-    if naam_norm in bekende_gevallen:
-        correct = bekende_gevallen[naam_norm]
-        for target in lijst_met_namen:
-            if correct in target:
-                return dict_met_namen[target]
+    for key, correct in bekende_gevallen.items():
+        if key in naam_norm:
+            for target in lijst_met_namen:
+                if correct in target:
+                    return dict_met_namen[target]
                     
-    # 2. Exacte match
     if naam_norm in lijst_met_namen:
         return dict_met_namen[naam_norm]
         
-    # 3. Fuzzy Match met de slimme Tie-Breaker
     bests = process.extractBests(naam_norm, lijst_met_namen, scorer=fuzz.token_set_ratio, limit=5)
     if bests and bests[0][1] >= 75:
         top_score = bests[0][1]
@@ -76,20 +73,20 @@ def match_naam_slim(naam, dict_met_namen):
 def match_uitslag_naam(naam, alle_renners):
     naam_norm = normalize_name_logic(naam)
     bekende_gevallen = {
-        "philipsen": "jasper philipsen", "j. philipsen": "jasper philipsen", "j philipsen": "jasper philipsen",
-        "pedersen": "mads pedersen", "m. pedersen": "mads pedersen", "m pedersen": "mads pedersen",
-        "pidcock": "thomas pidcock", "t. pidcock": "thomas pidcock", "tom pidcock": "thomas pidcock",
-        "van aert": "wout van aert", "w. van aert": "wout van aert", 
-        "van der poel": "mathieu van der poel", "m. van der poel": "mathieu van der poel",
-        "pogacar": "tadej pogacar", "t. pogacar": "tadej pogacar",
-        "de lie": "arnaud de lie", "a. de lie": "arnaud de lie"
+        "philipsen": "jasper philipsen",
+        "pedersen": "mads pedersen",
+        "pidcock": "thomas pidcock",
+        "van aert": "wout van aert", 
+        "van der poel": "mathieu van der poel",
+        "pogacar": "tadej pogacar",
+        "de lie": "arnaud de lie"
     }
     
-    if naam_norm in bekende_gevallen:
-        correct = bekende_gevallen[naam_norm]
-        for target in alle_renners:
-            if correct in normalize_name_logic(target):
-                return target
+    for key, correct in bekende_gevallen.items():
+        if key in naam_norm:
+            for target in alle_renners:
+                if correct in normalize_name_logic(target):
+                    return target
                 
     bests = process.extractBests(naam_norm, alle_renners, scorer=fuzz.token_set_ratio, limit=5)
     if bests and bests[0][1] >= 75:
@@ -180,7 +177,6 @@ def bepaal_klassieker_type(row):
         s = {'Kassei': cob, 'Heuvel': hll, 'Sprint': spr, 'Klimmer': row.get('MTN', 0), 'Tijdrit': row.get('ITT', 0), 'Klassement': row.get('GC', 0)}
         return max(s, key=s.get) if sum(s.values()) > 0 else 'Onbekend'
 
-# --- OPMAAK & SORTEER LOGICA ---
 def get_numeric_status(is_on_startlist, is_starter, is_verreden=False, rank_str=None):
     if is_verreden:
         if rank_str and str(rank_str) not in ['nan', 'None', 'DNS', '']:
@@ -209,20 +205,27 @@ def format_race_status(val, limit):
     if v <= limit: return f"🏅 {v}"
     return str(v)
 
-# --- DATA LADEN ---
+# --- AANGEPASTE DATA LADEN ---
 @st.cache_data
 def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
     try:
+        # 1. SPORZA LADEN (BASIS)
         df_prog = pd.read_csv("sporza_prijzen_startlijst.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
         df_prog.columns = df_prog.columns.str.strip()
         if 'Naam' in df_prog.columns: df_prog = df_prog.rename(columns={'Naam': 'Renner'})
         if 'Prijs' in df_prog.columns: df_prog = df_prog.drop(columns=['Prijs'])
+        
+        if 'PN' in df_prog.columns: df_prog = df_prog.drop(columns=['PN'])
+        if 'TA' in df_prog.columns: df_prog = df_prog.drop(columns=['TA'])
+        
         sporza_to_scorito = {'OML': 'OHN', 'STR': 'SB', 'RVB': 'BDP', 'IFF': 'GW', 'BRP': 'BP', 'AGT': 'AGR', 'WAP': 'WP'}
         df_prog = df_prog.rename(columns=sporza_to_scorito)
         
+        # 2. SCORITO LADEN (PRIJZEN + PN + TA)
         df_scorito = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
         df_scorito.columns = df_scorito.columns.str.strip()
         if 'Naam' in df_scorito.columns: df_scorito = df_scorito.rename(columns={'Naam': 'Renner'})
+        
         if 'Prijs' not in df_scorito.columns and df_scorito['Renner'].astype(str).str.contains(r'\(.*\)', regex=True).any():
             extracted = df_scorito['Renner'].str.extract(r'^(.*?)\s*\(([\d\.]+)[Mm]\)')
             df_scorito['Renner'] = extracted[0].str.strip()
@@ -230,38 +233,55 @@ def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
         if 'Prijs' in df_scorito.columns:
             df_scorito['Prijs'] = df_scorito['Prijs'].fillna(0)
             df_scorito.loc[df_scorito['Prijs'] == 800000, 'Prijs'] = 750000
-        df_prijzen = df_scorito[['Renner', 'Prijs']].drop_duplicates(subset=['Renner'])
+            
+        scorito_cols = ['Renner', 'Prijs']
+        if 'PN' in df_scorito.columns: scorito_cols.append('PN')
+        if 'TA' in df_scorito.columns: scorito_cols.append('TA')
+        df_prijzen = df_scorito[scorito_cols].drop_duplicates(subset=['Renner'])
 
+        # 3. STATS LADEN
         df_stats = pd.read_csv("renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip') 
         df_stats.columns = df_stats.columns.str.strip()
         if 'Naam' in df_stats.columns: df_stats = df_stats.rename(columns={'Naam': 'Renner'})
         if 'Team' not in df_stats.columns and 'Ploeg' in df_stats.columns: df_stats = df_stats.rename(columns={'Ploeg': 'Team'})
         df_stats = df_stats.drop_duplicates(subset=['Renner'], keep='first')
         
+        # 4. MERGE SPORZA (BASIS) EN SCORITO (PRIJS/PN/TA) - VIA OUTER JOIN
         scorito_names = df_prijzen['Renner'].unique()
-        stats_names = df_stats['Renner'].unique()
         norm_to_scorito = {normalize_name_logic(n): n for n in scorito_names}
-        norm_to_stats = {normalize_name_logic(n): n for n in stats_names}
-
         df_prog['Renner_Scorito'] = df_prog['Renner'].apply(lambda x: match_naam_slim(x, norm_to_scorito))
-        df_prog['Renner_Stats'] = df_prog['Renner'].apply(lambda x: match_naam_slim(x, norm_to_stats))
-                
-        merged_df = pd.merge(df_prog, df_prijzen, left_on='Renner_Scorito', right_on='Renner', how='left', suffixes=('', '_drop1'))
+        
+        merged_df = pd.merge(df_prog, df_prijzen, left_on='Renner_Scorito', right_on='Renner', how='outer')
+        # FIX: We gebruiken nu Sporza (Renner_x) als leidende naam, tenzij de renner alleen in Scorito zit.
+        merged_df['Renner'] = merged_df['Renner_x'].fillna(merged_df['Renner_y']) 
+        merged_df = merged_df.drop(columns=['Renner_x', 'Renner_y', 'Renner_Scorito'])
+        
+        # 5. MERGE STATS
+        stats_names = df_stats['Renner'].unique()
+        norm_to_stats = {normalize_name_logic(n): n for n in stats_names}
+        merged_df['Renner_Stats'] = merged_df['Renner'].apply(lambda x: match_naam_slim(x, norm_to_stats))
         merged_df = pd.merge(merged_df, df_stats, left_on='Renner_Stats', right_on='Renner', how='left', suffixes=('', '_drop2'))
         merged_df = merged_df.drop(columns=[c for c in merged_df.columns if '_drop' in c or 'Renner_' in c])
-        merged_df['Prijs'] = pd.to_numeric(merged_df['Prijs'], errors='coerce').fillna(0).astype(int)
         
+        merged_df['Prijs'] = pd.to_numeric(merged_df['Prijs'], errors='coerce').fillna(0).astype(int)
         merged_df = merged_df[merged_df['Prijs'] > 0].sort_values(by='Prijs', ascending=False).drop_duplicates(subset=['Renner'])
         
+        # 6. SCHOONMAAK & TOTALEN
         ALLE_KOERSEN = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'BDP', 'E3', 'GW', 'DDV', 'RVV', 'SP', 'PR', 'BP', 'AGR', 'WP', 'LBL']
         available_races = [k for k in ALLE_KOERSEN if k in merged_df.columns]
+        
         for col in available_races + ['COB', 'HLL', 'SPR', 'AVG', 'MTN', 'ITT']:
             if col not in merged_df.columns: merged_df[col] = 0
             merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0).astype(int)
+            
         merged_df['HLL/MTN'] = merged_df[['HLL', 'MTN']].max(axis=1)
         merged_df['Total_Races'] = merged_df[available_races].sum(axis=1)
+        
+        merged_df = merged_df[merged_df['Total_Races'] > 0]
+        
         merged_df['Team'] = merged_df.get('Team', pd.Series(['Onbekend']*len(merged_df))).fillna('Onbekend')
         koers_stat_map = {'OHN':'COB','KBK':'SPR','SB':'HLL','PN':'HLL/MTN','TA':'SPR','MSR':'AVG','BDP':'SPR','E3':'COB','GW':'SPR','DDV':'COB','RVV':'COB','SP':'SPR','PR':'COB','BP':'HLL','AGR':'HLL','WP':'HLL','LBL':'HLL'}
+        
         return merged_df, available_races, koers_stat_map
     except Exception as e:
         st.error(f"Fout in dataverwerking: {e}")
