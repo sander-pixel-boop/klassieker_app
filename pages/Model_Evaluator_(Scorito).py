@@ -77,6 +77,8 @@ HARDCODED_TEAMS = {
 MIJN_EIGEN_KOPMANNEN = {
     "OHN": {"C1": "Mathieu van der Poel", "C2": "Tom Pidcock", "C3": "Tim Wellens"},
     "KBK": {"C1": "Jonathan Milan", "C2": "Jasper Philipsen", "C3": "Jordi Meeus"},
+    "PN": {"C1": "Jonas Vingegaard", "C2": "Jasper Stuyven", "C3": "Laurence Pithie"},
+    "TA": {"C1": "Jasper Philipsen", "C2": "Jonathan Milan", "C3": "Paul Magnier"},
 }
 
 # --- HULPFUNCTIES VOOR NAAM-MATCHING ---
