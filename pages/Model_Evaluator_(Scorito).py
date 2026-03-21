@@ -118,9 +118,25 @@ def get_file_mod_time(filepath):
 
 @st.cache_data
 def load_data(stats_mod_time):
-    df_stats = pd.read_csv("renners_stats.csv", sep='\t')
+    try:
+        df_stats = pd.read_csv("renners_stats.csv", sep='\t')
+        if len(df_stats.columns) < 3:
+            df_stats = pd.read_csv("renners_stats.csv", sep=None, engine='python')
+    except:
+        df_stats = pd.read_csv("renners_stats.csv", sep=None, engine='python')
+
     if 'Naam' in df_stats.columns:
         df_stats = df_stats.rename(columns={'Naam': 'Renner'})
+        
+    for col in ['COB', 'HLL', 'SPR', 'MTN', 'ITT']:
+        if col not in df_stats.columns:
+            df_stats[col] = 0
+            
+    df_stats['HLL/MTN'] = df_stats[['HLL', 'MTN']].max(axis=1)
+    
+    if 'AVG' not in df_stats.columns:
+        df_stats['AVG'] = df_stats[['COB', 'HLL', 'SPR', 'MTN', 'ITT']].mean(axis=1).round(0)
+        
     alle_renners = sorted(df_stats['Renner'].dropna().unique())
     return df_stats, alle_renners
 
@@ -147,7 +163,6 @@ else:
     if 'Race' not in df_raw_uitslagen.columns or 'Rnk' not in df_raw_uitslagen.columns or 'Rider' not in df_raw_uitslagen.columns:
         st.error("Het bestand uitslagen.csv mist de vereiste kolommen: Race, Rnk, Rider.")
     else:
-        # Volledig woordenboek met extra afkortingen voor PN, TA en SB
         sporza_naar_scorito_map = {
             'OML': 'OHN', 
             'STR': 'SB', 'STD': 'SB', 'STRADE': 'SB',
@@ -164,7 +179,6 @@ else:
         for index, row in df_raw_uitslagen.iterrows():
             koers_origineel = str(row['Race']).strip().upper()
             
-            # Map de naam direct!
             koers = sporza_naar_scorito_map.get(koers_origineel, koers_origineel)
             
             rank_str = str(row['Rnk']).strip().upper()
@@ -209,7 +223,6 @@ else:
                         winnende_ploegen[pos] = ploeg[0] if len(ploeg) > 0 else "Onbekend"
 
                 for model_naam, model_data in HARDCODED_TEAMS.items():
-                    # 1. Bepaal de actieve selectie op dít koersmoment
                     actieve_selectie = list(model_data["Start"])
                     for t in model_data.get("Transfers", []):
                         moment_koers = t["moment"]
@@ -223,7 +236,6 @@ else:
                     
                     beschikbare_renners = [r for r in actieve_selectie if r in df_koers_uitslag['Renner'].values]
                     
-                    # 2. Kopmannen bepalen
                     c1, c2, c3 = None, None, None
                     if model_naam == "Sander's Team":
                         geplande_kopmannen = MIJN_EIGEN_KOPMANNEN.get(koers, {})
@@ -255,7 +267,6 @@ else:
                             c3 = r
                             reeds_kopman.append(r)
 
-                    # 3. Punten berekenen
                     koers_score = 0
                     for renner in actieve_selectie:
                         if renner not in beschikbare_renners:
