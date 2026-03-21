@@ -19,6 +19,25 @@ def hash_wachtwoord(wachtwoord):
 
 # --- AUTHENTICATIE ---
 if "ingelogde_speler" not in st.session_state:
+    
+    # --- ZIJBALK VOOR INLOGGEN ---
+    with st.sidebar:
+        st.title("🚴‍♂️ Wieler Spellen Solver")
+        st.markdown("Welkom bij de ultieme AI-tool voor al je wielermanagerspellen!")
+        st.divider()
+        st.markdown("### 🏆 Ondersteunde Spellen:")
+        st.markdown("- **Scorito** (Klassiekers & Grand Tours)")
+        st.markdown("- **Sporza** (Klassiekers & Grand Tours)")
+        st.markdown("- **Cycling Fantasy**")
+        st.divider()
+        st.markdown("### 🧠 Features:")
+        st.markdown("- Wiskundige AI Solvers")
+        st.markdown("- Verwachte Waarde (EV) Berekeningen")
+        st.markdown("- Dynamische Wisselstrategieën")
+        st.divider()
+        st.info("👉 Log in of ga door als gast om direct je ultieme selectie te berekenen.")
+
+    # --- HOOFDSCHERM INLOGGEN ---
     st.title("🔒 Welkom! Log in of maak een account")
     st.markdown("*Data en Statistieken van [Wielerorakel.nl](https://wielerorakel.nl/)*")
     tab1, tab2 = st.tabs(["Inloggen", "Account Aanmaken"])
