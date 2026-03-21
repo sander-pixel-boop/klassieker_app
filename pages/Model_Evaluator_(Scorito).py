@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
-from thefuzz import process
+from thefuzz import process, fuzz
+import unicodedata
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Model Evaluator", layout="wide", page_icon="📊")
@@ -18,8 +19,9 @@ Welkom bij de **Model Evaluator**. Dit dashboard test en vergelijkt live hoe ver
 4. Na elke race worden de individuele punten en teampunten berekend op basis van de renners die **op dat moment** in de actieve selectie zaten.
 """)
 
-ALLE_KOERSEN = ["OHN", "KBK", "SB", "PN", "TA", "MSR", "RVB", "E3", "IFF", "DDV", "RVV", "SP", "PR", "BP", "AGR", "WP", "LBL"]
-STAT_MAPPING = {"OHN": "COB", "KBK": "SPR", "SB": "HLL", "PN": "HLL/MTN", "TA": "SPR", "MSR": "AVG", "RVB": "SPR", "E3": "COB", "IFF": "SPR", "DDV": "COB", "RVV": "COB", "SP": "SPR", "PR": "COB", "BP": "HLL", "AGR": "HLL", "WP": "HLL", "LBL": "HLL"}
+# Aangepast naar officiële Scorito afkortingen (BDP ipv RVB, GW ipv IFF)
+ALLE_KOERSEN = ['OHN', 'KBK', 'SB', 'PN', 'TA', 'MSR', 'BDP', 'E3', 'GW', 'DDV', 'RVV', 'SP', 'PR', 'BP', 'AGR', 'WP', 'LBL']
+STAT_MAPPING = {'OHN':'COB','KBK':'SPR','SB':'HLL','PN':'HLL/MTN','TA':'SPR','MSR':'AVG','BDP':'SPR','E3':'COB','GW':'SPR','DDV':'COB','RVV':'COB','SP':'SPR','PR':'COB','BP':'HLL','AGR':'HLL','WP':'HLL','LBL':'HLL'}
 
 SCORITO_PUNTEN = {
     1: 100, 2: 90, 3: 80, 4: 70, 5: 64, 6: 60, 7: 56, 8: 52, 9: 48, 10: 44,
@@ -27,7 +29,7 @@ SCORITO_PUNTEN = {
 }
 TEAMPUNTEN = {1: 30, 2: 20, 3: 10}
 
-# --- HARDCODED TEAMS & TRANSFERS (Nieuwe Dynamische Structuur) ---
+# --- HARDCODED TEAMS & TRANSFERS ---
 HARDCODED_TEAMS = {
     "Rekenmodel 1": {
         "Start": ["Tadej Pogačar", "Mathieu van der Poel", "Jonathan Milan", "Tim Merlier", "Tim Wellens", "Dylan Groenewegen", "Stefan Küng", "Mattias Skjelmose", "Jasper Stuyven", "João Almeida", "Toms Skujiņš", "Mike Teunissen", "Isaac del Toro", "Jonas Vingegaard", "Jonas Abrahamsen", "Julian Alaphilippe", "Marc Hirschi", "Jasper Philipsen", "Mads Pedersen", "Florian Vermeersch"],
@@ -77,7 +79,40 @@ MIJN_EIGEN_KOPMANNEN = {
     "KBK": {"C1": "Jonathan Milan", "C2": "Jasper Philipsen", "C3": "Jordi Meeus"},
 }
 
-# --- HULPFUNCTIES ---
+# --- HULPFUNCTIES VOOR NAAM-MATCHING ---
+def normalize_name_logic(text):
+    if not isinstance(text, str):
+        return ""
+    text = text.lower().strip()
+    nfkd_form = unicodedata.normalize('NFKD', text)
+    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+
+def match_uitslag_naam(naam, alle_renners):
+    naam_norm = normalize_name_logic(naam)
+    bekende_gevallen = {
+        "philipsen": "jasper philipsen",
+        "pedersen": "mads pedersen",
+        "pidcock": "thomas pidcock",
+        "van aert": "wout van aert", 
+        "van der poel": "mathieu van der poel",
+        "pogacar": "tadej pogacar",
+        "de lie": "arnaud de lie"
+    }
+    
+    for key, correct in bekende_gevallen.items():
+        if key in naam_norm:
+            for target in alle_renners:
+                if correct in normalize_name_logic(target):
+                    return target
+                
+    bests = process.extractBests(naam_norm, alle_renners, scorer=fuzz.token_set_ratio, limit=5)
+    if bests and bests[0][1] >= 75:
+        top_score = bests[0][1]
+        candidates = [b[0] for b in bests if b[1] >= top_score - 3]
+        candidates.sort(key=lambda x: (abs(len(normalize_name_logic(x)) - len(naam_norm)), -fuzz.ratio(naam_norm, normalize_name_logic(x))))
+        return candidates[0]
+    return naam
+
 def get_file_mod_time(filepath):
     return os.path.getmtime(filepath) if os.path.exists(filepath) else 0
 
@@ -112,24 +147,31 @@ else:
     if 'Race' not in df_raw_uitslagen.columns or 'Rnk' not in df_raw_uitslagen.columns or 'Rider' not in df_raw_uitslagen.columns:
         st.error("Het bestand uitslagen.csv mist de vereiste kolommen: Race, Rnk, Rider.")
     else:
+        sporza_naar_scorito_map = {
+            'OML': 'OHN', 'STR': 'SB', 'RVB': 'BDP', 
+            'IFF': 'GW', 'BRP': 'BP', 'AGT': 'AGR', 'WAP': 'WP'
+        }
+        
         uitslag_parsed = []
         for index, row in df_raw_uitslagen.iterrows():
-            koers = str(row['Race']).strip()
-            rank_str = str(row['Rnk']).strip().upper()
+            koers_origineel = str(row['Race']).strip().upper()
             
+            # Pas hier direct de mapping toe zodat de eerste koersen wél matchen!
+            koers = sporza_naar_scorito_map.get(koers_origineel, koers_origineel)
+            
+            rank_str = str(row['Rnk']).strip().upper()
             if rank_str in ['DNS', 'NAN', '']:
                 continue 
                 
             rider_name = str(row['Rider']).strip()
-            beste_match, score = process.extractOne(rider_name, alle_renners)
+            gekoppelde_naam = match_uitslag_naam(rider_name, alle_renners)
             
-            if score > 70:
-                rank = int(rank_str) if rank_str.isdigit() else 999 
-                uitslag_parsed.append({
-                    "Koers": koers, 
-                    "Rank": rank, 
-                    "Renner": beste_match
-                })
+            rank = int(rank_str) if rank_str.isdigit() else 999 
+            uitslag_parsed.append({
+                "Koers": koers, 
+                "Rank": rank, 
+                "Renner": gekoppelde_naam
+            })
                         
         df_uitslagen = pd.DataFrame(uitslag_parsed)
         
@@ -148,211 +190,3 @@ else:
             for koers in verreden_koersen:
                 koers_stat = STAT_MAPPING.get(koers, "COB")
                 df_koers_uitslag = df_uitslagen[df_uitslagen['Koers'] == koers]
-                idx_current_race = ALLE_KOERSEN.index(koers)
-                
-                winnende_ploegen = {}
-                for pos in [1, 2, 3]:
-                    winnaar = df_koers_uitslag[df_koers_uitslag['Rank'] == pos]
-                    if not winnaar.empty:
-                        renner_naam = winnaar['Renner'].values[0]
-                        ploeg = df_stats.loc[df_stats['Renner'] == renner_naam, 'Team'].values
-                        winnende_ploegen[pos] = ploeg[0] if len(ploeg) > 0 else "Onbekend"
-
-                for model_naam, model_data in HARDCODED_TEAMS.items():
-                    # 1. Bepaal de actieve selectie op dít koersmoment
-                    actieve_selectie = list(model_data["Start"])
-                    for t in model_data.get("Transfers", []):
-                        moment_koers = t["moment"]
-                        if moment_koers in ALLE_KOERSEN:
-                            idx_moment = ALLE_KOERSEN.index(moment_koers)
-                            # Wissel is actief als huidige koers NA het wisselmoment valt
-                            if idx_current_race > idx_moment:
-                                if t["uit"] in actieve_selectie:
-                                    actieve_selectie.remove(t["uit"])
-                                if t["in"] not in actieve_selectie:
-                                    actieve_selectie.append(t["in"])
-                    
-                    beschikbare_renners = [r for r in actieve_selectie if r in df_koers_uitslag['Renner'].values]
-                    
-                    # 2. Kopmannen bepalen
-                    c1, c2, c3 = None, None, None
-                    if model_naam == "Sander's Team":
-                        geplande_kopmannen = MIJN_EIGEN_KOPMANNEN.get(koers, {})
-                        c1_intended = geplande_kopmannen.get("C1")
-                        c2_intended = geplande_kopmannen.get("C2")
-                        c3_intended = geplande_kopmannen.get("C3")
-                        
-                        if c1_intended in beschikbare_renners: c1 = c1_intended
-                        if c2_intended in beschikbare_renners: c2 = c2_intended
-                        if c3_intended in beschikbare_renners: c3 = c3_intended
-                            
-                    team_stats = df_stats[df_stats['Renner'].isin(beschikbare_renners)].copy()
-                    team_stats = team_stats.sort_values(by=koers_stat, ascending=False).reset_index(drop=True)
-                    
-                    reeds_kopman = [x for x in [c1, c2, c3] if x is not None]
-                    for r in team_stats['Renner'].tolist():
-                        if c1 is not None and c2 is not None and c3 is not None:
-                            break
-                        if r in reeds_kopman:
-                            continue
-                            
-                        if c1 is None:
-                            c1 = r
-                            reeds_kopman.append(r)
-                        elif c2 is None:
-                            c2 = r
-                            reeds_kopman.append(r)
-                        elif c3 is None:
-                            c3 = r
-                            reeds_kopman.append(r)
-
-                    # 3. Punten berekenen
-                    koers_score = 0
-                    for renner in actieve_selectie:
-                        if renner not in beschikbare_renners:
-                            continue
-                            
-                        punten = 0
-                        uitleg = []
-                        
-                        finish = df_koers_uitslag[df_koers_uitslag['Renner'] == renner]
-                        rank = finish['Rank'].values[0] if not finish.empty else None
-                        base_pts = SCORITO_PUNTEN.get(rank, 0) if rank else 0
-                        
-                        multiplier = 1
-                        kopman_label = "-"
-                        if renner == c1: 
-                            multiplier = 3
-                            kopman_label = "C1"
-                        elif renner == c2: 
-                            multiplier = 2.5
-                            kopman_label = "C2"
-                        elif renner == c3: 
-                            multiplier = 2
-                            kopman_label = "C3"
-                        
-                        if base_pts > 0:
-                            pt_ind = int(base_pts * multiplier)
-                            punten += pt_ind
-                            if multiplier > 1:
-                                uitleg.append(f"Top 20 ({base_pts} x {multiplier})")
-                            else:
-                                uitleg.append(f"Top 20 ({base_pts})")
-                        
-                        renner_ploeg = df_stats.loc[df_stats['Renner'] == renner, 'Team'].values
-                        renner_ploeg = renner_ploeg[0] if len(renner_ploeg) > 0 else ""
-                        
-                        if rank not in [1, 2, 3]: 
-                            for pos, punten_team in TEAMPUNTEN.items():
-                                if winnende_ploegen.get(pos) == renner_ploeg and renner_ploeg != "Onbekend":
-                                    punten += punten_team
-                                    uitleg.append(f"Team P{pos} ({punten_team})")
-                                    
-                        koers_score += punten
-                        
-                        if punten > 0:
-                            details_lijst.append({
-                                "Koers": koers,
-                                "Model": model_naam,
-                                "Renner": renner,
-                                "Kopman": kopman_label,
-                                "Uitslag": f"P{rank}" if rank <= 20 else ("DNF (wel teampunten)" if rank == 999 else f"P{rank}"),
-                                "Punten": punten,
-                                "Opbouw": " + ".join(uitleg)
-                            })
-                        
-                    resultaten_lijst.append({
-                        "Model": model_naam,
-                        "Koers": koers,
-                        "Punten": koers_score,
-                        "C1 (3x)": c1,
-                        "C2 (2.5x)": c2,
-                        "C3 (2x)": c3
-                    })
-
-            # Data prep voor grafiek en tabel
-            df_res = pd.DataFrame(resultaten_lijst)
-            df_res['Koers_Index'] = df_res['Koers'].apply(lambda x: verreden_koersen.index(x))
-            df_res = df_res.sort_values(by=['Model', 'Koers_Index'])
-            df_res['Cumulatieve Punten'] = df_res.groupby('Model')['Punten'].cumsum()
-
-            # Grafiek
-            fig = px.line(
-                df_res, 
-                x="Koers", 
-                y="Cumulatieve Punten", 
-                color="Model", 
-                markers=True,
-                title="Verloop Cumulatieve Scorito Punten"
-            )
-            fig.update_layout(xaxis=dict(categoryorder='array', categoryarray=verreden_koersen))
-            st.plotly_chart(fig, use_container_width=True)
-
-            # Gecombineerde Standen Tabel
-            st.subheader("🏆 Klassement & Punten per Koers")
-            df_pivot = df_res.pivot(index='Model', columns='Koers', values='Punten')
-            
-            for k in ALLE_KOERSEN:
-                if k not in df_pivot.columns:
-                    df_pivot[k] = pd.NA
-                    
-            totaal_punten = df_res.groupby('Model')['Cumulatieve Punten'].max()
-            df_combined = df_pivot.copy()
-            df_combined.insert(0, 'Totaal', totaal_punten)
-            df_combined = df_combined.reset_index().sort_values(by='Totaal', ascending=False)
-            
-            cols = ['Model', 'Totaal'] + ALLE_KOERSEN
-            df_combined = df_combined[cols]
-            
-            st.dataframe(df_combined, hide_index=True, use_container_width=True)
-            
-            st.divider()
-            
-            # Detail Analyse Sectie
-            st.subheader("🔍 Inzoomen per Koers")
-            geselecteerde_koers = st.selectbox("Selecteer een koers om kopmannen en puntenopbouw in te zien:", verreden_koersen)
-            
-            if geselecteerde_koers:
-                st.markdown(f"**🎯 Kopmannen ({geselecteerde_koers})**")
-                df_kop_koers = df_res[df_res['Koers'] == geselecteerde_koers][['Model', 'C1 (3x)', 'C2 (2.5x)', 'C3 (2x)']]
-                st.dataframe(df_kop_koers, hide_index=True, use_container_width=True)
-                
-                st.markdown(f"**📝 Puntenopbouw per Selectie ({geselecteerde_koers})**")
-                if details_lijst:
-                    df_details = pd.DataFrame(details_lijst)
-                    df_det_koers = df_details[df_details['Koers'] == geselecteerde_koers]
-                    
-                    model_namen = df_kop_koers['Model'].tolist()
-                    tabs = st.tabs(model_namen)
-                    
-                    for i, m_naam in enumerate(model_namen):
-                        with tabs[i]:
-                            df_m = df_det_koers[df_det_koers['Model'] == m_naam]
-                            if not df_m.empty:
-                                df_m = df_m[['Renner', 'Kopman', 'Uitslag', 'Punten', 'Opbouw']].sort_values(by='Punten', ascending=False)
-                                st.dataframe(df_m, hide_index=True, use_container_width=True)
-                                st.markdown(f"*Totaal score in {geselecteerde_koers}: **{df_m['Punten'].sum()}***")
-                            else:
-                                st.info("Geen punten gescoord in deze koers.")
-
-# --- VOLLEDIGE SELECTIES WEERGAVE ---
-st.divider()
-st.subheader("📋 Selecties & Transfers per Model")
-
-cols_display = st.columns(2)
-for i, (m_name, m_data) in enumerate(HARDCODED_TEAMS.items()):
-    col = cols_display[i % 2]
-    with col:
-        with st.expander(f"Team: {m_name}"):
-            c1, c2 = st.columns([1, 1])
-            with c1:
-                st.markdown("**Start-Team (20)**")
-                for r in m_data["Start"]:
-                    st.write(f"- {r}")
-            with c2:
-                st.markdown("**Transfers**")
-                if m_data.get("Transfers"):
-                    for t in m_data["Transfers"]:
-                        st.write(f"Wissel na **{t['moment']}**:\n❌ {t['uit']}\n📥 {t['in']}")
-                else:
-                    st.write("Geen wissels gepland.")
