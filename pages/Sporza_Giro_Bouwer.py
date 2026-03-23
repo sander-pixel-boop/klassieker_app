@@ -256,7 +256,6 @@ with tab1:
             
             st.info(f"💡 **AI Top 5 Suggesties:** {', '.join(top_5_namen)}")
             
-            # Dropdown opties bepalen obv de gekozen sortering
             if "Alfabetisch" in sorteer_optie:
                 renners_opties_stage = ["-"] + sorted(df['Naam'].tolist())
             else:
@@ -269,7 +268,7 @@ with tab1:
                 if st.button("🤖 Neem AI Top 3 over", key=f"btn_ai_{eid}"):
                     for idx, naam in enumerate(top_3_pure_names):
                         st.session_state.etappe_keuzes[eid][idx] = naam
-                        st.session_state[f"sel_{eid}_{idx}"] = naam # UI updaten
+                        st.session_state[f"sel_{eid}_{idx}"] = naam
                     st.rerun()
 
             c1, c2, c3 = st.columns(3)
@@ -330,6 +329,26 @@ with tab2:
     c1.metric("Aantal Renners", f"{aantal_renners} / 16")
     c2.metric("Budget Besteed", f"€ {totaal_prijs:.2f}M")
     c3.metric("Budget Over", f"€ {100 - totaal_prijs:.2f}M")
+    
+    st.divider()
+    st.subheader("3. Jouw Definitieve Selectie (16 Renners)")
+    if not huidig_team_df.empty:
+        col_grafiek, col_tabel = st.columns([1, 2])
+        with col_grafiek:
+            st.write("**Gemiddelde Team Stats:**")
+            plot_cols = [c for c in ['GC', 'SPR', 'ITT', 'MTN'] if c in huidig_team_df.columns]
+            if plot_cols:
+                st.bar_chart(huidig_team_df[plot_cols].mean())
+
+        with col_tabel:
+            st.write("**Geselecteerde Renners:**")
+            st.dataframe(
+                huidig_team_df[['Naam', 'Ploeg', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV']].sort_values(by='Prijs', ascending=False),
+                hide_index=True,
+                use_container_width=True
+            )
+    else:
+        st.info("Selecteer hierboven je team om het overzicht te zien.")
 
 # TAB 3: OPSTELLINGEN
 with tab3:
