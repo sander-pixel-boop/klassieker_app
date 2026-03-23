@@ -269,6 +269,7 @@ with tab1:
                 if st.button("🤖 Neem AI Top 3 over", key=f"btn_ai_{eid}"):
                     for idx, naam in enumerate(top_3_pure_names):
                         st.session_state.etappe_keuzes[eid][idx] = naam
+                        st.session_state[f"sel_{eid}_{idx}"] = naam # UI updaten
                     st.rerun()
 
             c1, c2, c3 = st.columns(3)
