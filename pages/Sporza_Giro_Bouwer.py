@@ -206,12 +206,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["🗺️ Etappe Voorspellingen", "🛡�
 with tab1:
     st.info("Kies onbeperkt per etappe de renners waarvan jij denkt dat ze gaan scoren. In Tab 2 stellen we op basis hiervan het definitieve team samen.")
     
-    sorteer_optie = st.radio("Sorteer dropdown-lijsten op:", ["🔤 Alfabetisch", "📊 Verwachte Waarde (Algemene EV)"], horizontal=True)
-    
-    if "Alfabetisch" in sorteer_optie:
-        renners_opties = ["-"] + sorted(df['Naam'].tolist())
-    else:
-        renners_opties = ["-"] + df.sort_values(by='EV', ascending=False)['Naam'].tolist()
+    sorteer_optie = st.radio("Sorteer dropdown-lijsten op:", ["🔤 Alfabetisch", "📊 Verwachte Waarde (Per Etappe)"], horizontal=True)
 
     for etappe in GIRO_ETAPPES:
         eid = str(etappe["id"])
@@ -261,6 +256,12 @@ with tab1:
             
             st.info(f"💡 **AI Top 5 Suggesties:** {', '.join(top_5_namen)}")
             
+            # Dropdown opties bepalen obv de gekozen sortering
+            if "Alfabetisch" in sorteer_optie:
+                renners_opties_stage = ["-"] + sorted(df['Naam'].tolist())
+            else:
+                renners_opties_stage = ["-"] + df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()
+            
             c_pred_head, c_pred_btn = st.columns([3, 1])
             with c_pred_head:
                 st.markdown("###### Jouw Voorspelling:")
@@ -273,9 +274,9 @@ with tab1:
             c1, c2, c3 = st.columns(3)
             for i, col in enumerate([c1, c2, c3]):
                 current_val = st.session_state.etappe_keuzes[eid][i]
-                d_idx = renners_opties.index(current_val) if current_val in renners_opties else 0
+                d_idx = renners_opties_stage.index(current_val) if current_val in renners_opties_stage else 0
                 
-                keuze = col.selectbox(f"Positie {i+1}", renners_opties, index=d_idx, key=f"sel_{eid}_{i}")
+                keuze = col.selectbox(f"Positie {i+1}", renners_opties_stage, index=d_idx, key=f"sel_{eid}_{i}")
                 st.session_state.etappe_keuzes[eid][i] = keuze if keuze != "-" else None
 
 # TAB 2: FINAAL TEAM SAMENSTELLEN
