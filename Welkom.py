@@ -78,3 +78,63 @@ def login_page():
                             st.error("❌ Deze gebruikersnaam is al in gebruik. Kies een andere.")
                         else:
                             try:
+                                supabase.table(TABEL_NAAM).insert({
+                                    "username": nieuw_naam.lower(),
+                                    "password": hash_wachtwoord(nieuw_ww)
+                                }).execute()
+                                st.success("✅ Account succesvol aangemaakt! Je kunt nu inloggen.")
+                            except Exception as e:
+                                st.error(f"Fout bij aanmaken account: {e}")
+                    else:
+                        st.warning("Vul beide velden in.")
+        
+        st.write("")
+        if st.button("🚪 Doorgaan als gast (zonder cloud-opslag)", use_container_width=True):
+            st.session_state["ingelogde_speler"] = "gast"
+            st.rerun()
+
+
+# --- HOME PAGINA (INGELOGD) ---
+def home_page():
+    speler = st.session_state.get("ingelogde_speler", "bezoeker").capitalize()
+    st.write(f"# Welkom bij het Dashboard, {speler}! 🚴‍♂️")
+    st.markdown("*Kies een spel in het menu aan de linkerkant om je selectie te bouwen.*")
+    st.divider()
+    
+    if st.button("Uitloggen", type="secondary"):
+        del st.session_state["ingelogde_speler"]
+        st.rerun()
+
+
+# --- NAVIGATIE INSTELLEN ---
+login = st.Page(login_page, title="Inloggen", icon="🔒")
+home = st.Page(home_page, title="Home", icon="🏠", default=True)
+cf_pagina = st.Page("pages/Cycling_Fantasy.py", title="CF Dashboard", icon="🚴")
+
+# Scorito pagina's
+scorito_klassiekers = st.Page("pages/Klassiekers - Scorito.py", title="Klassiekers", icon="🏆")
+scorito_evaluator = st.Page("pages/Model_Evaluator_(Scorito).py", title="Evaluator", icon="📊")
+scorito_giro = st.Page("pages/Scorito_Grand_Tour.py", title="[Binnenkort] Giro d'Italia", icon="🇮🇹")
+
+# Sporza pagina's
+sporza_klassiekers = st.Page("pages/Klassiekers - Sporza.py", title="Klassiekers", icon="🏁")
+sporza_evaluator = st.Page("pages/Sporza_Evaluator.py", title="Evaluator", icon="📊")
+
+# Sporza Grand Tour opties
+sporza_giro_ai = st.Page("pages/Sporza_Giro.py", title="[Beta] Giro: AI Solver", icon="🤖")
+sporza_giro_bouwer = st.Page("pages/Sporza_Giro_Bouwer.py", title="[Beta] Giro: Team Bouwer", icon="🛠️")
+
+# --- KEUZE: WEL OF NIET INGELOGD ---
+if "ingelogde_speler" not in st.session_state:
+    pg = st.navigation([login])
+else:
+    pg = st.navigation({
+        "Info": [home],
+        "Cycling Fantasy": [cf_pagina],
+        "Scorito - Klassiekers": [scorito_klassiekers, scorito_evaluator],
+        "Scorito - Grand Tours": [scorito_giro],
+        "Sporza - Klassiekers": [sporza_klassiekers, sporza_evaluator],
+        "Sporza - Grand Tours": [sporza_giro_ai, sporza_giro_bouwer]
+    })
+
+pg.run()
