@@ -200,7 +200,7 @@ if df.empty:
     st.stop()
 
 # --- TABS AANMAKEN ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["🗺️ Etappe Voorspellingen", "🛡️ Finaal Team Samenstellen", "🚀 Opstellingen", "📋 Startlijst", "ℹ️ Uitleg"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["🗺️ Etappe Voorspellingen", "🛡️ Finaal Team Samenstellen", "🚀 Opstellingen Matrix", "📋 Startlijst", "ℹ️ Uitleg"])
 
 # TAB 1: ETAPPE VOORSPELLINGEN
 with tab1:
@@ -350,19 +350,25 @@ with tab2:
     else:
         st.info("Selecteer hierboven je team om het overzicht te zien.")
 
-# TAB 3: OPSTELLINGEN
+# TAB 3: OPSTELLINGEN MATRIX
 with tab3:
-    st.subheader("🚀 Optimale Opstelling per Etappe")
     if not st.session_state.finaal_team:
-        st.warning("Stel eerst je definitieve team van 16 samen in Tab 2.")
+        st.warning("Stel eerst je definitieve team van 16 samen in Tab 2 om je dagelijkse opstellingen te zien.")
     else:
-        st.write("Hier zie je per etappe de ideale basisopstelling en Kopman gehaald uit je definitieve team. Jouw eigen voorspellingen krijgen altijd voorrang.")
+        st.subheader("📅 Matrix: Wie start wanneer?")
+        st.write("Overzicht van jouw opstellingen per etappe. **©** = Kopman | **✅** = Basis | **-** = Bank")
+        
+        # Matrix opbouwen
+        matrix_data = {renner: {"Renner": renner} for renner in st.session_state.finaal_team}
         for etappe in GIRO_ETAPPES:
             eid = str(etappe["id"])
+            col_name = f"E{etappe['id']}"
             cw = st.session_state.giro_weights_v2[eid]
             
+            for renner in st.session_state.finaal_team:
+                matrix_data[renner][col_name] = "-"
+                
             voorspelde_namen = [naam for naam in st.session_state.etappe_keuzes[eid] if naam and naam in st.session_state.finaal_team]
-            
             som_input = sum(cw.values())
             w = {"SPR": cw['SPR']/som_input, "GC": cw['GC']/som_input, "ITT": cw['ITT']/som_input, "MTN": cw['MTN']/som_input} if som_input > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
             
@@ -375,7 +381,35 @@ with tab3:
                 voorspeld_df = pd.DataFrame()
                 
             rest_df = team_stage_df[~team_stage_df['Naam'].isin(voorspelde_namen)].sort_values(by=['StageScore', 'EV'], ascending=[False, False])
+            top_9_df = pd.concat([voorspeld_df, rest_df]).head(9)
             
+            for i, (_, row) in enumerate(top_9_df.iterrows()):
+                renner_naam = row['Naam']
+                matrix_data[renner_naam][col_name] = "©" if i == 0 else "✅"
+
+        matrix_df = pd.DataFrame(list(matrix_data.values()))
+        st.dataframe(matrix_df, hide_index=True, use_container_width=True)
+        
+        st.divider()
+        st.subheader("🔍 Details per Etappe")
+        
+        for etappe in GIRO_ETAPPES:
+            eid = str(etappe["id"])
+            cw = st.session_state.giro_weights_v2[eid]
+            
+            voorspelde_namen = [naam for naam in st.session_state.etappe_keuzes[eid] if naam and naam in st.session_state.finaal_team]
+            som_input = sum(cw.values())
+            w = {"SPR": cw['SPR']/som_input, "GC": cw['GC']/som_input, "ITT": cw['ITT']/som_input, "MTN": cw['MTN']/som_input} if som_input > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+            
+            team_stage_df = huidig_team_df.copy()
+            team_stage_df['StageScore'] = (team_stage_df['SPR'] * w['SPR'] + team_stage_df['GC'] * w['GC'] + team_stage_df['ITT'] * w['ITT'] + team_stage_df['MTN'] * w['MTN'])
+            
+            if voorspelde_namen:
+                voorspeld_df = team_stage_df.set_index('Naam').loc[voorspelde_namen].reset_index()
+            else:
+                voorspeld_df = pd.DataFrame()
+                
+            rest_df = team_stage_df[~team_stage_df['Naam'].isin(voorspelde_namen)].sort_values(by=['StageScore', 'EV'], ascending=[False, False])
             top_9_df = pd.concat([voorspeld_df, rest_df]).head(9)
             
             with st.expander(f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']})"):
