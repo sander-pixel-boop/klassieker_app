@@ -8,7 +8,6 @@ import base64
 from thefuzz import process, fuzz
 from supabase import create_client
 from datetime import datetime
-from claude_predictions import genereer_claude_etappe_voorspellingen
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Sporza Giro AI", layout="wide", page_icon="🇮🇹")
@@ -120,6 +119,40 @@ def get_clickable_image_html(image_path, fallback_text, link):
     else:
         img_src = f"https://placehold.co/600x400/eeeeee/000000?text={fallback_text}"
     return f'<a href="{link}" target="_blank"><img src="{img_src}" width="100%" style="border-radius:8px;"></a>'
+
+# --- AI ETAPPE VOORSPELLER (math-based, geen API nodig) ---
+def genereer_ai_etappe_voorspellingen(df, etappes, top_x, custom_weights):
+    ai_voorspellingen = {}
+    for etappe in etappes:
+        df_temp = df.copy()
+        w = custom_weights[str(etappe["id"])]
+
+        som = sum(w.values())
+        if som == 0:
+            w_norm = {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+        else:
+            w_norm = {k: v / som for k, v in w.items()}
+
+        df_temp['stage_score'] = (
+            (df_temp['SPR'] * w_norm['SPR']) +
+            (df_temp['GC']  * w_norm['GC'])  +
+            (df_temp['ITT'] * w_norm['ITT']) +
+            (df_temp['MTN'] * w_norm['MTN'])
+        )
+
+        top_renners = (
+            df_temp
+            .sort_values(by=['stage_score', 'Giro_EV'], ascending=[False, False])
+            ['Renner']
+            .head(top_x)
+            .tolist()
+        )
+
+        while len(top_renners) < 10:
+            top_renners.append(None)
+
+        ai_voorspellingen[str(etappe["id"])] = top_renners
+    return ai_voorspellingen
 
 # --- DATA LADEN ---
 @st.cache_data
@@ -241,10 +274,9 @@ df_raw = load_giro_data()
 if df_raw.empty: st.stop()
 
 # --- SESSIESTATES ---
-if "giro_selected_riders"    not in st.session_state: st.session_state.giro_selected_riders    = []
-if "giro_stage_predictions"  not in st.session_state: st.session_state.giro_stage_predictions  = {str(s["id"]): [None]*10 for s in GIRO_ETAPPES}
-if "giro_weights"            not in st.session_state: st.session_state.giro_weights            = {str(e["id"]): e["w"].copy() for e in GIRO_ETAPPES}
-if "giro_reasoning"          not in st.session_state: st.session_state.giro_reasoning          = {}
+if "giro_selected_riders"   not in st.session_state: st.session_state.giro_selected_riders   = []
+if "giro_stage_predictions" not in st.session_state: st.session_state.giro_stage_predictions = {str(s["id"]): [None]*10 for s in GIRO_ETAPPES}
+if "giro_weights"           not in st.session_state: st.session_state.giro_weights           = {str(e["id"]): e["w"].copy() for e in GIRO_ETAPPES}
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -258,7 +290,6 @@ with st.sidebar:
                     "selected_riders": st.session_state.giro_selected_riders,
                     "predictions":     st.session_state.giro_stage_predictions,
                     "weights":         st.session_state.giro_weights,
-                    "reasoning":       st.session_state.giro_reasoning,
                     "ts":              datetime.now().strftime("%Y-%m-%d %H:%M"),
                 }
                 supabase.table(TABEL_NAAM).update({DB_KOLOM: data}).eq("username", speler_naam).execute()
@@ -271,7 +302,6 @@ with st.sidebar:
                     st.session_state.giro_selected_riders   = db_data.get("selected_riders", [])
                     st.session_state.giro_stage_predictions = db_data.get("predictions", {str(s["id"]): [None]*10 for s in GIRO_ETAPPES})
                     st.session_state.giro_weights           = db_data.get("weights",      {str(e["id"]): e["w"].copy() for e in GIRO_ETAPPES})
-                    st.session_state.giro_reasoning         = db_data.get("reasoning",    {})
                     st.rerun()
 
     st.divider()
@@ -346,19 +376,13 @@ with tab2:
     c1, c2 = st.columns([1, 4])
 
     if c1.button("🤖 Vul in met AI"):
-        preds, reasoning = genereer_claude_etappe_voorspellingen(
-            df,
-            GIRO_ETAPPES,
-            top_x_voorspellingen,
-            st.session_state.giro_weights,
+        st.session_state.giro_stage_predictions = genereer_ai_etappe_voorspellingen(
+            df, GIRO_ETAPPES, top_x_voorspellingen, st.session_state.giro_weights
         )
-        st.session_state.giro_stage_predictions = preds
-        st.session_state.giro_reasoning         = reasoning
         st.rerun()
 
     if c2.button("🗑️ Wis alles"):
         st.session_state.giro_stage_predictions = {str(s["id"]): [None]*10 for s in GIRO_ETAPPES}
-        st.session_state.giro_reasoning         = {}
         st.rerun()
 
     renners_opties = ["-"] + sorted(df['Renner'].tolist())
@@ -367,9 +391,8 @@ with tab2:
         stage_id = str(etappe["id"])
         cw = st.session_state.giro_weights[stage_id]
 
-        # Header weight display (normalised)
-        som_header  = sum(cw.values()) if sum(cw.values()) > 0 else 1.0
-        weight_str  = (
+        som_header = sum(cw.values()) if sum(cw.values()) > 0 else 1.0
+        weight_str = (
             f"SPR:{int((cw['SPR']/som_header)*100)}% "
             f"GC:{int((cw['GC']/som_header)*100)}% "
             f"ITT:{int((cw['ITT']/som_header)*100)}% "
@@ -389,17 +412,15 @@ with tab2:
 
             st.divider()
 
-            # Weight sliders
             st.markdown("###### ⚙️ Pas de weging aan voor andere suggesties:")
             wc1, wc2, wc3, wc4 = st.columns(4)
-            new_spr = wc1.number_input("Sprint (SPR)",          0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{stage_id}")
-            new_gc  = wc2.number_input("Klassement (GC)",       0.0, 1.0, float(cw["GC"]),  0.1, key=f"wgc_{stage_id}")
-            new_itt = wc3.number_input("Tijdrit (ITT)",         0.0, 1.0, float(cw["ITT"]), 0.1, key=f"witt_{stage_id}")
-            new_mtn = wc4.number_input("Klim/Aanval (MTN)",     0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{stage_id}")
+            new_spr = wc1.number_input("Sprint (SPR)",      0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{stage_id}")
+            new_gc  = wc2.number_input("Klassement (GC)",   0.0, 1.0, float(cw["GC"]),  0.1, key=f"wgc_{stage_id}")
+            new_itt = wc3.number_input("Tijdrit (ITT)",     0.0, 1.0, float(cw["ITT"]), 0.1, key=f"witt_{stage_id}")
+            new_mtn = wc4.number_input("Klim/Aanval (MTN)", 0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{stage_id}")
 
             st.session_state.giro_weights[stage_id] = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
 
-            # Normalisation warning
             som_input = new_spr + new_gc + new_itt + new_mtn
             if abs(som_input - 1.0) > 0.01 and som_input > 0:
                 st.warning(
@@ -415,7 +436,6 @@ with tab2:
             else:
                 active_weights = st.session_state.giro_weights[stage_id]
 
-            # Static AI top-5 suggestion
             df_stage = df.copy()
             df_stage['StageScore'] = (
                 df_stage['SPR'] * active_weights['SPR'] +
@@ -427,25 +447,8 @@ with tab2:
             top_5_namen = [f"{row['Renner']} ({int(row['StageScore'])})" for _, row in top_5.iterrows()]
             st.info(f"💡 **AI Top 5 Suggesties:** {', '.join(top_5_namen)}")
 
-            # ── Claude reasoning block ──────────────────────────────────────
-            stage_reasoning = st.session_state.giro_reasoning.get(stage_id, "")
-            if stage_reasoning:
-                st.markdown(
-                    f"<div style='"
-                    f"border-left:3px solid #1D9E75;"
-                    f"padding:10px 14px;"
-                    f"border-radius:0 4px 4px 0;"
-                    f"margin:8px 0 12px 0;"
-                    f"font-size:14px;"
-                    f"'>"
-                    f"🧠 <strong>Claude:</strong> {stage_reasoning}"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
-
             st.divider()
 
-            # Manual prediction pickers
             st.markdown("###### Jouw Voorspelling:")
             for i in range(0, top_x_voorspellingen, 5):
                 cols = st.columns(min(5, top_x_voorspellingen - i))
@@ -482,13 +485,6 @@ with tab4:
     * De solver gebruikt de namen die jij in Tab 2 (Etappe Voorspellingen) hebt ingevuld om bonuspunten toe te kennen.
     * Renners die je vaker voorspelt worden als "waardevoller" beschouwd. De rest van het budget wordt door de AI optimaal opgevuld.
 
-    ### 🤖 Hoe werkt de Claude AI-voorspelling?
-    De knop **"Vul in met AI"** stuurt alle 21 etappes én de volledige startlijst in één keer naar Claude (Anthropic).
-    Claude analyseert voor elke etappe het profiel, de wegingen en de rennerscores, en kiest de meest geschikte renners.
-    Per etappe krijg je ook een korte **🧠 Claude-toelichting** te zien die uitlegt waarom bepaalde renners de voorkeur krijgen.
-
-    > *Vereist: `ANTHROPIC_API_KEY` in `.streamlit/secrets.toml`*
-
     ### ⚙️ Wat doen de wegingen per etappe?
     Elke etappe is vooraf ingesteld met een weging die idealiter `1.0` (100%) vormt.
     * **SPR (Sprint):** Bepaalt of typische sprinters hier makkelijk punten scoren.
@@ -499,6 +495,6 @@ with tab4:
     *Voorbeeld: Een weging van `SPR: 0.8` en `MTN: 0.2` betekent dat de AI er vanuit gaat dat sprinters 80% kans hebben om het hier uit te vechten, maar dat ontsnappingen (20%) niet ondenkbaar zijn wegens een vroege heuvel.*
 
     ### 💾 Data opslaan en delen
-    Je profiel slaat je team, voorspellingen, wegingen en Claude-toelichtingen op in een cloud-database.
+    Je profiel slaat je team, voorspellingen en wegingen op in een cloud-database.
     Via de knoppen links onderin kun je je selectie bovendien downloaden als CSV (voor Excel) of als JSON-bestand.
     """)
