@@ -80,7 +80,7 @@ MIJN_EIGEN_KOPMANNEN = {
     "STR": {"C1": "Tadej Pogacar", "C2": "Tom Pidcock", "C3": "Romain Gregoire"},
     "PN": {"C1": "Jonas Vingegaard", "C2": "Jasper Stuyven", "C3": "Laurence Pithie"},
     "TA": {"C1": "Jasper Philipsen", "C2": "Jonathan Milan", "C3": "Paul Magnier"},
-    "MSR": {"C1": "Mathieu van der Poel", "C2": "Tadej Pogacar", "C3": "Tom Pidcock"},
+    "MSR": {"C1": "Tadej Pogacar", "C2": "Mathieu van der Poel", "C3": "Tom Pidcock"},
 }
 
 # --- HULPFUNCTIES VOOR NAAM-MATCHING ---
