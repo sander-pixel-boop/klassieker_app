@@ -7,3 +7,4 @@ pypdf
 openpyxl
 streamlit-authenticator
 supabase
+anthropic>=0.25.0
