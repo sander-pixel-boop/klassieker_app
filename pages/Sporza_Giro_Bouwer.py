@@ -278,13 +278,12 @@ with tab1:
             f"MTN:{int((cw['MTN']/som_header)*100)}%"
         )
 
-        # Badge met huidige picks
         huidige = [x for x in st.session_state.etappe_keuzes[eid] if x]
-        picks_str = f" → {', '.join(huidige)}" if huidige else " → nog geen keuze"
+        picks_str = f"✅ Jouw keuze: {', '.join(huidige)}" if huidige else "⏳ Nog geen keuze"
 
-        with st.expander(
-            f"**E{etappe['id']}** {emoji} {etappe['route']} ({etappe['date']}) {picks_str}"
-        ):
+        with st.expander(f"**E{etappe['id']}** {emoji} {etappe['route']} ({etappe['date']})"):
+            st.caption(picks_str)
+            
             # Afbeeldingen
             giro_link = "https://www.giroditalia.it/en/the-route/"
             map_path  = f"giro262/giro26-{etappe['id']}-map.jpg"
