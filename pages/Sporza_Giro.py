@@ -8,9 +8,10 @@ import base64
 from thefuzz import process, fuzz
 from supabase import create_client
 from datetime import datetime
+from claude_predictions import genereer_claude_etappe_voorspellingen
 
 # --- CONFIGURATIE ---
-st.set_page_config(page_title="Sporza Giro AI", layout="wide", page_icon="🇮🇹")
+st.set_page_config(page_title="Sporza Giro AI Solver", layout="wide", page_icon="🤖")
 
 if "ingelogde_speler" not in st.session_state:
     st.warning("⚠️ Je bent niet ingelogd. Ga terug naar de Home pagina om in te loggen.")
@@ -28,7 +29,7 @@ supabase = init_connection()
 TABEL_NAAM = "gebruikers_data_test"
 DB_KOLOM = "sporza_giro_team26"
 
-# --- ETAPPE DATA (Standaard wegingen obv profielzwaarte) ---
+# --- ETAPPE DATA ---
 GIRO_ETAPPES = [
     {"id": 1,  "date": "08/05", "route": "Nessebar - Burgas",                        "km": 156,   "type": "Vlak ➖",        "w": {"SPR": 1.0, "GC": 0.0, "ITT": 0.0, "MTN": 0.0}},
     {"id": 2,  "date": "09/05", "route": "Burgas - Valiko Tarnovo",                  "km": 220,   "type": "Heuvel ↗️",      "w": {"SPR": 0.3, "GC": 0.3, "ITT": 0.0, "MTN": 0.4}},
@@ -119,40 +120,6 @@ def get_clickable_image_html(image_path, fallback_text, link):
     else:
         img_src = f"https://placehold.co/600x400/eeeeee/000000?text={fallback_text}"
     return f'<a href="{link}" target="_blank"><img src="{img_src}" width="100%" style="border-radius:8px;"></a>'
-
-# --- AI ETAPPE VOORSPELLER (math-based, geen API nodig) ---
-def genereer_ai_etappe_voorspellingen(df, etappes, top_x, custom_weights):
-    ai_voorspellingen = {}
-    for etappe in etappes:
-        df_temp = df.copy()
-        w = custom_weights[str(etappe["id"])]
-
-        som = sum(w.values())
-        if som == 0:
-            w_norm = {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
-        else:
-            w_norm = {k: v / som for k, v in w.items()}
-
-        df_temp['stage_score'] = (
-            (df_temp['SPR'] * w_norm['SPR']) +
-            (df_temp['GC']  * w_norm['GC'])  +
-            (df_temp['ITT'] * w_norm['ITT']) +
-            (df_temp['MTN'] * w_norm['MTN'])
-        )
-
-        top_renners = (
-            df_temp
-            .sort_values(by=['stage_score', 'Giro_EV'], ascending=[False, False])
-            ['Renner']
-            .head(top_x)
-            .tolist()
-        )
-
-        while len(top_renners) < 10:
-            top_renners.append(None)
-
-        ai_voorspellingen[str(etappe["id"])] = top_renners
-    return ai_voorspellingen
 
 # --- DATA LADEN ---
 @st.cache_data
@@ -267,16 +234,20 @@ def solve_giro_team(df, max_bud, max_ren, max_per_team, force_base, ban_base, ev
     return []
 
 # --- HOOFDCODE ---
-st.title("🇮🇹 Grote Ronde: Sporza Giromanager")
-st.markdown("*Data en Statistieken van [Wielerorakel](https://wielerorakel.nl/)*")
+st.title("🤖 Sporza Giro — AI Solver")
+st.markdown(
+    "De AI analyseert alle 21 etappes op basis van parcoursprofiel en rennerdata, en bouwt automatisch "
+    "het optimale team. *Data van [Wielerorakel](https://wielerorakel.nl/)*"
+)
 
 df_raw = load_giro_data()
 if df_raw.empty: st.stop()
 
 # --- SESSIESTATES ---
-if "giro_selected_riders"   not in st.session_state: st.session_state.giro_selected_riders   = []
-if "giro_stage_predictions" not in st.session_state: st.session_state.giro_stage_predictions = {str(s["id"]): [None]*10 for s in GIRO_ETAPPES}
-if "giro_weights"           not in st.session_state: st.session_state.giro_weights           = {str(e["id"]): e["w"].copy() for e in GIRO_ETAPPES}
+if "giro_selected_riders"    not in st.session_state: st.session_state.giro_selected_riders    = []
+if "giro_stage_predictions"  not in st.session_state: st.session_state.giro_stage_predictions  = {str(s["id"]): [None]*10 for s in GIRO_ETAPPES}
+if "giro_weights"            not in st.session_state: st.session_state.giro_weights            = {str(e["id"]): e["w"].copy() for e in GIRO_ETAPPES}
+if "giro_reasoning"          not in st.session_state: st.session_state.giro_reasoning          = {}
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -290,6 +261,7 @@ with st.sidebar:
                     "selected_riders": st.session_state.giro_selected_riders,
                     "predictions":     st.session_state.giro_stage_predictions,
                     "weights":         st.session_state.giro_weights,
+                    "reasoning":       st.session_state.giro_reasoning,
                     "ts":              datetime.now().strftime("%Y-%m-%d %H:%M"),
                 }
                 supabase.table(TABEL_NAAM).update({DB_KOLOM: data}).eq("username", speler_naam).execute()
@@ -302,11 +274,12 @@ with st.sidebar:
                     st.session_state.giro_selected_riders   = db_data.get("selected_riders", [])
                     st.session_state.giro_stage_predictions = db_data.get("predictions", {str(s["id"]): [None]*10 for s in GIRO_ETAPPES})
                     st.session_state.giro_weights           = db_data.get("weights",      {str(e["id"]): e["w"].copy() for e in GIRO_ETAPPES})
+                    st.session_state.giro_reasoning         = db_data.get("reasoning",    {})
                     st.rerun()
 
     st.divider()
-    bouw_methode         = st.radio("Samenstel methode:", ["1. Volledig AI (Stats)", "2. Mijn Voorspellingen (+ AI opvulling)"])
-    top_x_voorspellingen = st.number_input("Top X per etappe", 1, 10, 3)
+
+    top_x_voorspellingen = st.number_input("Top X per etappe (AI)", 1, 10, 3)
     max_budget           = st.number_input("Budget (Miljoen)", value=100.0)
     max_renners          = st.number_input("Aantal Renners",   value=16)
     max_per_ploeg        = st.number_input("Max per ploeg",    value=3)
@@ -319,45 +292,36 @@ with st.sidebar:
         force_base = st.multiselect("🟢 Moet in team:", options=df['Renner'].tolist())
         ban_base   = st.multiselect("🔴 Niet in team:", options=[r for r in df['Renner'].tolist() if r not in force_base])
 
-    if st.button("🚀 BEREKEN GIRO TEAM", type="primary", use_container_width=True):
-        ev_col = "Giro_EV" if "1." in bouw_methode else "Combined_EV"
-        res = solve_giro_team(df, max_budget, max_renners, max_per_ploeg, force_base, ban_base, ev_col)
+    st.divider()
+    if st.button("🚀 BEREKEN TEAM (Puur AI Stats)", type="primary", use_container_width=True):
+        res = solve_giro_team(df, max_budget, max_renners, max_per_ploeg, force_base, ban_base, "Giro_EV")
+        if res:
+            st.session_state.giro_selected_riders = res
+            st.rerun()
+
+    if st.button("🚀 BEREKEN TEAM (AI + Voorspellingen)", use_container_width=True):
+        res = solve_giro_team(df, max_budget, max_renners, max_per_ploeg, force_base, ban_base, "Combined_EV")
         if res:
             st.session_state.giro_selected_riders = res
             st.rerun()
 
     st.divider()
-    st.markdown("#### 📥 Exporteer Data")
-    d_col1, d_col2 = st.columns(2)
-
+    st.markdown("#### 📥 Exporteer")
     export_data = {
         "team":        st.session_state.giro_selected_riders,
         "predictions": st.session_state.giro_stage_predictions,
         "weights":     st.session_state.giro_weights,
     }
-    d_col1.download_button(
+    st.download_button(
         label="📄 JSON",
         data=json.dumps(export_data, indent=2),
-        file_name="sporza_giro_export.json",
+        file_name="sporza_giro_ai_export.json",
         mime="application/json",
         use_container_width=True,
     )
 
-    if st.session_state.giro_selected_riders:
-        export_df = df[df['Renner'].isin(st.session_state.giro_selected_riders)].copy()
-        csv_data  = export_df.to_csv(index=False, sep=";").encode('utf-8-sig')
-        d_col2.download_button(
-            label="📊 Excel",
-            data=csv_data,
-            file_name="sporza_giro_team.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-    else:
-        d_col2.button("📊 Excel", disabled=True, use_container_width=True, help="Bereken eerst een team")
-
 # --- TABS ---
-tab1, tab2, tab3, tab4 = st.tabs(["🚀 Jouw Selectie", "📅 Etappe Voorspellingen", "📋 Database (Giro)", "ℹ️ Uitleg"])
+tab1, tab2, tab3, tab4 = st.tabs(["🚀 Jouw Selectie", "📅 AI Etappe Voorspellingen", "📋 Database", "ℹ️ Uitleg"])
 
 # ── TAB 1: SELECTIE ──────────────────────────────────────────────────────────
 with tab1:
@@ -366,40 +330,58 @@ with tab1:
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("💰 Budget over",  f"€ {max_budget - start_team_df['Prijs'].sum():.2f}M")
         m2.metric("🚴 Renners",      f"{len(start_team_df)} / {max_renners}")
-        m3.metric("🎯 EV (AI)",      f"{start_team_df['Giro_EV'].sum()}")
-        m4.metric("🏆 EV (Jouw)",    f"{start_team_df['Prediction_EV'].sum()}")
-        st.dataframe(start_team_df.sort_values(by='Prijs', ascending=False), hide_index=True, use_container_width=True)
-
-# ── TAB 2: VOORSPELLINGEN ─────────────────────────────────────────────────────
-with tab2:
-    st.subheader(f"🏆 Voorspel de Top {top_x_voorspellingen}")
-    c1, c2 = st.columns([1, 4])
-
-    if c1.button("🤖 Vul in met AI"):
-        st.session_state.giro_stage_predictions = genereer_ai_etappe_voorspellingen(
-            df, GIRO_ETAPPES, top_x_voorspellingen, st.session_state.giro_weights
+        m3.metric("🎯 EV (AI Stats)", f"{start_team_df['Giro_EV'].sum()}")
+        m4.metric("🏆 EV (Voorspellingen)", f"{start_team_df['Prediction_EV'].sum()}")
+        st.dataframe(
+            start_team_df[['Renner', 'Team', 'Prijs', 'Type', 'Giro_EV', 'Waarde (EV/M)']].sort_values(by='Prijs', ascending=False),
+            hide_index=True, use_container_width=True
         )
+    else:
+        st.info("👈 Klik op **Bereken Team** in de zijbalk om de AI een optimale selectie te laten samenstellen.")
+
+# ── TAB 2: AI VOORSPELLINGEN ──────────────────────────────────────────────────
+with tab2:
+    st.subheader("🤖 Claude AI Etappe Voorspellingen")
+    st.info(
+        "De AI analyseert het parcoursprofiel en de wegingen van alle 21 etappes en kiest automatisch "
+        "de sterkste renners per rit. Pas de wegingen per etappe aan om de AI te sturen."
+    )
+
+    c1, c2 = st.columns([1, 4])
+    if c1.button("🤖 Analyseer alle 21 etappes", type="primary"):
+        preds, reasoning = genereer_claude_etappe_voorspellingen(
+            df,
+            GIRO_ETAPPES,
+            top_x_voorspellingen,
+            st.session_state.giro_weights,
+        )
+        st.session_state.giro_stage_predictions = preds
+        st.session_state.giro_reasoning         = reasoning
         st.rerun()
 
-    if c2.button("🗑️ Wis alles"):
+    if c2.button("🗑️ Wis AI voorspellingen"):
         st.session_state.giro_stage_predictions = {str(s["id"]): [None]*10 for s in GIRO_ETAPPES}
+        st.session_state.giro_reasoning         = {}
         st.rerun()
 
-    renners_opties = ["-"] + sorted(df['Renner'].tolist())
-
+    # Per-etappe weging + AI output
     for etappe in GIRO_ETAPPES:
         stage_id = str(etappe["id"])
         cw = st.session_state.giro_weights[stage_id]
 
-        som_header = sum(cw.values()) if sum(cw.values()) > 0 else 1.0
-        weight_str = (
+        som_header  = sum(cw.values()) if sum(cw.values()) > 0 else 1.0
+        weight_str  = (
             f"SPR:{int((cw['SPR']/som_header)*100)}% "
             f"GC:{int((cw['GC']/som_header)*100)}% "
             f"ITT:{int((cw['ITT']/som_header)*100)}% "
             f"MTN:{int((cw['MTN']/som_header)*100)}%"
         )
 
-        with st.expander(f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']}) | 🤖 {weight_str}"):
+        # Check of er AI picks zijn voor deze etappe
+        ai_picks = [p for p in st.session_state.giro_stage_predictions.get(stage_id, []) if p]
+        picks_badge = f" ✅ {', '.join(ai_picks[:3])}" if ai_picks else ""
+
+        with st.expander(f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']}) | 🎯 {weight_str}{picks_badge}"):
 
             giro_link = "https://www.giroditalia.it/en/the-route/"
             map_path  = f"giro262/giro26-{etappe['id']}-map.jpg"
@@ -412,7 +394,8 @@ with tab2:
 
             st.divider()
 
-            st.markdown("###### ⚙️ Pas de weging aan voor andere suggesties:")
+            # Weight sliders
+            st.markdown("###### ⚙️ Pas de weging aan:")
             wc1, wc2, wc3, wc4 = st.columns(4)
             new_spr = wc1.number_input("Sprint (SPR)",      0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{stage_id}")
             new_gc  = wc2.number_input("Klassement (GC)",   0.0, 1.0, float(cw["GC"]),  0.1, key=f"wgc_{stage_id}")
@@ -423,19 +406,16 @@ with tab2:
 
             som_input = new_spr + new_gc + new_itt + new_mtn
             if abs(som_input - 1.0) > 0.01 and som_input > 0:
-                st.warning(
-                    f"⚠️ Jouw weging telt op tot **{som_input*100:.0f}%**. Dit wordt op de achtergrond "
-                    f"teruggeschaald naar exact 100% "
-                    f"(SPR: {new_spr/som_input*100:.0f}%, GC: {new_gc/som_input*100:.0f}%, "
-                    f"ITT: {new_itt/som_input*100:.0f}%, MTN: {new_mtn/som_input*100:.0f}%)."
-                )
-                active_weights = {"SPR": new_spr/som_input, "GC": new_gc/som_input, "ITT": new_itt/som_input, "MTN": new_mtn/som_input}
+                active_weights = {"SPR": new_spr/som_input, "GC": new_gc/som_input,
+                                  "ITT": new_itt/som_input, "MTN": new_mtn/som_input}
+                st.warning(f"⚠️ Weging telt op tot {som_input*100:.0f}% — wordt automatisch herschaald naar 100%.")
             elif som_input == 0:
-                st.error("⚠️ Weging mag niet 0% zijn. Er wordt tijdelijk een standaardverdeling gebruikt.")
                 active_weights = {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+                st.error("⚠️ Weging mag niet 0% zijn.")
             else:
                 active_weights = st.session_state.giro_weights[stage_id]
 
+            # Static AI top-5
             df_stage = df.copy()
             df_stage['StageScore'] = (
                 df_stage['SPR'] * active_weights['SPR'] +
@@ -445,56 +425,63 @@ with tab2:
             )
             top_5       = df_stage.sort_values(by=['StageScore', 'Giro_EV'], ascending=[False, False]).head(5)
             top_5_namen = [f"{row['Renner']} ({int(row['StageScore'])})" for _, row in top_5.iterrows()]
-            st.info(f"💡 **AI Top 5 Suggesties:** {', '.join(top_5_namen)}")
+            st.info(f"💡 **Stat Top 5:** {', '.join(top_5_namen)}")
 
-            st.divider()
+            # Claude reasoning + picks
+            stage_reasoning = st.session_state.giro_reasoning.get(stage_id, "")
+            if stage_reasoning:
+                st.markdown(
+                    f"<div style='border-left:3px solid #1D9E75;padding:10px 14px;"
+                    f"border-radius:0 4px 4px 0;margin:8px 0 12px 0;font-size:14px;'>"
+                    f"🧠 <strong>Claude:</strong> {stage_reasoning}</div>",
+                    unsafe_allow_html=True,
+                )
 
-            st.markdown("###### Jouw Voorspelling:")
-            for i in range(0, top_x_voorspellingen, 5):
-                cols = st.columns(min(5, top_x_voorspellingen - i))
-                for j, col in enumerate(cols):
-                    pos = i + j
-                    val = st.session_state.giro_stage_predictions[stage_id][pos]
-                    idx = renners_opties.index(val) if val in renners_opties else 0
-                    new_val = col.selectbox(f"Pos {pos+1}", renners_opties, index=idx, key=f"s{stage_id}p{pos}")
-                    st.session_state.giro_stage_predictions[stage_id][pos] = new_val if new_val != "-" else None
+            if ai_picks:
+                st.success(f"**AI keuzes:** {', '.join(ai_picks)}")
+            else:
+                st.caption("Nog geen AI analyse — klik op **Analyseer alle 21 etappes** hierboven.")
 
-# ── TAB 3: DATABASE ───────────────────────────────────────────────────────────
+# ── TAB 3: DATABASE ────────────────────────────────────────────────────────────
 with tab3:
     st.dataframe(df.sort_values('Giro_EV', ascending=False), hide_index=True, use_container_width=True)
 
-# ── TAB 4: UITLEG ─────────────────────────────────────────────────────────────
+# ── TAB 4: UITLEG ──────────────────────────────────────────────────────────────
 with tab4:
-    st.header("ℹ️ Uitleg & Disclaimer")
+    st.header("ℹ️ Uitleg: AI Solver")
 
     st.warning("""
     **⚠️ LET OP: Voorlopige Data!**
-    De huidige startlijst en de daaraan gekoppelde Sporza-prijzen zijn op dit moment nog **niet compleet en slechts een inschatting**.
-    Zodra de echte Giro d'Italia dichterbij komt en Sporza de definitieve prijzen lanceert, worden deze bestanden achter de schermen geüpdatet!
+    De startlijst en Sporza-prijzen zijn nog niet definitief. Ze worden bijgewerkt zodra de officiële Giro-lancering plaatsvindt.
     """)
 
     st.markdown("""
-    ### 🚴‍♂️ Hoe werkt de AI Manager?
-    Dit dashboard combineert krachtige wiskundige optimalisatie met de data van *Wielerorakel* om het perfecte Sporza Giro-team voor jou samen te stellen.
+    ### 🤖 Wat doet de AI Solver?
 
-    **Samenstel Methode 1: Volledig AI (Stats)**
-    * De solver negeert jouw etappe-voorspellingen.
-    * Hij berekent de optimale 16 renners puur op basis van de algemene zwaarte van het parcours en de basisscores (EV) per renner per uitgegeven miljoen.
+    Deze pagina is volledig **AI-gestuurd** — jij stelt de parameters in, de AI doet de rest.
 
-    **Samenstel Methode 2: Mijn Voorspellingen (+ AI opvulling)**
-    * De solver gebruikt de namen die jij in Tab 2 (Etappe Voorspellingen) hebt ingevuld om bonuspunten toe te kennen.
-    * Renners die je vaker voorspelt worden als "waardevoller" beschouwd. De rest van het budget wordt door de AI optimaal opgevuld.
+    **Stap 1 — Wegingen aanpassen (optioneel)**
+    Elke etappe heeft een standaardweging op basis van het profiel. In Tab 2 kun je per etappe de balans
+    tussen Sprint, Klassement, Tijdrit en Klimmen/Aanval verschuiven. De AI gebruikt deze wegingen om
+    renners te selecteren die het best passen bij elke rit.
 
-    ### ⚙️ Wat doen de wegingen per etappe?
-    Elke etappe is vooraf ingesteld met een weging die idealiter `1.0` (100%) vormt.
-    * **SPR (Sprint):** Bepaalt of typische sprinters hier makkelijk punten scoren.
-    * **GC (Klassement):** Bepaalt of de rit zo zwaar is dat alleen de échte topklimmers voor de zege strijden.
-    * **ITT (Tijdrit):** Tijdrijdersvoordeel.
-    * **MTN (Aanval/Klim):** Bepaalt of vluchters en punchers hier een kans maken.
+    **Stap 2 — Claude analyseert (Tab 2)**
+    Klik op *Analyseer alle 21 etappes*. Claude ontvangt de volledige startlijst, alle statssores en
+    de parcourswegingen in één prompt, en kiest per etappe de top-X renners. Per etappe verschijnt
+    ook een korte 🧠 toelichting waarom die renners de beste keuze zijn.
 
-    *Voorbeeld: Een weging van `SPR: 0.8` en `MTN: 0.2` betekent dat de AI er vanuit gaat dat sprinters 80% kans hebben om het hier uit te vechten, maar dat ontsnappingen (20%) niet ondenkbaar zijn wegens een vroege heuvel.*
+    **Stap 3 — Team berekenen (zijbalk)**
+    - *Puur AI Stats*: de solver optimaliseert puur op de wiskundige EV-scores (macht-4 curve).
+    - *AI + Voorspellingen*: de solver weegt de Claude-picks mee als extra bonus, zodat renners
+      die Claude vaker noemt meer kans hebben geselecteerd te worden.
 
-    ### 💾 Data opslaan en delen
-    Je profiel slaat je team, voorspellingen en wegingen op in een cloud-database.
-    Via de knoppen links onderin kun je je selectie bovendien downloaden als CSV (voor Excel) of als JSON-bestand.
+    ### ⚙️ Wegingen uitleg
+    | Weging | Betekenis |
+    |---|---|
+    | **SPR** | Sprinters en klassieke renners profiteren van vlakke aankomsten |
+    | **GC** | Zware bergritten zijn domein van de topklimmers |
+    | **ITT** | Tijdritspecialisten hebben een voordeel op de TT-etappes |
+    | **MTN** | Aanvallers, punchers en vluchters kunnen hier scoren |
+
+    > *Vereist: `ANTHROPIC_API_KEY` in `.streamlit/secrets.toml`*
     """)
