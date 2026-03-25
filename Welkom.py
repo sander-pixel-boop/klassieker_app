@@ -121,8 +121,8 @@ sporza_klassiekers = st.Page("pages/Klassiekers - Sporza.py", title="Klassiekers
 sporza_evaluator = st.Page("pages/Sporza_Evaluator.py", title="Evaluator", icon="📊")
 
 # Sporza Grand Tour opties
-sporza_giro_ai = st.Page("pages/Sporza_Giro.py", title="[Beta] Giro: AI Solver", icon="🤖")
-sporza_giro_bouwer = st.Page("pages/Sporza_Giro_Bouwer.py", title="[Beta] Giro: Team Bouwer", icon="🛠️")
+sporza_giro_ai = st.Page("pages/Sporza_Giro.py", title="Giro: AI Solver", icon="🤖")
+sporza_giro_bouwer = st.Page("pages/Sporza_Giro_Bouwer.py", title="Giro: Team Bouwer", icon="🛠️")
 
 # --- KEUZE: WEL OF NIET INGELOGD ---
 if "ingelogde_speler" not in st.session_state:
