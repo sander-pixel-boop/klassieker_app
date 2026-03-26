@@ -252,7 +252,6 @@ def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
         df_prog['Renner_Scorito'] = df_prog['Renner'].apply(lambda x: match_naam_slim(x, norm_to_scorito))
         
         merged_df = pd.merge(df_prog, df_prijzen, left_on='Renner_Scorito', right_on='Renner', how='outer')
-        # FIX: We gebruiken nu Sporza (Renner_x) als leidende naam, tenzij de renner alleen in Scorito zit.
         merged_df['Renner'] = merged_df['Renner_x'].fillna(merged_df['Renner_y']) 
         merged_df = merged_df.drop(columns=['Renner_x', 'Renner_y', 'Renner_Scorito'])
         
@@ -688,14 +687,8 @@ else:
             st.dataframe(start_team_df[['Renner', 'Prijs', 'Type', 'Rol']].sort_values(by='Prijs', ascending=False), hide_index=True, use_container_width=True)
         
         with col_t2:
-            c_tr_head, c_tr_btn = st.columns([3,1])
-            with c_tr_head: st.markdown(f"**🔁 Transfer Plan ({len(st.session_state.transfer_plan)}/3)**")
-            with c_tr_btn:
-                if st.session_state.transfer_plan:
-                    if st.button("🗑️ Annuleer laatste", use_container_width=True):
-                        st.session_state.transfer_plan.pop()
-                        st.rerun()
-
+            st.markdown(f"**🔁 Transfer Plan ({len(st.session_state.transfer_plan)}/3)**")
+            
             if not st.session_state.transfer_plan:
                 st.info("Nog geen transfers doorgevoerd.")
             else:
@@ -704,11 +697,49 @@ else:
                     if t['uit'] in temp_team: temp_team.remove(t['uit'])
                     if t['in'] not in temp_team: temp_team.append(t['in'])
                     budget_now = max_bud - df[df['Renner'].isin(temp_team)]['Prijs'].sum()
-                    st.markdown(f"***Wissel {i+1} (ná {t['moment']} | Resterend budget: €{budget_now/1000000:.2f}M)***")
-                    c_uit, c_in = st.columns(2)
+                    
+                    st.markdown(f"***Wissel {i+1} (ná {t['moment']} | Budget over: € {budget_now/1000000:.2f}M)***")
+                    c_uit, c_in, c_del = st.columns([4, 4, 1])
                     with c_uit: st.error(f"❌ {t['uit']}")
                     with c_in: st.success(f"📥 {t['in']}")
+                    with c_del: 
+                        if st.button("🗑️", key=f"del_tr_{i}", help="Verwijder specifieke wissel"):
+                            st.session_state.transfer_plan.pop(i)
+                            st.rerun()
                     st.write("")
+
+            # --- Handmatige Wissels Toevoegen ---
+            with st.expander("✏️ Handmatige Wissel Toevoegen", expanded=(len(st.session_state.transfer_plan) < 3)):
+                if len(st.session_state.transfer_plan) >= 3:
+                    st.warning("Maximum van 3 wissels bereikt. Verwijder er eerst één via het prullenbak-icoon hierboven.")
+                else:
+                    m_race = st.selectbox("Wisselmoment (Ná race):", options=available_races[:-1], index=len(available_races)-2)
+                    
+                    # Bepaal exact wie er in het team zit op dit moment
+                    actief_op_moment = list(st.session_state.selected_riders)
+                    idx_m = available_races.index(m_race)
+                    for t in st.session_state.transfer_plan:
+                        if available_races.index(t['moment']) <= idx_m:
+                            if t['uit'] in actief_op_moment: actief_op_moment.remove(t['uit'])
+                            if t['in'] not in actief_op_moment: actief_op_moment.append(t['in'])
+                            
+                    m_uit = st.selectbox("❌ Wie gaat eruit?", options=sorted(actief_op_moment))
+                    m_in_opties = [r for r in df['Renner'].tolist() if r not in actief_op_moment]
+                    m_in = st.selectbox("📥 Wie komt erin?", options=sorted(m_in_opties))
+                    
+                    if st.button("➕ Voeg Wissel Toe", use_container_width=True):
+                        test_team = list(actief_op_moment)
+                        test_team.remove(m_uit)
+                        test_team.append(m_in)
+                        test_kosten = df[df['Renner'].isin(test_team)]['Prijs'].sum()
+                        
+                        if test_kosten > max_bud:
+                            st.error(f"Budget overschreden! Het team zou € {test_kosten/1000000:.2f}M kosten (Max budget: € {max_bud/1000000:.2f}M).")
+                        else:
+                            st.session_state.transfer_plan.append({"uit": m_uit, "in": m_in, "moment": m_race})
+                            # Sorteer het plan chronologisch
+                            st.session_state.transfer_plan.sort(key=lambda x: available_races.index(x['moment']))
+                            st.rerun()
 
         st.divider()
         with st.container(border=True):
