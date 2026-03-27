@@ -135,7 +135,7 @@ else:
         "Scorito - Klassiekers": [scorito_klassiekers, scorito_evaluator],
         "Scorito - Grand Tours": [scorito_giro],
         "Sporza - Klassiekers": [sporza_klassiekers, sporza_evaluator],
-        "Sporza - Grand Tours": [sporza_giro_ai, sporza_giro_bouwer]
+        "Sporza - Grand Tours": [sporza_giro_ai, sporza_giro_bouwer, sporza_giro_evaluator]
     })
 
 pg.run()
