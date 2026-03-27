@@ -844,13 +844,19 @@ else:
                 idx = display_matrix.columns.get_loc(moment) + 1
                 display_matrix.insert(idx, f'🔁 {moment}', '|')
         
+        # --- NIEUW: Totaal aantal actieve renners per koers berekenen en toevoegen aan kolomnaam ---
+        rename_map = {c: f"{c} ({int(active_matrix[c].sum())})" for c in available_races}
+        display_matrix = display_matrix.rename(columns=rename_map)
+
         def color_rows(row):
             if 'Verkocht' in row['Rol']: return ['background-color: rgba(255, 99, 71, 0.2)'] * len(row)
             if 'Gekocht' in row['Rol']: return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
             return [''] * len(row)
 
-        format_dict = {c: lambda x: format_race_status(x, 20) for c in available_races}
+        # Let op dat we hier ook rename_map[c] gebruiken voor het formatteren
+        format_dict = {rename_map[c]: lambda x: format_race_status(x, 20) for c in available_races}
         format_dict['Prijs'] = lambda x: f"€ {x/1000000:.2f}M"
+        
         st.dataframe(display_matrix.style.apply(color_rows, axis=1).format(format_dict), use_container_width=True)
 
     with tab3:
