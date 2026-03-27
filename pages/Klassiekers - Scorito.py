@@ -836,6 +836,7 @@ else:
 
         display_matrix.insert(0, 'Rol', matrix_df['Rol'])
         display_matrix.insert(1, 'Type', matrix_df['Type'])
+        display_matrix.insert(2, 'Prijs', matrix_df['Prijs'])
         
         for t in st.session_state.transfer_plan:
             moment = t['moment']
@@ -849,6 +850,7 @@ else:
             return [''] * len(row)
 
         format_dict = {c: lambda x: format_race_status(x, 20) for c in available_races}
+        format_dict['Prijs'] = lambda x: f"€ {x/1000000:.2f}M"
         st.dataframe(display_matrix.style.apply(color_rows, axis=1).format(format_dict), use_container_width=True)
 
     with tab3:
