@@ -133,10 +133,13 @@ def load_giro_results():
         st.error(f"Fout bij laden resultaten: {e}")
         return pd.DataFrame()
 
-def bepaal_starters_en_kopman(team_renners, etappe_id, etappe_keuzes, df_stats, n_starters=9):
+def bepaal_starters_en_kopman(team_renners, etappe_id, etappe_keuzes, df_stats, n_starters=9,
+                              kopman_override=None):
     """
     Bepaalt de 9 starters + kopman voor een etappe.
     Voorspelde renners krijgen prioriteit; kopman = hoogst scorende gestarte renner.
+    Als kopman_override is opgegeven (handmatige keuze uit de Bouwer), wordt die gebruikt
+    mits de renner daadwerkelijk in de starters zit.
     """
     w = ETAPPE_WEIGHTS.get(etappe_id, {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25})
     s = sum(w.values()) or 1.0
@@ -164,9 +167,15 @@ def bepaal_starters_en_kopman(team_renners, etappe_id, etappe_keuzes, df_stats, 
     starters = prioriteit[:n_starters]
     if not starters: return [], None
 
-    # Kopman = best scorende starter
-    kopman = max(starters, key=lambda x: scores.get(x, 0))
-    return starters, kopman
+    # Kopman: gebruik handmatige override als die in de starters zit, anders auto
+    if kopman_override and kopman_override in starters:
+        kopman = kopman_override
+        kopman_bron = "✏️"
+    else:
+        kopman = max(starters, key=lambda x: scores.get(x, 0))
+        kopman_bron = "🤖"
+
+    return starters, kopman, kopman_bron
 
 
 def bereken_etappe_score(starters, kopman, etappe_id, df_uitslag_etappe, alle_renners):
@@ -232,8 +241,9 @@ with st.sidebar:
             if res.data and res.data[0].get("sporza_giro_team26_v2"):
                 d = res.data[0]["sporza_giro_team26_v2"]
                 st.session_state["eval_bouwer_team"] = {
-                    "renners": d.get("team", []),
-                    "keuzes": d.get("etappe_keuzes", {str(i): [None, None, None] for i in range(1, 22)})
+                    "renners":       d.get("team", []),
+                    "keuzes":        d.get("etappe_keuzes",  {str(i): [None, None, None] for i in range(1, 22)}),
+                    "kopman_keuzes": d.get("kopman_keuzes",  {str(i): None               for i in range(1, 22)}),
                 }
                 st.success("Bouwer team geladen!")
 
@@ -290,14 +300,20 @@ alle_resultaten = []   # per team per etappe: totaalscore
 alle_details = []      # per team per etappe per renner: detail
 
 for team_naam, team_data in teams.items():
-    team_renners = team_data["renners"]
+    team_renners  = team_data["renners"]
     etappe_keuzes = team_data["keuzes"]
+    kopman_keuzes = team_data.get("kopman_keuzes", {})
     cumulatief = 0
 
     for etappe_id in gereden_etappes:
         df_etappe = df_results_matched[df_results_matched['Stage'] == etappe_id]
-        starters, kopman = bepaal_starters_en_kopman(
-            team_renners, etappe_id, etappe_keuzes, df_stats, n_starters
+
+        # Gebruik de handmatige kopman als die beschikbaar is
+        kopman_override = kopman_keuzes.get(str(etappe_id))
+
+        starters, kopman, kopman_bron = bepaal_starters_en_kopman(
+            team_renners, etappe_id, etappe_keuzes, df_stats, n_starters,
+            kopman_override=kopman_override
         )
         if not starters:
             continue
@@ -307,26 +323,27 @@ for team_naam, team_data in teams.items():
         cumulatief += etappe_totaal
 
         alle_resultaten.append({
-            "Team": team_naam,
-            "Etappe": etappe_id,
-            "Label": f"E{etappe_id}",
-            "Type": ETAPPE_TYPE.get(etappe_id, "?"),
-            "Route": ETAPPE_ROUTE.get(etappe_id, ""),
-            "Punten": etappe_totaal,
+            "Team":       team_naam,
+            "Etappe":     etappe_id,
+            "Label":      f"E{etappe_id}",
+            "Type":       ETAPPE_TYPE.get(etappe_id, "?"),
+            "Route":      ETAPPE_ROUTE.get(etappe_id, ""),
+            "Punten":     etappe_totaal,
             "Cumulatief": cumulatief,
-            "Kopman": kopman,
+            "Kopman":     kopman,
+            "KopmanBron": kopman_bron,
         })
 
         for renner, info in punten_dict.items():
             alle_details.append({
-                "Team": team_naam,
-                "Etappe": etappe_id,
-                "Renner": renner,
-                "Kopman": "©" if info.get("kopman") else "",
-                "Positie": f"P{info['positie']}" if info.get("positie") else "-",
+                "Team":       team_naam,
+                "Etappe":     etappe_id,
+                "Renner":     renner,
+                "Kopman":     "©" if info.get("kopman") else "",
+                "Positie":    f"P{info['positie']}" if info.get("positie") else "-",
                 "BasePunten": info.get("base_punten", 0),
                 "Multiplier": f"x{info.get('multiplier', 1)}" if info.get("kopman") else "-",
-                "Punten": info["punten"],
+                "Punten":     info["punten"],
             })
 
 df_res = pd.DataFrame(alle_resultaten)
@@ -464,12 +481,19 @@ with tab2:
 # ── TAB 3: TEAM OVERZICHT ─────────────────────────────────────────────
 with tab3:
     st.subheader("📋 Team Samenstelling & Kopmannen per Etappe")
+    st.markdown(
+        "**✏️** = Handmatig ingesteld in de Bouwer &nbsp;|&nbsp; "
+        "**🤖** = Automatisch op basis van etappeprofiel"
+    )
 
     for team_naam, team_data in teams.items():
-        team_renners = team_data["renners"]
+        team_renners  = team_data["renners"]
         etappe_keuzes = team_data["keuzes"]
+        kopman_keuzes = team_data.get("kopman_keuzes", {})
 
-        with st.expander(f"**{team_naam}** – {len(team_renners)} renners"):
+        handmatig_count = sum(1 for v in kopman_keuzes.values() if v)
+
+        with st.expander(f"**{team_naam}** – {len(team_renners)} renners | {handmatig_count} handmatige kopmannen"):
             c_renners, c_kopmannen = st.columns([1, 2])
 
             with c_renners:
@@ -481,16 +505,18 @@ with tab3:
                 st.markdown("**Kopman per gereden etappe:**")
                 kopman_data = []
                 for eid in gereden_etappes:
-                    starters, kopman = bepaal_starters_en_kopman(
-                        team_renners, eid, etappe_keuzes, df_stats, n_starters
+                    km_override = kopman_keuzes.get(str(eid))
+                    starters, kopman, kopman_bron = bepaal_starters_en_kopman(
+                        team_renners, eid, etappe_keuzes, df_stats, n_starters,
+                        kopman_override=km_override
                     )
                     etappe_row = df_res[(df_res["Team"] == team_naam) & (df_res["Etappe"] == eid)]
                     score = int(etappe_row["Punten"].values[0]) if not etappe_row.empty else 0
                     kopman_data.append({
                         "Etappe": f"E{eid} – {ETAPPE_ROUTE.get(eid, '')}",
-                        "Type": ETAPPE_TYPE.get(eid, ""),
-                        "Kopman": kopman or "-",
-                        "Score": score
+                        "Type":   ETAPPE_TYPE.get(eid, ""),
+                        "Kopman": f"{kopman_bron} {kopman}" if kopman else "-",
+                        "Score":  score
                     })
 
                 st.dataframe(
