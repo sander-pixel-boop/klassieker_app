@@ -301,14 +301,15 @@ with tab1:
     # ── Mini progress bar: all 21 stages as coloured dots ────────────
     dots = []
     for e in GIRO_ETAPPES:
-        n, _ = etappe_samenvatting(str(e["id"]))
-        active = e["id"] == GIRO_ETAPPES[st.session_state.aktieve_etappe_idx]["id"]
+        eid_dot = e["id"]
+        n, _ = etappe_samenvatting(str(eid_dot))
+        active = eid_dot == GIRO_ETAPPES[st.session_state.aktieve_etappe_idx]["id"]
         if active:
-            dots.append(f"<span title='E{e[\"id\"]}' style='font-size:18px;cursor:default;'>🔵</span>")
+            dots.append(f"<span title='E{eid_dot}' style='font-size:18px;cursor:default;'>🔵</span>")
         elif n > 0:
-            dots.append(f"<span title='E{e[\"id\"]} – {n} picks' style='font-size:18px;cursor:default;'>🟢</span>")
+            dots.append(f"<span title='E{eid_dot} – {n} picks' style='font-size:18px;cursor:default;'>🟢</span>")
         else:
-            dots.append(f"<span title='E{e[\"id\"]} – geen picks' style='font-size:18px;cursor:default;'>⚪</span>")
+            dots.append(f"<span title='E{eid_dot} – geen picks' style='font-size:18px;cursor:default;'>⚪</span>")
     st.markdown(" ".join(dots) + "  <small style='color:grey;'>🔵 actief &nbsp; 🟢 ingevuld &nbsp; ⚪ leeg</small>", unsafe_allow_html=True)
 
     st.divider()
