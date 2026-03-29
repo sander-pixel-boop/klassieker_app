@@ -10,7 +10,7 @@ from supabase import create_client
 from datetime import datetime
 
 # --- CONFIGURATIE ---
-st.set_page_config(page_title="Sporza Giro Team Bouwer", layout="wide", page_icon="🛠️")
+st.set_page_config(page_title="Giro Etappe Bouwer", layout="wide", page_icon="🇮🇹")
 
 if "ingelogde_speler" not in st.session_state:
     st.warning("⚠️ Je bent niet ingelogd. Ga terug naar de Home pagina.")
@@ -30,33 +30,28 @@ DB_KOLOM = "sporza_giro_team26_v2"
 
 # --- ETAPPE DATA ---
 GIRO_ETAPPES = [
-    {"id": 1,  "date": "08/05", "route": "Nessebar - Burgas",                        "type": "Vlak",       "w": {"SPR": 1.0, "GC": 0.0, "ITT": 0.0, "MTN": 0.0}},
-    {"id": 2,  "date": "09/05", "route": "Burgas - Valiko Tarnovo",                  "type": "Heuvel",     "w": {"SPR": 0.3, "GC": 0.3, "ITT": 0.0, "MTN": 0.4}},
-    {"id": 3,  "date": "10/05", "route": "Plovdiv - Sofia",                          "type": "Vlak/Heuvel","w": {"SPR": 0.9, "GC": 0.0, "ITT": 0.0, "MTN": 0.1}},
-    {"id": 4,  "date": "12/05", "route": "Catanzaro - Cosenza",                      "type": "Vlak/Heuvel","w": {"SPR": 0.6, "GC": 0.0, "ITT": 0.0, "MTN": 0.4}},
-    {"id": 5,  "date": "13/05", "route": "Praia a Mare - Potenza",                   "type": "Heuvel",     "w": {"SPR": 0.1, "GC": 0.6, "ITT": 0.0, "MTN": 0.3}},
-    {"id": 6,  "date": "14/05", "route": "Paestum - Naples",                         "type": "Heuvel",     "w": {"SPR": 0.8, "GC": 0.0, "ITT": 0.0, "MTN": 0.2}},
-    {"id": 7,  "date": "15/05", "route": "Formia - Blockhaus",                       "type": "Berg",       "w": {"SPR": 0.0, "GC": 0.9, "ITT": 0.0, "MTN": 0.1}},
-    {"id": 8,  "date": "16/05", "route": "Chieti - Fermo",                           "type": "Heuvel",     "w": {"SPR": 0.2, "GC": 0.4, "ITT": 0.0, "MTN": 0.4}},
-    {"id": 9,  "date": "17/05", "route": "Cervia - Corno alle Scale",                "type": "Berg",       "w": {"SPR": 0.0, "GC": 0.8, "ITT": 0.0, "MTN": 0.2}},
-    {"id": 10, "date": "19/05", "route": "Viareggio - Massa",                        "type": "Tijdrit",    "w": {"SPR": 0.0, "GC": 0.0, "ITT": 1.0, "MTN": 0.0}},
-    {"id": 11, "date": "20/05", "route": "Porcari - Chiavari",                       "type": "Heuvel",     "w": {"SPR": 0.2, "GC": 0.4, "ITT": 0.0, "MTN": 0.4}},
-    {"id": 12, "date": "21/05", "route": "Imperia - Novi Ligure",                    "type": "Vlak",       "w": {"SPR": 0.6, "GC": 0.0, "ITT": 0.0, "MTN": 0.4}},
-    {"id": 13, "date": "22/05", "route": "Alessandria - Verbania",                   "type": "Heuvel",     "w": {"SPR": 0.6, "GC": 0.0, "ITT": 0.0, "MTN": 0.4}},
-    {"id": 14, "date": "23/05", "route": "Aosta - Pila",                             "type": "Berg",       "w": {"SPR": 0.0, "GC": 0.9, "ITT": 0.0, "MTN": 0.1}},
-    {"id": 15, "date": "24/05", "route": "Voghera - Milan",                          "type": "Vlak",       "w": {"SPR": 1.0, "GC": 0.0, "ITT": 0.0, "MTN": 0.0}},
-    {"id": 16, "date": "26/05", "route": "Bellinzona - Carì",                        "type": "Berg",       "w": {"SPR": 0.0, "GC": 0.9, "ITT": 0.0, "MTN": 0.1}},
-    {"id": 17, "date": "27/05", "route": "Cassano d'Adda - Andalo",                  "type": "Heuvel",     "w": {"SPR": 0.1, "GC": 0.5, "ITT": 0.0, "MTN": 0.4}},
-    {"id": 18, "date": "28/05", "route": "Fai della Paganella - Pieve di Soligo",    "type": "Heuvel",     "w": {"SPR": 0.3, "GC": 0.2, "ITT": 0.0, "MTN": 0.5}},
-    {"id": 19, "date": "29/05", "route": "Feltre - Alleghe",                         "type": "Berg",       "w": {"SPR": 0.0, "GC": 0.9, "ITT": 0.0, "MTN": 0.1}},
-    {"id": 20, "date": "30/05", "route": "Gemona del Friuli - Piancavallo",          "type": "Berg",       "w": {"SPR": 0.0, "GC": 0.9, "ITT": 0.0, "MTN": 0.1}},
-    {"id": 21, "date": "31/05", "route": "Rome - Rome",                              "type": "Vlak",       "w": {"SPR": 1.0, "GC": 0.0, "ITT": 0.0, "MTN": 0.0}},
+    {"id": 1,  "date": "08/05", "route": "Nessebar - Burgas",                       "type": "Vlak",       "w": {"SPR": 1.0, "GC": 0.0, "ITT": 0.0, "MTN": 0.0}},
+    {"id": 2,  "date": "09/05", "route": "Burgas - Valiko Tarnovo",                 "type": "Heuvel",     "w": {"SPR": 0.3, "GC": 0.3, "ITT": 0.0, "MTN": 0.4}},
+    {"id": 3,  "date": "10/05", "route": "Plovdiv - Sofia",                         "type": "Vlak/Heuvel","w": {"SPR": 0.9, "GC": 0.0, "ITT": 0.0, "MTN": 0.1}},
+    {"id": 4,  "date": "12/05", "route": "Catanzaro - Cosenza",                     "type": "Vlak/Heuvel","w": {"SPR": 0.6, "GC": 0.0, "ITT": 0.0, "MTN": 0.4}},
+    {"id": 5,  "date": "13/05", "route": "Praia a Mare - Potenza",                  "type": "Heuvel",     "w": {"SPR": 0.1, "GC": 0.6, "ITT": 0.0, "MTN": 0.3}},
+    {"id": 6,  "date": "14/05", "route": "Paestum - Naples",                        "type": "Heuvel",     "w": {"SPR": 0.8, "GC": 0.0, "ITT": 0.0, "MTN": 0.2}},
+    {"id": 7,  "date": "15/05", "route": "Formia - Blockhaus",                      "type": "Berg",       "w": {"SPR": 0.0, "GC": 0.9, "ITT": 0.0, "MTN": 0.1}},
+    {"id": 8,  "date": "16/05", "route": "Chieti - Fermo",                          "type": "Heuvel",     "w": {"SPR": 0.2, "GC": 0.4, "ITT": 0.0, "MTN": 0.4}},
+    {"id": 9,  "date": "17/05", "route": "Cervia - Corno alle Scale",               "type": "Berg",       "w": {"SPR": 0.0, "GC": 0.8, "ITT": 0.0, "MTN": 0.2}},
+    {"id": 10, "date": "19/05", "route": "Viareggio - Massa",                       "type": "Tijdrit",    "w": {"SPR": 0.0, "GC": 0.0, "ITT": 1.0, "MTN": 0.0}},
+    {"id": 11, "date": "20/05", "route": "Porcari - Chiavari",                      "type": "Heuvel",     "w": {"SPR": 0.2, "GC": 0.4, "ITT": 0.0, "MTN": 0.4}},
+    {"id": 12, "date": "21/05", "route": "Imperia - Novi Ligure",                   "type": "Vlak",       "w": {"SPR": 0.6, "GC": 0.0, "ITT": 0.0, "MTN": 0.4}},
+    {"id": 13, "date": "22/05", "route": "Alessandria - Verbania",                  "type": "Heuvel",     "w": {"SPR": 0.6, "GC": 0.0, "ITT": 0.0, "MTN": 0.4}},
+    {"id": 14, "date": "23/05", "route": "Aosta - Pila",                            "type": "Berg",       "w": {"SPR": 0.0, "GC": 0.9, "ITT": 0.0, "MTN": 0.1}},
+    {"id": 15, "date": "24/05", "route": "Voghera - Milan",                         "type": "Vlak",       "w": {"SPR": 1.0, "GC": 0.0, "ITT": 0.0, "MTN": 0.0}},
+    {"id": 16, "date": "26/05", "route": "Bellinzona - Carì",                       "type": "Berg",       "w": {"SPR": 0.0, "GC": 0.9, "ITT": 0.0, "MTN": 0.1}},
+    {"id": 17, "date": "27/05", "route": "Cassano d'Adda - Andalo",                 "type": "Heuvel",     "w": {"SPR": 0.1, "GC": 0.5, "ITT": 0.0, "MTN": 0.4}},
+    {"id": 18, "date": "28/05", "route": "Fai della Paganella - Pieve di Soligo",   "type": "Heuvel",     "w": {"SPR": 0.3, "GC": 0.2, "ITT": 0.0, "MTN": 0.5}},
+    {"id": 19, "date": "29/05", "route": "Feltre - Alleghe",                        "type": "Berg",       "w": {"SPR": 0.0, "GC": 0.9, "ITT": 0.0, "MTN": 0.1}},
+    {"id": 20, "date": "30/05", "route": "Gemona del Friuli - Piancavallo",         "type": "Berg",       "w": {"SPR": 0.0, "GC": 0.9, "ITT": 0.0, "MTN": 0.1}},
+    {"id": 21, "date": "31/05", "route": "Rome - Rome",                             "type": "Vlak",       "w": {"SPR": 1.0, "GC": 0.0, "ITT": 0.0, "MTN": 0.0}},
 ]
-
-TYPE_EMOJI = {
-    "Vlak": "➖", "Heuvel": "↗️", "Vlak/Heuvel": "〰️",
-    "Berg": "⛰️", "Tijdrit": "⏱️",
-}
 
 def laad_profiel_scores():
     bestand = "giro262/profile_score.csv"
@@ -108,18 +103,49 @@ def get_clickable_image_html(image_path, fallback_text, link):
         img_src = f"https://placehold.co/600x400/eeeeee/000000?text={fallback_text}"
     return f'<a href="{link}" target="_blank"><img src="{img_src}" width="100%" style="border-radius:8px;"></a>'
 
+def bereken_stage_scores(df, weights):
+    """Geeft dict {renner: stagescore} op basis van wegingen."""
+    s = sum(weights.values()) or 1.0
+    w = {k: v / s for k, v in weights.items()}
+    scores = {}
+    for _, row in df.iterrows():
+        scores[row['Naam']] = (
+            row.get('SPR', 0) * w.get('SPR', 0) +
+            row.get('GC',  0) * w.get('GC',  0) +
+            row.get('ITT', 0) * w.get('ITT', 0) +
+            row.get('MTN', 0) * w.get('MTN', 0)
+        )
+    return scores
+
+def bepaal_auto_kopman(team_renners, etappe_id, df):
+    """Berekent de automatische kopman puur op basis van het etappeprofiel."""
+    w = next((e['w'] for e in GIRO_ETAPPES if e['id'] == etappe_id), {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25})
+    s = sum(w.values()) or 1.0
+    w = {k: v / s for k, v in w.items()}
+    best, best_score = None, -1
+    for r in team_renners:
+        rij = df[df['Naam'] == r]
+        if rij.empty: continue
+        score = (
+            rij.iloc[0].get('SPR', 0) * w.get('SPR', 0) +
+            rij.iloc[0].get('GC',  0) * w.get('GC',  0) +
+            rij.iloc[0].get('ITT', 0) * w.get('ITT', 0) +
+            rij.iloc[0].get('MTN', 0) * w.get('MTN', 0)
+        )
+        if score > best_score:
+            best_score = score
+            best = r
+    return best
+
 def solve_final_team(df, draft_counts, max_bud=100.0, max_ren=16):
     prob = pulp.LpProblem("Giro_Builder", pulp.LpMaximize)
     x = pulp.LpVariable.dicts("Select", df.index, cat='Binary')
-
     df_solve = df.copy()
     df_solve['Draft_Pts'] = df_solve['Naam'].map(draft_counts).fillna(0)
     df_solve['Obj_Score'] = (df_solve['Draft_Pts'] * 1000) + df_solve['EV']
-
     prob += pulp.lpSum([df_solve.loc[i, 'Obj_Score'] * x[i] for i in df_solve.index])
     prob += pulp.lpSum([x[i] for i in df_solve.index]) == max_ren
     prob += pulp.lpSum([df_solve.loc[i, 'Prijs'] * x[i] for i in df_solve.index]) <= max_bud
-
     prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=10))
     if pulp.LpStatus[prob.status] == 'Optimal':
         return [df_solve.loc[i, 'Naam'] for i in df_solve.index if x[i].varValue > 0.5]
@@ -128,42 +154,40 @@ def solve_final_team(df, draft_counts, max_bud=100.0, max_ren=16):
 @st.cache_data
 def load_all_data():
     prijzen_file = "giro262/sporza_giro26_startlijst.csv"
-    stats_file = "renners_stats.csv"
+    stats_file   = "renners_stats.csv"
     if not os.path.exists(prijzen_file) or not os.path.exists(stats_file):
         return pd.DataFrame()
-
     df_p = pd.read_csv(prijzen_file, sep=None, engine='python')
-    df_s = pd.read_csv(stats_file, sep=None, engine='python')
+    df_s = pd.read_csv(stats_file,   sep=None, engine='python')
     df_p.columns = df_p.columns.str.strip()
     df_s.columns = df_s.columns.str.strip()
-
     naam_col_p = 'Naam' if 'Naam' in df_p.columns else 'Renner'
     naam_col_s = 'Naam' if 'Naam' in df_s.columns else 'Renner'
-
     df = pd.merge(df_p, df_s, left_on=naam_col_p, right_on=naam_col_s, how='left')
     df['Prijs'] = pd.to_numeric(df['Prijs'], errors='coerce').fillna(0)
     df.loc[df['Prijs'] > 1000, 'Prijs'] = df['Prijs'] / 1000000
     df.loc[df['Prijs'] == 0.8, 'Prijs'] = 0.75
-
     for col in ['GC', 'SPR', 'ITT', 'MTN']:
         if col not in df.columns: df[col] = 0
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
-
     df['EV'] = ((df['GC']/100)**4 * 400 + (df['SPR']/100)**4 * 250 +
                 (df['ITT']/100)**4 * 80  + (df['MTN']/100)**4 * 100).fillna(0).round(0)
-
+    # Zorg voor consistente Naam kolom
     if naam_col_p != 'Naam': df = df.rename(columns={naam_col_p: 'Naam'})
-    return df.sort_values('Naam')
+    elif 'Renner' in df.columns and 'Naam' not in df.columns: df = df.rename(columns={'Renner': 'Naam'})
+    return df.drop_duplicates(subset=['Naam']).sort_values('Naam')
 
 df = load_all_data()
 
 # --- SESSION STATE ---
-if "etappe_keuzes"    not in st.session_state:
-    st.session_state.etappe_keuzes    = {str(e["id"]): [None, None, None] for e in GIRO_ETAPPES}
-if "giro_weights_v2"  not in st.session_state:
-    st.session_state.giro_weights_v2  = {str(e["id"]): e["w"].copy() for e in GIRO_ETAPPES}
-if "finaal_team"      not in st.session_state:
-    st.session_state.finaal_team      = []
+_default_keuzes  = {str(e["id"]): [None, None, None] for e in GIRO_ETAPPES}
+_default_weights = {str(e["id"]): e["w"].copy()      for e in GIRO_ETAPPES}
+_default_kopman  = {str(e["id"]): None               for e in GIRO_ETAPPES}
+
+if "etappe_keuzes"  not in st.session_state: st.session_state.etappe_keuzes  = _default_keuzes.copy()
+if "giro_weights_v2" not in st.session_state: st.session_state.giro_weights_v2 = _default_weights.copy()
+if "finaal_team"    not in st.session_state: st.session_state.finaal_team    = []
+if "kopman_keuzes"  not in st.session_state: st.session_state.kopman_keuzes  = _default_kopman.copy()
 
 huidig_team_namen = st.session_state.finaal_team
 huidig_team_df    = df[df['Naam'].isin(huidig_team_namen)].copy() if not df.empty else pd.DataFrame()
@@ -172,19 +196,9 @@ aantal_renners    = len(huidig_team_namen)
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.title("📋 Jouw Team")
-
-    # Budget & renners meter
-    budget_over = 100 - totaal_prijs
-    budget_pct  = min(totaal_prijs / 100, 1.0)
-    st.progress(budget_pct, text=f"€ {totaal_prijs:.2f}M / €100M")
-
-    col_m1, col_m2 = st.columns(2)
-    col_m1.metric("Budget over", f"€ {budget_over:.2f}M",
-                  delta_color="inverse" if budget_over < 0 else "normal")
-    col_m2.metric("Renners", f"{aantal_renners} / 16",
-                  delta_color="inverse" if aantal_renners > 16 else "normal")
-
+    st.title("📋 Team Status")
+    st.metric("Budget over", f"€ {100 - totaal_prijs:.2f}M")
+    st.metric("Renners",     f"{aantal_renners} / 16")
     if aantal_renners > 16: st.error("🚨 Te veel renners!")
     if totaal_prijs > 100:  st.error("🚨 Budget overschreden!")
 
@@ -194,7 +208,8 @@ with st.sidebar:
         data = {
             "team":          st.session_state.finaal_team,
             "etappe_keuzes": st.session_state.etappe_keuzes,
-            "weights":       st.session_state.giro_weights_v2
+            "weights":       st.session_state.giro_weights_v2,
+            "kopman_keuzes": st.session_state.kopman_keuzes,
         }
         supabase.table(TABEL_NAAM).update({DB_KOLOM: data}).eq("username", speler_naam).execute()
         st.success("Opgeslagen!")
@@ -203,72 +218,58 @@ with st.sidebar:
         res = supabase.table(TABEL_NAAM).select(DB_KOLOM).eq("username", speler_naam).execute()
         if res.data and res.data[0].get(DB_KOLOM):
             db_data = res.data[0][DB_KOLOM]
-            st.session_state.etappe_keuzes   = db_data.get("etappe_keuzes", {str(e["id"]): [None]*3 for e in GIRO_ETAPPES})
-            st.session_state.giro_weights_v2 = db_data.get("weights", {str(e["id"]): e["w"].copy() for e in GIRO_ETAPPES})
-            st.session_state.finaal_team     = db_data.get("team", [])
+            st.session_state.etappe_keuzes  = db_data.get("etappe_keuzes",  _default_keuzes.copy())
+            st.session_state.giro_weights_v2 = db_data.get("weights",       _default_weights.copy())
+            st.session_state.finaal_team    = db_data.get("team",           [])
+            st.session_state.kopman_keuzes  = db_data.get("kopman_keuzes",  _default_kopman.copy())
             st.rerun()
 
-    # Compact teamlijst in sidebar
+    # Kopman snelknoppen
     if huidig_team_namen:
         st.divider()
-        st.caption("Geselecteerde renners:")
-        for r in sorted(huidig_team_namen):
-            prijs = df.loc[df['Naam'] == r, 'Prijs'].values
-            p_str = f"€{prijs[0]:.1f}M" if len(prijs) > 0 else ""
-            st.caption(f"• {r} {p_str}")
+        st.markdown("#### 🎖️ Kopman beheer")
+        col_k1, col_k2 = st.columns(2)
+        with col_k1:
+            if st.button("🔄 Reset\nalle kopmannen", use_container_width=True,
+                         help="Zet alle etappes terug naar automatisch"):
+                st.session_state.kopman_keuzes = _default_kopman.copy()
+                st.rerun()
+        with col_k2:
+            ingesteld = sum(1 for v in st.session_state.kopman_keuzes.values() if v is not None)
+            st.metric("Handmatig", f"{ingesteld}/21")
 
 # --- HOOFDSCHERM ---
-st.title("🛠️ Giro Team Bouwer")
-st.markdown(
-    "Bouw je team op etappe voor etappe. Kies renners die jij ziet scoren, "
-    "laat de assistent de rest aanvullen en stel je definitieve 16 samen. "
-    "*Data van [Wielerorakel](https://wielerorakel.nl/)*"
-)
+st.title("🇮🇹 Handmatige Team Bouwer")
+st.markdown("*Data en Statistieken van [Wielerorakel](https://wielerorakel.nl/)*")
 
 if df.empty:
-    st.error("Databestanden niet gevonden. Controleer de mappen.")
+    st.error("Databestanden niet gevonden.")
     st.stop()
 
-# Progress overzicht bovenaan
-n_etappes_met_picks = sum(
-    1 for eid in st.session_state.etappe_keuzes
-    if any(x for x in st.session_state.etappe_keuzes[eid] if x)
-)
-col_p1, col_p2, col_p3 = st.columns(3)
-col_p1.metric("Etappes ingevuld", f"{n_etappes_met_picks} / 21")
-col_p2.metric("Renners in team",  f"{aantal_renners} / 16")
-col_p3.metric("Budget besteed",   f"€ {totaal_prijs:.2f}M")
-
-st.divider()
-
-# --- TABS ---
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "🗺️ Etappe Picks",
-    "🛡️ Team Samenstellen",
-    "🚀 Opstellingen",
+    "🗺️ Etappe Voorspellingen",
+    "🛡️ Finaal Team Samenstellen",
+    "🚀 Opstellingen & Kopmannen",
     "📋 Startlijst",
     "ℹ️ Uitleg"
 ])
 
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 1: ETAPPE PICKS
-# ════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
+# TAB 1 – ETAPPE VOORSPELLINGEN + KOPMAN PER ETAPPE
+# ══════════════════════════════════════════════════════════════════════
 with tab1:
-    st.info(
-        "Kies per etappe welke renners jij ziet winnen of hoog eindigen. "
-        "De assistent suggereert kandidaten op basis van het profiel — jij beslist. "
-        "Jouw picks worden in Tab 2 gebruikt om het definitieve team samen te stellen."
-    )
+    st.info("Kies per etappe de renners waarvan jij denkt dat ze gaan scoren. "
+            "Stel ook je kopman in: de kopman scoort **dubbele punten**.")
 
     sorteer_optie = st.radio(
-        "Sorteer dropdowns op:", ["🔤 Alfabetisch", "📊 Verwachte Waarde (per etappe)"],
+        "Sorteer dropdown-lijsten op:",
+        ["🔤 Alfabetisch", "📊 Verwachte Waarde (Per Etappe)"],
         horizontal=True
     )
 
     for etappe in GIRO_ETAPPES:
-        eid  = str(etappe["id"])
-        cw   = st.session_state.giro_weights_v2[eid]
-        emoji = TYPE_EMOJI.get(etappe["type"], "")
+        eid = str(etappe["id"])
+        cw  = st.session_state.giro_weights_v2[eid]
 
         som_header = sum(cw.values()) if sum(cw.values()) > 0 else 1.0
         weight_str = (
@@ -278,16 +279,18 @@ with tab1:
             f"MTN:{int((cw['MTN']/som_header)*100)}%"
         )
 
-        huidige = [x for x in st.session_state.etappe_keuzes[eid] if x]
-        picks_str = f"✅ Jouw keuze: {', '.join(huidige)}" if huidige else "⏳ Nog geen keuze"
+        # Kopman status tonen in de expander header
+        huidige_kopman = st.session_state.kopman_keuzes.get(eid)
+        kopman_label   = f"🎖️ {huidige_kopman}" if huidige_kopman else "🎖️ Auto"
 
-        with st.expander(f"**E{etappe['id']}** {emoji} {etappe['route']} ({etappe['date']})"):
-            st.caption(picks_str)
-            
-            # Afbeeldingen
+        with st.expander(
+            f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']}) "
+            f"| {weight_str} | {kopman_label}"
+        ):
             giro_link = "https://www.giroditalia.it/en/the-route/"
             map_path  = f"giro262/giro26-{etappe['id']}-map.jpg"
             prof_path = f"giro262/giro26-{etappe['id']}-hp.jpg"
+
             i1, i2 = st.columns(2)
             i1.markdown(get_clickable_image_html(map_path,  f"Kaart+{etappe['id']}", giro_link), unsafe_allow_html=True)
             i2.markdown(get_clickable_image_html(prof_path, f"Profiel+{etappe['id']}", giro_link), unsafe_allow_html=True)
@@ -295,73 +298,107 @@ with tab1:
             st.divider()
 
             # Weging sliders
-            st.markdown("###### ⚙️ Profiel weging aanpassen:")
+            st.markdown("###### ⚙️ Pas de weging aan:")
             wc1, wc2, wc3, wc4 = st.columns(4)
-            new_spr = wc1.number_input("Sprint",       0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{eid}")
-            new_gc  = wc2.number_input("Klassement",   0.0, 1.0, float(cw["GC"]),  0.1, key=f"wgc_{eid}")
-            new_itt = wc3.number_input("Tijdrit",      0.0, 1.0, float(cw["ITT"]), 0.1, key=f"witt_{eid}")
-            new_mtn = wc4.number_input("Klim/Aanval",  0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{eid}")
+            new_spr = wc1.number_input("Sprint (SPR)",      0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{eid}")
+            new_gc  = wc2.number_input("Klassement (GC)",   0.0, 1.0, float(cw["GC"]),  0.1, key=f"wgc_{eid}")
+            new_itt = wc3.number_input("Tijdrit (ITT)",     0.0, 1.0, float(cw["ITT"]), 0.1, key=f"witt_{eid}")
+            new_mtn = wc4.number_input("Klim/Aanval (MTN)", 0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{eid}")
             st.session_state.giro_weights_v2[eid] = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
 
             som_input = new_spr + new_gc + new_itt + new_mtn
             if abs(som_input - 1.0) > 0.01 and som_input > 0:
-                st.warning(f"⚠️ Weging telt op tot {som_input*100:.0f}% — wordt automatisch herschaald.")
-                active_weights = {"SPR": new_spr/som_input, "GC": new_gc/som_input,
-                                  "ITT": new_itt/som_input, "MTN": new_mtn/som_input}
+                st.warning(f"⚠️ Weging telt op tot {som_input*100:.0f}%, wordt automatisch herschaald naar 100%.")
+                active_w = {k: v / som_input for k, v in {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}.items()}
             elif som_input == 0:
-                st.error("⚠️ Weging mag niet 0% zijn.")
-                active_weights = {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+                st.error("Weging mag niet 0% zijn.")
+                active_w = {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
             else:
-                active_weights = st.session_state.giro_weights_v2[eid]
+                active_w = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
 
-            # Assistent suggesties
+            # AI top-5
             df_stage = df.copy()
             df_stage['StageScore'] = (
-                df_stage['SPR'] * active_weights['SPR'] +
-                df_stage['GC']  * active_weights['GC']  +
-                df_stage['ITT'] * active_weights['ITT'] +
-                df_stage['MTN'] * active_weights['MTN']
+                df_stage['SPR'] * active_w['SPR'] +
+                df_stage['GC']  * active_w['GC']  +
+                df_stage['ITT'] * active_w['ITT']  +
+                df_stage['MTN'] * active_w['MTN']
             )
-            top_5 = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False]).head(5)
-            top_5_namen = [f"{row['Naam']} ({int(row['StageScore'])})" for _, row in top_5.iterrows()]
-            top_3_pure  = top_5['Naam'].tolist()[:3]
+            top_5            = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False]).head(5)
+            top_5_namen      = [f"{row['Naam']} ({int(row['StageScore'])})" for _, row in top_5.iterrows()]
+            top_3_pure_names = top_5['Naam'].tolist()[:3]
+            st.info(f"💡 **AI Top 5 Suggesties:** {', '.join(top_5_namen)}")
 
-            st.info(f"💡 **Assistent tip:** {', '.join(top_5_namen)}")
-
-            # Jouw picks
             if "Alfabetisch" in sorteer_optie:
-                renners_opties = ["-"] + sorted(df['Naam'].tolist())
+                renners_opties_stage = ["-"] + sorted(df['Naam'].tolist())
             else:
-                renners_opties = ["-"] + df_stage.sort_values(
-                    by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()
+                renners_opties_stage = ["-"] + df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()
 
-            pick_head, pick_btn = st.columns([3, 1])
-            pick_head.markdown("###### ✏️ Jouw keuze (max 3):")
-            if pick_btn.button("🤖 Neem top 3 over", key=f"btn_ai_{eid}"):
-                for idx, naam in enumerate(top_3_pure):
-                    st.session_state.etappe_keuzes[eid][idx] = naam
-                    st.session_state[f"sel_{eid}_{idx}"] = naam
-                st.rerun()
+            # Voorspellingen (3 posities)
+            c_pred_head, c_pred_btn = st.columns([3, 1])
+            with c_pred_head:
+                st.markdown("###### 🏁 Jouw Etappe Voorspelling:")
+            with c_pred_btn:
+                if st.button("🤖 AI Top 3", key=f"btn_ai_{eid}"):
+                    for idx, naam in enumerate(top_3_pure_names):
+                        st.session_state.etappe_keuzes[eid][idx] = naam
+                        st.session_state[f"sel_{eid}_{idx}"] = naam
+                    st.rerun()
 
             c1, c2, c3 = st.columns(3)
             for i, col in enumerate([c1, c2, c3]):
                 current_val = st.session_state.etappe_keuzes[eid][i]
-                d_idx = renners_opties.index(current_val) if current_val in renners_opties else 0
-                keuze = col.selectbox(f"Pos {i+1}", renners_opties, index=d_idx, key=f"sel_{eid}_{i}")
+                d_idx = renners_opties_stage.index(current_val) if current_val in renners_opties_stage else 0
+                keuze = col.selectbox(f"Positie {i+1}", renners_opties_stage, index=d_idx, key=f"sel_{eid}_{i}")
                 st.session_state.etappe_keuzes[eid][i] = keuze if keuze != "-" else None
 
-            # Reset knop voor deze etappe
-            if any(st.session_state.etappe_keuzes[eid]):
-                if st.button(f"↩️ Reset etappe {etappe['id']}", key=f"reset_{eid}"):
-                    st.session_state.etappe_keuzes[eid] = [None, None, None]
-                    st.rerun()
+            # ── KOPMAN SECTIE ──────────────────────────────────────────────────
+            st.divider()
+            st.markdown("###### 🎖️ Kopman voor deze etappe")
+            st.markdown(
+                "De kopman scoort **dubbele punten** (x2). Kies handmatig of laat de AI beslissen "
+                "op basis van het etappeprofiel."
+            )
 
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 2: TEAM SAMENSTELLEN
-# ════════════════════════════════════════════════════════════════════════════
+            # Bepaal auto-kopman voor guidance
+            if huidig_team_namen:
+                auto_kopman = bepaal_auto_kopman(huidig_team_namen, etappe["id"], df)
+                auto_hint   = f"Auto ({auto_kopman})" if auto_kopman else "Auto (geen team)"
+            else:
+                auto_hint = "Auto (stel eerst een team in, Tab 2)"
+
+            kopman_opties = ["🤖 " + auto_hint] + sorted(huidig_team_namen)
+
+            # Huidige waarde terug naar index
+            huidige_keuze = st.session_state.kopman_keuzes.get(eid)
+            if huidige_keuze and huidige_keuze in kopman_opties:
+                kopman_idx = kopman_opties.index(huidige_keuze)
+            else:
+                kopman_idx = 0
+
+            gekozen = st.selectbox(
+                "Kopman:",
+                options=kopman_opties,
+                index=kopman_idx,
+                key=f"kopman_sel_{eid}",
+                help="'Auto' = het systeem kiest de best scorende renner op basis van het etappeprofiel."
+            )
+
+            # Sla op: None betekent auto, anders de naam
+            if gekozen.startswith("🤖"):
+                st.session_state.kopman_keuzes[eid] = None
+                if huidig_team_namen and auto_kopman:
+                    st.success(f"✅ Auto-kopman voor E{etappe['id']}: **{auto_kopman}**")
+            else:
+                st.session_state.kopman_keuzes[eid] = gekozen
+                st.success(f"✅ Handmatige kopman voor E{etappe['id']}: **{gekozen}**")
+
+# ══════════════════════════════════════════════════════════════════════
+# TAB 2 – FINAAL TEAM SAMENSTELLEN
+# ══════════════════════════════════════════════════════════════════════
 with tab2:
-    st.subheader("Stap 1 — Jouw Picks Overzicht")
-    st.caption("Renners die jij vaker hebt gekozen krijgen een hogere prioriteit bij het samenstellen.")
+    st.subheader("1. Jouw Voorspellingen Overzicht")
+    st.write("Renners die je vaker voorspelt krijgen meer gewicht bij de automatische teamselectie.")
 
     draft_data = []
     for eid, keuzes in st.session_state.etappe_keuzes.items():
@@ -369,232 +406,273 @@ with tab2:
             if r and r != "-":
                 draft_data.append({"Naam": r, "Punten": 3 - i})
 
+    draft_df     = pd.DataFrame(draft_data)
     draft_counts = {}
-    if draft_data:
-        draft_df = pd.DataFrame(draft_data)
+    if not draft_df.empty:
         draft_summary = (
-            draft_df.groupby("Naam")["Punten"]
-            .sum().reset_index()
+            draft_df.groupby("Naam")["Punten"].sum()
+            .reset_index()
             .sort_values(by="Punten", ascending=False)
         )
         draft_summary = pd.merge(draft_summary, df[['Naam', 'Prijs', 'EV']], on='Naam', how='left')
-        draft_summary.columns = ['Renner', 'Jouw Score', 'Prijs (M)', 'EV']
-
-        # Kleurcodering: hoe vaker gekozen, hoe groener
-        max_score = draft_summary['Jouw Score'].max()
-        def kleur(val):
-            pct = val / max_score if max_score > 0 else 0
-            g = int(100 + pct * 155)
-            return f'background-color: rgba(0,{g},0,0.15)'
-
-        st.dataframe(
-            draft_summary.style.applymap(kleur, subset=['Jouw Score']),
-            hide_index=True, use_container_width=True
-        )
-        draft_counts = dict(zip(draft_summary['Renner'], draft_summary['Jouw Score']))
+        st.dataframe(draft_summary, hide_index=True, use_container_width=True)
+        draft_counts = dict(zip(draft_summary['Naam'], draft_summary['Punten']))
     else:
-        st.info("Je hebt nog geen etappes ingevuld in Tab 1. De assistent kan dan alleen op stats optimaliseren.")
+        st.info("Je hebt nog geen etappes voorspeld in Tab 1.")
 
     st.divider()
-    st.subheader("Stap 2 — Stel je 16 samen")
+    st.subheader("2. Finaal Team Selecteren (16 Renners)")
 
-    col_auto, col_manual = st.columns([1, 2])
-
-    with col_auto:
-        st.markdown("**🤖 Laat de assistent kiezen**")
-        max_bud_inp = st.number_input("Budget (M€)", value=100.0, step=0.5)
-        max_ren_inp = st.number_input("Aantal renners", value=16, min_value=1, max_value=25)
-
-        if st.button("🚀 Bereken optimaal team", type="primary", use_container_width=True):
-            res = solve_final_team(df, draft_counts, max_bud_inp, max_ren_inp)
+    c_auto, c_space = st.columns([1, 2])
+    with c_auto:
+        if st.button("🤖 Bereken Optimaal Team", type="primary", use_container_width=True):
+            res = solve_final_team(df, draft_counts, 100.0, 16)
             if res:
                 st.session_state.finaal_team = res
                 st.rerun()
             else:
                 st.error("Kon geen geldig team berekenen binnen het budget.")
 
-    with col_manual:
-        st.markdown("**✏️ Of kies handmatig**")
+    def update_finaal_team():
+        st.session_state.finaal_team = st.session_state._finaal_team_selector
 
-        def update_finaal_team():
-            st.session_state.finaal_team = st.session_state._finaal_team_selector
+    st.multiselect(
+        "Selecteer handmatig je 16 definitieve renners:",
+        options=df['Naam'].tolist(),
+        default=st.session_state.finaal_team,
+        max_selections=16,
+        key="_finaal_team_selector",
+        on_change=update_finaal_team
+    )
 
-        st.multiselect(
-            "Selecteer je 16 renners:",
-            options=df['Naam'].tolist(),
-            default=st.session_state.finaal_team,
-            max_selections=16,
-            key="_finaal_team_selector",
-            on_change=update_finaal_team,
-        )
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Aantal Renners", f"{aantal_renners} / 16")
+    c2.metric("Budget Besteed",  f"€ {totaal_prijs:.2f}M")
+    c3.metric("Budget Over",     f"€ {100 - totaal_prijs:.2f}M")
 
     st.divider()
+    st.subheader("3. Jouw Definitieve Selectie")
     if not huidig_team_df.empty:
-        st.subheader("Stap 3 — Jouw definitieve selectie")
         col_grafiek, col_tabel = st.columns([1, 2])
         with col_grafiek:
             plot_cols = [c for c in ['GC', 'SPR', 'ITT', 'MTN'] if c in huidig_team_df.columns]
             if plot_cols:
-                st.markdown("**Gemiddelde team stats:**")
                 st.bar_chart(huidig_team_df[plot_cols].mean())
         with col_tabel:
-            show_cols = [c for c in ['Naam', 'Ploeg', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV'] if c in huidig_team_df.columns]
             st.dataframe(
-                huidig_team_df[show_cols].sort_values(by='Prijs', ascending=False),
+                huidig_team_df[['Naam', 'Ploeg', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV']].sort_values('Prijs', ascending=False),
                 hide_index=True, use_container_width=True
             )
+    else:
+        st.info("Selecteer hierboven je team.")
 
-        # Budget check
-        if totaal_prijs > 100:
-            st.error(f"🚨 Budget overschreden met €{totaal_prijs - 100:.2f}M!")
-        elif totaal_prijs > 98:
-            st.success(f"✅ Budget optimaal benut: €{totaal_prijs:.2f}M / €100M")
-        else:
-            st.info(f"💰 Nog €{100 - totaal_prijs:.2f}M over.")
-
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 3: OPSTELLINGEN
-# ════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
+# TAB 3 – OPSTELLINGEN MATRIX + KOPMAN OVERZICHT
+# ══════════════════════════════════════════════════════════════════════
 with tab3:
     if not st.session_state.finaal_team:
-        st.warning("Stel eerst je team van 16 samen in Tab 2.")
+        st.warning("Stel eerst een definitief team samen in Tab 2.")
     else:
-        st.subheader("📅 Dagopstellingen & Kopman advies")
-        st.caption(
-            "Per etappe zie je je beste 9 en de geadviseerde kopman (de renner met de hoogste etappescore). "
-            "Jouw eigen picks krijgen altijd voorrang."
+        # ── Kopman Overzicht Tabel ────────────────────────────────────────
+        st.subheader("🎖️ Kopman per Etappe – Overzicht")
+        st.markdown(
+            "Handmatig ingestelde kopmannen zijn gemarkeerd met **✏️**. "
+            "Auto-kopmannen (op basis van etappeprofiel) zijn gemarkeerd met **🤖**."
         )
 
-        # Matrix
+        kopman_overzicht = []
+        for etappe in GIRO_ETAPPES:
+            eid = str(etappe["id"])
+            handmatig = st.session_state.kopman_keuzes.get(eid)
+            auto_k    = bepaal_auto_kopman(huidig_team_namen, etappe["id"], df)
+
+            if handmatig:
+                effectief_kopman = handmatig
+                bron = "✏️ Handmatig"
+            else:
+                effectief_kopman = auto_k
+                bron = "🤖 Auto"
+
+            kopman_overzicht.append({
+                "E":      f"E{etappe['id']}",
+                "Datum":  etappe["date"],
+                "Route":  etappe["route"],
+                "Type":   etappe["type"],
+                "Kopman": effectief_kopman or "-",
+                "Bron":   bron,
+            })
+
+        df_kopman_ovz = pd.DataFrame(kopman_overzicht)
+
+        def kleur_kopman(row):
+            if "Handmatig" in row["Bron"]:
+                return ["background-color: rgba(255,215,0,0.15)"] * len(row)
+            return [""] * len(row)
+
+        st.dataframe(
+            df_kopman_ovz.style.apply(kleur_kopman, axis=1),
+            hide_index=True,
+            use_container_width=True
+        )
+
+        st.divider()
+
+        # ── Opstellingen Matrix ───────────────────────────────────────────
+        st.subheader("📅 Dagelijkse Opstellingen Matrix")
+        st.write(
+            "**©** = Kopman (dubbele punten) &nbsp;|&nbsp; "
+            "**✅** = Basis &nbsp;|&nbsp; **-** = Bank"
+        )
+
         matrix_data = {renner: {"Renner": renner} for renner in st.session_state.finaal_team}
+
         for etappe in GIRO_ETAPPES:
             eid      = str(etappe["id"])
             col_name = f"E{etappe['id']}"
             cw       = st.session_state.giro_weights_v2[eid]
-            emoji    = TYPE_EMOJI.get(etappe["type"], "")
 
             for renner in st.session_state.finaal_team:
                 matrix_data[renner][col_name] = "-"
 
-            voorspelde_namen = [n for n in st.session_state.etappe_keuzes[eid] if n and n in st.session_state.finaal_team]
+            voorspeld = [n for n in st.session_state.etappe_keuzes[eid] if n and n in st.session_state.finaal_team]
             som_input = sum(cw.values())
-            w = ({k: cw[k]/som_input for k in cw} if som_input > 0
-                 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25})
+            w = {k: v / som_input for k, v in cw.items()} if som_input > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
 
             team_stage_df = huidig_team_df.copy()
             team_stage_df['StageScore'] = (
-                team_stage_df['SPR'] * w['SPR'] + team_stage_df['GC'] * w['GC'] +
-                team_stage_df['ITT'] * w['ITT'] + team_stage_df['MTN'] * w['MTN']
+                team_stage_df.get('SPR', 0) * w['SPR'] +
+                team_stage_df.get('GC',  0) * w['GC']  +
+                team_stage_df.get('ITT', 0) * w['ITT']  +
+                team_stage_df.get('MTN', 0) * w['MTN']
             )
 
-            voorspeld_df = (team_stage_df.set_index('Naam').loc[voorspelde_namen].reset_index()
-                            if voorspelde_namen and 'Naam' in team_stage_df.columns else pd.DataFrame())
-            rest_df = team_stage_df[~team_stage_df['Naam'].isin(voorspelde_namen)].sort_values(
-                by=['StageScore', 'EV'], ascending=[False, False])
-            top_9_df = pd.concat([voorspeld_df, rest_df]).head(9)
+            voorspeld_df = team_stage_df[team_stage_df['Naam'].isin(voorspeld)] if voorspeld else pd.DataFrame()
+            rest_df      = team_stage_df[~team_stage_df['Naam'].isin(voorspeld)].sort_values('StageScore', ascending=False)
+            top_9_df     = pd.concat([voorspeld_df, rest_df]).head(9)
 
-            for i, (_, row) in enumerate(top_9_df.iterrows()):
-                matrix_data[row['Naam']][col_name] = f"{emoji}©" if i == 0 else f"{emoji}✅"
+            # Bepaal kopman voor deze etappe
+            handmatig_km  = st.session_state.kopman_keuzes.get(eid)
+            starters_lijst = top_9_df['Naam'].tolist()
+            if handmatig_km and handmatig_km in starters_lijst:
+                effectief_km = handmatig_km
+            elif handmatig_km and handmatig_km not in starters_lijst:
+                # Handmatig kopman zit niet in de 9 starters → waarschuwing
+                effectief_km = handmatig_km  # toch tonen zodat gebruiker het ziet
+            else:
+                # Auto: eerste (hoogst scorende) starter
+                effectief_km = starters_lijst[0] if starters_lijst else None
 
-        matrix_df = pd.DataFrame(list(matrix_data.values()))
-        st.dataframe(matrix_df, hide_index=True, use_container_width=True)
+            for renner_naam in starters_lijst:
+                matrix_data[renner_naam][col_name] = "©" if renner_naam == effectief_km else "✅"
 
+        matrix_df_display = pd.DataFrame(list(matrix_data.values()))
+        st.dataframe(matrix_df_display, hide_index=True, use_container_width=True)
+
+        # ── Details per Etappe ────────────────────────────────────────────
         st.divider()
-        st.subheader("🔍 Etappe Details")
+        st.subheader("🔍 Details per Etappe")
 
         for etappe in GIRO_ETAPPES:
-            eid   = str(etappe["id"])
-            cw    = st.session_state.giro_weights_v2[eid]
-            emoji = TYPE_EMOJI.get(etappe["type"], "")
+            eid = str(etappe["id"])
+            cw  = st.session_state.giro_weights_v2[eid]
 
-            voorspelde_namen = [n for n in st.session_state.etappe_keuzes[eid] if n and n in st.session_state.finaal_team]
-            som_input = sum(cw.values())
-            w = ({k: cw[k]/som_input for k in cw} if som_input > 0
-                 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25})
+            voorspeld    = [n for n in st.session_state.etappe_keuzes[eid] if n and n in st.session_state.finaal_team]
+            som_input    = sum(cw.values())
+            w = {k: v / som_input for k, v in cw.items()} if som_input > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
 
             team_stage_df = huidig_team_df.copy()
             team_stage_df['StageScore'] = (
-                team_stage_df['SPR'] * w['SPR'] + team_stage_df['GC'] * w['GC'] +
-                team_stage_df['ITT'] * w['ITT'] + team_stage_df['MTN'] * w['MTN']
+                team_stage_df.get('SPR', 0) * w['SPR'] +
+                team_stage_df.get('GC',  0) * w['GC']  +
+                team_stage_df.get('ITT', 0) * w['ITT']  +
+                team_stage_df.get('MTN', 0) * w['MTN']
             )
+            voorspeld_df = team_stage_df[team_stage_df['Naam'].isin(voorspeld)] if voorspeld else pd.DataFrame()
+            rest_df      = team_stage_df[~team_stage_df['Naam'].isin(voorspeld)].sort_values('StageScore', ascending=False)
+            top_9_df     = pd.concat([voorspeld_df, rest_df]).head(9)
+            starters_lijst = top_9_df['Naam'].tolist()
 
-            voorspeld_df = (team_stage_df.set_index('Naam').loc[voorspelde_namen].reset_index()
-                            if voorspelde_namen and 'Naam' in team_stage_df.columns else pd.DataFrame())
-            rest_df = team_stage_df[~team_stage_df['Naam'].isin(voorspelde_namen)].sort_values(
-                by=['StageScore', 'EV'], ascending=[False, False])
-            top_9_df = pd.concat([voorspeld_df, rest_df]).head(9)
+            handmatig_km = st.session_state.kopman_keuzes.get(eid)
+            if handmatig_km and handmatig_km in starters_lijst:
+                effectief_km = handmatig_km
+                kopman_bron  = "✏️ Handmatig"
+            elif handmatig_km and handmatig_km not in starters_lijst:
+                effectief_km = handmatig_km
+                kopman_bron  = "⚠️ Handmatig (staat niet in top 9!)"
+            else:
+                effectief_km = starters_lijst[0] if starters_lijst else None
+                kopman_bron  = "🤖 Auto"
 
-            with st.expander(f"E{etappe['id']} {emoji} {etappe['route']} ({etappe['date']})"):
+            with st.expander(
+                f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']}) "
+                f"| Kopman: **{effectief_km or '-'}** {kopman_bron}"
+            ):
+                # Waarschuwing als handmatige kopman buiten de starters valt
+                if handmatig_km and handmatig_km not in starters_lijst:
+                    st.warning(
+                        f"⚠️ **{handmatig_km}** is je handmatige kopman maar staat niet in de top 9 starters "
+                        f"voor deze etappe. Pas je etappevoorspellingen aan of kies een andere kopman."
+                    )
+
                 opstelling = []
-                for i, (_, row) in enumerate(top_9_df.iterrows()):
+                for _, row in top_9_df.iterrows():
                     naam = row['Naam']
-                    if i == 0:
-                        rol = "© Kopman (geadviseerd)"
-                    elif naam in voorspelde_namen:
-                        rol = "Basis (jouw pick)"
+                    if naam == effectief_km:
+                        rol = f"© Kopman ({kopman_bron})"
+                    elif naam in voorspeld:
+                        rol = "Basis (Jouw Voorspelling)"
                     else:
-                        rol = "Basis (assistent aanvulling)"
-                    opstelling.append({"Rol": rol, "Renner": naam, "Score": int(row['StageScore'])})
+                        rol = "Basis (AI Opvulling)"
+                    opstelling.append({
+                        "Rol":             rol,
+                        "Renner":          naam,
+                        "Verwachte Score": int(row['StageScore'])
+                    })
 
                 st.dataframe(pd.DataFrame(opstelling), hide_index=True, use_container_width=True)
 
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 4: STARTLIJST
-# ════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
+# TAB 4 – STARTLIJST
+# ══════════════════════════════════════════════════════════════════════
 with tab4:
-    st.subheader("Volledige Startlijst & Statistieken")
-    search = st.text_input("🔍 Zoek op naam of ploeg:")
-    show_cols = [c for c in ['Naam', 'Ploeg', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV'] if c in df.columns]
-    display_df = df[show_cols].copy()
-    if search:
-        mask = display_df['Naam'].str.contains(search, case=False, na=False)
-        if 'Ploeg' in display_df.columns:
-            mask |= display_df['Ploeg'].str.contains(search, case=False, na=False)
-        display_df = display_df[mask]
-    st.dataframe(display_df.sort_values(by='Prijs', ascending=False), hide_index=True, use_container_width=True)
+    st.subheader("Volledige Startlijst & Prijzen")
+    cols_show = [c for c in ['Naam', 'Ploeg', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV'] if c in df.columns]
+    st.dataframe(df[cols_show].sort_values('Prijs', ascending=False), hide_index=True, use_container_width=True)
 
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 5: UITLEG
-# ════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
+# TAB 5 – UITLEG
+# ══════════════════════════════════════════════════════════════════════
 with tab5:
-    st.header("ℹ️ Hoe werkt de Team Bouwer?")
+    st.header("ℹ️ Uitleg & Disclaimer")
 
     st.warning("""
     **⚠️ LET OP: Voorlopige Data!**
-    De startlijst en prijzen zijn een inschatting. Ze worden bijgewerkt zodra de officiële Sporza Giro-lancering plaatsvindt.
+    De huidige startlijst en prijzen zijn nog niet definitief.
+    Zodra Sporza de officiële Giromanager lanceert, worden de bestanden geüpdatet.
     """)
 
     st.markdown("""
-    De **Team Bouwer** is de tegenhanger van de AI Solver. Hier bouw jij je team — de assistent helpt je
-    onderweg met suggesties, maar jij hebt het laatste woord.
+    ### 🎖️ Kopman – Hoe werkt het?
 
-    ---
+    In Sporza Giromanager kies je per etappe **één kopman** die dubbele punten scoort (x2).
 
-    ### 🗺️ Tab 1 — Etappe Picks
-    Loop etappe voor etappe door het parcours:
-    - Bekijk de kaart en het hoogteprofiel.
-    - Pas de profielwegingen aan als jij denkt dat het type anders uitpakt (bijv. meer MTN dan de standaard voorspelt).
-    - De assistent toont de top 5 renners op basis van jouw weging.
-    - Klik **Neem top 3 over** om direct in te vullen, of kies zelf via de dropdowns.
+    **Automatische kopman (🤖 Auto)**
+    Het systeem kiest automatisch de renner uit jouw 9 starters die het beste past bij het
+    etappeprofiel (sprint, klim, tijdrit of aanval). Dit is handig als je snel wil gaan.
 
-    ### 🛡️ Tab 2 — Team Samenstellen
-    Jouw picks worden samengevat in een scoretabel: renners die je vaker hebt gekozen staan hoger.
-    - **Automatisch**: de solver bouwt het beste 16-koppige team dat binnen €100M past, met jouw favorieten als prioriteit.
-    - **Handmatig**: selecteer zelf de 16 renners via de multiselect.
+    **Handmatige kopman (✏️ Handmatig)**
+    In Tab 1 kun je per etappe zelf een kopman kiezen uit je 16 renners.
+    De expander-header toont direct welke kopman actief is zodat je een snel overzicht hebt.
 
-    ### 🚀 Tab 3 — Opstellingen
-    Per etappe zie je de ideale 9 uit jouw 16, inclusief de geadviseerde kopman.
-    - Jouw eigen picks (Tab 1) krijgen altijd voorrang als basisplaats.
-    - De eerste renner op basis van de etappescore wordt kopman.
-    - De matrix bovenaan geeft een overzicht van alle 21 etappes in één oogopslag.
+    > **Tip:** In Tab 3 zie je een volledig overzicht van alle kopmannen en krijg je een
+    > waarschuwing als je handmatige kopman niet in de top 9 starters voor die etappe valt.
 
-    ---
+    ### 🛠️ Hoe werkt de Handmatige Bouwer?
 
-    ### 🤖 Verschil met de AI Solver
-    | | AI Solver | Team Bouwer |
-    |---|---|---|
-    | **Etappe analyse** | Claude AI (volledig automatisch) | Jij kiest, assistent adviseert |
-    | **Team selectie** | Wiskundige optimalisatie | Jij bepaalt, solver vult aan |
-    | **Kopman** | Puur op stats | Jouw picks krijgen voorrang |
-    | **Ideaal voor** | Snel een sterk AI-team | Eigen wielerkennis inbrengen |
+    1. **Tab 1 – Voorspellingen:** Kies per etappe welke renners jij verwacht te scoren
+       én stel je kopman in.
+    2. **Tab 2 – Finaal Team:** Selecteer je definitieve 16 renners of laat de AI ze
+       automatisch kiezen op basis van jouw voorspellingen.
+    3. **Tab 3 – Opstellingen:** Bekijk de dagelijkse 9-koppige opstelling plus
+       een volledig kopman-overzicht voor alle 21 etappes.
     """)
