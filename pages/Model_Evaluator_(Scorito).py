@@ -67,8 +67,8 @@ HARDCODED_TEAMS = {
         "Start": ["Tadej Pogačar", "Jonathan Milan", "Tom Pidcock", "Christophe Laporte", "Tim Wellens", "Paul Magnier", "Romain Grégoire", "Mattias Skjelmose", "Jasper Stuyven", "Florian Vermeersch", "Milan Fretin", "Jordi Meeus", "Toms Skujiņš", "Mike Teunissen", "Jonas Vingegaard", "Gianni Vermeersch", "Jonas Abrahamsen", "Mathieu van der Poel", "Jasper Philipsen", "Laurence Pithie"],
         "Transfers": [
             {"uit": "Mathieu van der Poel", "in": "Remco Evenepoel", "moment": "PR"},
-            {"uit": "Jasper Philipsen", "in": "Ben Healy", "moment": "PR"},
-            {"uit": "Laurence Pithie", "in": "Marc Hirschi", "moment": "PR"}
+            {"uit": "Jonathan Milan", "in": "Mads Pedersen", "moment": "BDP"},
+            {"uit": "Jonas Vingegaard", "in": "Marc Hirschi", "moment": "BDP"}
         ]
     }
 }
@@ -81,6 +81,8 @@ MIJN_EIGEN_KOPMANNEN = {
     "PN": {"C1": "Jonas Vingegaard", "C2": "Jasper Stuyven", "C3": "Laurence Pithie"},
     "TA": {"C1": "Jasper Philipsen", "C2": "Jonathan Milan", "C3": "Paul Magnier"},
     "MSR": {"C1": "Tadej Pogacar", "C2": "Mathieu van der Poel", "C3": "Tom Pidcock"},
+    "BDP": {"C1": "Jasper Philipsen", "C2": "Florian Vermeersch", "C3": ""},
+    "E3": {"C1": "Mathieu van der Poel", "C2": "Mads Pedersen", "C3": "Christoph Laporte"},
 }
 
 # --- HULPFUNCTIES VOOR NAAM-MATCHING ---
