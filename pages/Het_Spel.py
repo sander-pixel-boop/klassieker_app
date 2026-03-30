@@ -87,19 +87,22 @@ st.title(f"🎮 Custom Spel: {speler_naam.capitalize()}")
 
 with st.sidebar:
     st.header("Opslag")
-    if st.button("💾 Opslaan in Cloud", type="primary", use_container_width=True):
-        data = {"base": st.session_state.game_base_team, "picks": st.session_state.game_picks}
-        payload = {"username": speler_naam, "custom_team": {"data": data, "signature": generate_signature(data)}}
-        supabase.table(tabel_naam).upsert(payload, on_conflict="username").execute()
-        st.success("Opgeslagen!")
+    if speler_naam != "gast":
+        if st.button("💾 Opslaan in Cloud", type="primary", use_container_width=True):
+            data = {"base": st.session_state.game_base_team, "picks": st.session_state.game_picks}
+            payload = {"username": speler_naam, "custom_team": {"data": data, "signature": generate_signature(data)}}
+            supabase.table(tabel_naam).upsert(payload, on_conflict="username").execute()
+            st.success("Opgeslagen!")
 
-    if st.button("🔄 Laden uit Cloud", use_container_width=True):
-        res = supabase.table(tabel_naam).select("custom_team").eq("username", speler_naam).execute()
-        if res.data:
-            d = res.data[0]["custom_team"]["data"]
-            st.session_state.game_base_team = d.get("base", [])
-            st.session_state.game_picks = d.get("picks", {r: {"extras": [], "dark_horse": None, "kopman": None} for r in races})
-            st.rerun()
+        if st.button("🔄 Laden uit Cloud", use_container_width=True):
+            res = supabase.table(tabel_naam).select("custom_team").eq("username", speler_naam).execute()
+            if res.data:
+                d = res.data[0]["custom_team"]["data"]
+                st.session_state.game_base_team = d.get("base", [])
+                st.session_state.game_picks = d.get("picks", {r: {"extras": [], "dark_horse": None, "kopman": None} for r in races})
+                st.rerun()
+    else:
+        st.info("Log in met een account om cloud-opslag te gebruiken.")
 
 st.divider()
 
