@@ -9,7 +9,7 @@ from pypdf import PdfReader
 import os
 
 # --- CONFIGURATIE ---
-st.set_page_config(page_title="Cycling Fantasy AI", layout="wide", page_icon="🚲")
+st.set_page_config(page_title="Cycling Fantasy Systeem", layout="wide", page_icon="🚲")
 
 # --- PADEN NAAR BRONBESTANDEN (IN MAIN) ---
 # Omdat dit script in pages/ staat, zoeken we in de root map.
@@ -182,7 +182,7 @@ if df_static.empty:
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.title("🚲 CF AI Coach")
+    st.title("🚲 CF Systeem Coach")
     st.header("📂 1. Upload Startlijst")
     uploaded_file = st.file_uploader("Upload PCS PDF, CSV of Excel", type=['pdf', 'csv', 'xlsx', 'xls'])
     
@@ -249,6 +249,6 @@ with tab3:
     st.markdown("""
     1. **PDF Import:** De app leest de officiële PDF startlijst van ProCyclingStats. Hij herkent rugnummers en namen.
     2. **Prijzen:** Hij koppelt namen aan `cf_prijzen.csv`. Renners buiten de top 200 kosten automatisch **200 credits**.
-    3. **Tie-Breaker:** In Cycling Fantasy is de volgorde van je 9 renners de tie-breaker (multiplier x1.0 tot x0.2). De AI zet de renners met de hoogste puntenverwachting altijd bovenaan.
+    3. **Tie-Breaker:** In Cycling Fantasy is de volgorde van je 9 renners de tie-breaker (multiplier x1.0 tot x0.2). Het Systeem zet de renners met de hoogste puntenverwachting altijd bovenaan.
     4. **Requirements:** Zorg dat `pypdf` in je `requirements.txt` staat op GitHub.
     """)

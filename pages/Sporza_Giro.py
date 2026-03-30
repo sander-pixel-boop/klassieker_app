@@ -11,7 +11,7 @@ from datetime import datetime
 from claude_predictions import genereer_claude_etappe_voorspellingen
 
 # --- CONFIGURATIE ---
-st.set_page_config(page_title="Sporza Giro AI Solver", layout="wide", page_icon="🤖")
+st.set_page_config(page_title="Sporza Giro Systeem Solver", layout="wide", page_icon="🤖")
 
 if "ingelogde_speler" not in st.session_state:
     st.warning("⚠️ Je bent niet ingelogd. Ga terug naar de Home pagina om in te loggen.")
@@ -234,9 +234,9 @@ def solve_giro_team(df, max_bud, max_ren, max_per_team, force_base, ban_base, ev
     return []
 
 # --- HOOFDCODE ---
-st.title("🤖 Sporza Giro — AI Solver")
+st.title("🤖 Sporza Giro — Systeem Solver")
 st.markdown(
-    "De AI analyseert alle 21 etappes op basis van parcoursprofiel en rennerdata, en bouwt automatisch "
+    "Het Systeem analyseert alle 21 etappes op basis van parcoursprofiel en rennerdata, en bouwt automatisch "
     "het optimale team. *Data van [Wielerorakel](https://wielerorakel.nl/)*"
 )
 
@@ -279,7 +279,7 @@ with st.sidebar:
 
     st.divider()
 
-    top_x_voorspellingen = st.number_input("Top X per etappe (AI)", 1, 10, 3)
+    top_x_voorspellingen = st.number_input("Top X per etappe (Systeem)", 1, 10, 3)
     max_budget           = st.number_input("Budget (Miljoen)", value=100.0)
     max_renners          = st.number_input("Aantal Renners",   value=16)
     max_per_ploeg        = st.number_input("Max per ploeg",    value=3)
@@ -293,13 +293,13 @@ with st.sidebar:
         ban_base   = st.multiselect("🔴 Niet in team:", options=[r for r in df['Renner'].tolist() if r not in force_base])
 
     st.divider()
-    if st.button("🚀 BEREKEN TEAM (Puur AI Stats)", type="primary", use_container_width=True):
+    if st.button("🚀 BEREKEN TEAM (Puur Systeem Stats)", type="primary", use_container_width=True):
         res = solve_giro_team(df, max_budget, max_renners, max_per_ploeg, force_base, ban_base, "Giro_EV")
         if res:
             st.session_state.giro_selected_riders = res
             st.rerun()
 
-    if st.button("🚀 BEREKEN TEAM (AI + Voorspellingen)", use_container_width=True):
+    if st.button("🚀 BEREKEN TEAM (Systeem + Voorspellingen)", use_container_width=True):
         res = solve_giro_team(df, max_budget, max_renners, max_per_ploeg, force_base, ban_base, "Combined_EV")
         if res:
             st.session_state.giro_selected_riders = res
@@ -321,7 +321,7 @@ with st.sidebar:
     )
 
 # --- TABS ---
-tab1, tab2, tab3, tab4 = st.tabs(["🚀 Jouw Selectie", "📅 AI Etappe Voorspellingen", "📋 Database", "ℹ️ Uitleg"])
+tab1, tab2, tab3, tab4 = st.tabs(["🚀 Jouw Selectie", "📅 Systeem Etappe Voorspellingen", "📋 Database", "ℹ️ Uitleg"])
 
 # ── TAB 1: SELECTIE ──────────────────────────────────────────────────────────
 with tab1:
@@ -330,21 +330,21 @@ with tab1:
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("💰 Budget over",  f"€ {max_budget - start_team_df['Prijs'].sum():.2f}M")
         m2.metric("🚴 Renners",      f"{len(start_team_df)} / {max_renners}")
-        m3.metric("🎯 EV (AI Stats)", f"{start_team_df['Giro_EV'].sum()}")
+        m3.metric("🎯 EV (Systeem Stats)", f"{start_team_df['Giro_EV'].sum()}")
         m4.metric("🏆 EV (Voorspellingen)", f"{start_team_df['Prediction_EV'].sum()}")
         st.dataframe(
             start_team_df[['Renner', 'Team', 'Prijs', 'Type', 'Giro_EV', 'Waarde (EV/M)']].sort_values(by='Prijs', ascending=False),
             hide_index=True, use_container_width=True
         )
     else:
-        st.info("👈 Klik op **Bereken Team** in de zijbalk om de AI een optimale selectie te laten samenstellen.")
+        st.info("👈 Klik op **Bereken Team** in de zijbalk om het Systeem een optimale selectie te laten samenstellen.")
 
-# ── TAB 2: AI VOORSPELLINGEN ──────────────────────────────────────────────────
+# ── TAB 2: Systeem VOORSPELLINGEN ──────────────────────────────────────────────────
 with tab2:
-    st.subheader("🤖 Claude AI Etappe Voorspellingen")
+    st.subheader("🤖 Clauhet Systeem Etappe Voorspellingen")
     st.info(
-        "De AI analyseert het parcoursprofiel en de wegingen van alle 21 etappes en kiest automatisch "
-        "de sterkste renners per rit. Pas de wegingen per etappe aan om de AI te sturen."
+        "Het Systeem analyseert het parcoursprofiel en de wegingen van alle 21 etappes en kiest automatisch "
+        "de sterkste renners per rit. Pas de wegingen per etappe aan om het Systeem te sturen."
     )
 
     c1, c2 = st.columns([1, 4])
@@ -359,12 +359,12 @@ with tab2:
         st.session_state.giro_reasoning         = reasoning
         st.rerun()
 
-    if c2.button("🗑️ Wis AI voorspellingen"):
+    if c2.button("🗑️ Wis Systeem voorspellingen"):
         st.session_state.giro_stage_predictions = {str(s["id"]): [None]*10 for s in GIRO_ETAPPES}
         st.session_state.giro_reasoning         = {}
         st.rerun()
 
-    # Per-etappe weging + AI output
+    # Per-etappe weging + Systeem output
     for etappe in GIRO_ETAPPES:
         stage_id = str(etappe["id"])
         cw = st.session_state.giro_weights[stage_id]
@@ -377,7 +377,7 @@ with tab2:
             f"MTN:{int((cw['MTN']/som_header)*100)}%"
         )
 
-        # Check of er AI picks zijn voor deze etappe
+        # Check of er Systeem picks zijn voor deze etappe
         ai_picks = [p for p in st.session_state.giro_stage_predictions.get(stage_id, []) if p]
         picks_badge = f" ✅ {', '.join(ai_picks[:3])}" if ai_picks else ""
 
@@ -415,7 +415,7 @@ with tab2:
             else:
                 active_weights = st.session_state.giro_weights[stage_id]
 
-            # Static AI top-5
+            # Static Systeem top-5
             df_stage = df.copy()
             df_stage['StageScore'] = (
                 df_stage['SPR'] * active_weights['SPR'] +
@@ -438,9 +438,9 @@ with tab2:
                 )
 
             if ai_picks:
-                st.success(f"**AI keuzes:** {', '.join(ai_picks)}")
+                st.success(f"**Systeem keuzes:** {', '.join(ai_picks)}")
             else:
-                st.caption("Nog geen AI analyse — klik op **Analyseer alle 21 etappes** hierboven.")
+                st.caption("Nog geen Systeem analyse — klik op **Analyseer alle 21 etappes** hierboven.")
 
 # ── TAB 3: DATABASE ────────────────────────────────────────────────────────────
 with tab3:
@@ -448,7 +448,7 @@ with tab3:
 
 # ── TAB 4: UITLEG ──────────────────────────────────────────────────────────────
 with tab4:
-    st.header("ℹ️ Uitleg: AI Solver")
+    st.header("ℹ️ Uitleg: Systeem Solver")
 
     st.warning("""
     **⚠️ LET OP: Voorlopige Data!**
@@ -456,13 +456,13 @@ with tab4:
     """)
 
     st.markdown("""
-    ### 🤖 Wat doet de AI Solver?
+    ### 🤖 Wat doet het Systeem Solver?
 
-    Deze pagina is volledig **AI-gestuurd** — jij stelt de parameters in, de AI doet de rest.
+    Deze pagina is volledig **Systeem-gestuurd** — jij stelt de parameters in, het Systeem doet de rest.
 
     **Stap 1 — Wegingen aanpassen (optioneel)**
     Elke etappe heeft een standaardweging op basis van het profiel. In Tab 2 kun je per etappe de balans
-    tussen Sprint, Klassement, Tijdrit en Klimmen/Aanval verschuiven. De AI gebruikt deze wegingen om
+    tussen Sprint, Klassement, Tijdrit en Klimmen/Aanval verschuiven. Het Systeem gebruikt deze wegingen om
     renners te selecteren die het best passen bij elke rit.
 
     **Stap 2 — Claude analyseert (Tab 2)**
@@ -471,8 +471,8 @@ with tab4:
     ook een korte 🧠 toelichting waarom die renners de beste keuze zijn.
 
     **Stap 3 — Team berekenen (zijbalk)**
-    - *Puur AI Stats*: de solver optimaliseert puur op de wiskundige EV-scores (macht-4 curve).
-    - *AI + Voorspellingen*: de solver weegt de Claude-picks mee als extra bonus, zodat renners
+    - *Puur Systeem Stats*: de solver optimaliseert puur op de wiskundige EV-scores (macht-4 curve).
+    - *Systeem + Voorspellingen*: de solver weegt de Claude-picks mee als extra bonus, zodat renners
       die Claude vaker noemt meer kans hebben geselecteerd te worden.
 
     ### ⚙️ Wegingen uitleg
