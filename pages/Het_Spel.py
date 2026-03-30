@@ -6,6 +6,7 @@ import hashlib
 from datetime import datetime
 from thefuzz import process, fuzz
 from supabase import create_client
+from utils.crypto import generate_signature
 
 # 1. Paginaconfiguratie
 st.set_page_config(page_title="Custom Klassiekers Spel", layout="wide", page_icon="🎮")
@@ -28,11 +29,6 @@ supabase = init_connection()
 tabel_naam = st.secrets["TABEL_NAAM"]
 
 # --- HULPFUNCTIES ---
-def generate_signature(data_dict):
-    data_str = json.dumps(data_dict, sort_keys=True)
-    salt = "GeheimeKlassiekerSleutel2026"
-    return hashlib.sha256((data_str + salt).encode('utf-8')).hexdigest()
-
 def is_team_locked():
     if os.path.exists("uitslagen.csv"):
         try:
