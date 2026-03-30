@@ -36,7 +36,7 @@ def login_page():
     
     with col_links:
         st.header("Welkom!")
-        st.markdown("De ultieme Systeem-tool voor je wielermanagerspellen. Combineer data met wiskundige optimalisatie en bereken de perfecte selectie.")
+        st.markdown("De ultieme AI-tool voor je wielermanagerspellen. Combineer data met wiskundige optimalisatie en bereken de perfecte selectie.")
         
         st.divider()
         st.markdown("### 🏆 Ondersteunde Spellen")
@@ -46,7 +46,7 @@ def login_page():
         
         st.divider()
         st.markdown("### 🧠 Features")
-        st.markdown("✅ Wiskundige Systeem Solvers (Knapsack optimalisatie)\n✅ Verwachte Waarde (EV) berekeningen op basis van parcours\n✅ Dynamische wissel- en transferstrategieën\n✅ Live Model Evaluator")
+        st.markdown("✅ Wiskundige AI Solvers (Knapsack optimalisatie)\n✅ Verwachte Waarde (EV) berekeningen op basis van parcours\n✅ Dynamische wissel- en transferstrategieën\n✅ Live Model Evaluator")
         st.markdown("*Data: [Wielerorakel.nl](https://wielerorakel.nl/)*")
 
     with col_rechts:
@@ -121,7 +121,7 @@ sporza_klassiekers = st.Page("pages/Klassiekers - Sporza.py", title="Klassiekers
 sporza_evaluator = st.Page("pages/Sporza_Evaluator.py", title="Evaluator", icon="📊")
 
 # Sporza Grand Tour opties
-sporza_giro_ai = st.Page("pages/Sporza_Giro.py", title="Giro: Systeem Solver", icon="🤖")
+sporza_giro_ai = st.Page("pages/Sporza_Giro.py", title="Giro: AI Solver", icon="🤖")
 sporza_giro_bouwer = st.Page("pages/Sporza_Giro_Bouwer.py", title="Giro: Team Bouwer", icon="🛠️")
 sporza_giro_evaluator = st.Page("pages/Sporza_Giro_Evaluator.py", title="[Beta] Giro: Evaluator", icon="📊")
 

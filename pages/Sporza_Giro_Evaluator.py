@@ -225,7 +225,7 @@ with st.sidebar:
     teams = {}  # naam -> {"renners": [], "keuzes": {}}
 
     with col1:
-        if st.button("🤖 Systeem Solver", use_container_width=True):
+        if st.button("🤖 AI Solver", use_container_width=True):
             res = supabase.table(TABEL_NAAM).select("sporza_giro_team26").eq("username", speler_naam).execute()
             if res.data and res.data[0].get("sporza_giro_team26"):
                 d = res.data[0]["sporza_giro_team26"]
@@ -233,7 +233,7 @@ with st.sidebar:
                     "renners": d.get("selected_riders", []),
                     "keuzes": d.get("predictions", {str(i): [None]*10 for i in range(1, 22)})
                 }
-                st.success("Systeem team geladen!")
+                st.success("AI team geladen!")
 
     with col2:
         if st.button("🛠️ Bouwer", use_container_width=True):
@@ -272,7 +272,7 @@ with st.sidebar:
 
 # Bouw teams dict op uit session state
 if "eval_ai_team" in st.session_state and st.session_state["eval_ai_team"]["renners"]:
-    teams[f"🤖 Systeem Solver ({speler_naam})"] = st.session_state["eval_ai_team"]
+    teams[f"🤖 AI Solver ({speler_naam})"] = st.session_state["eval_ai_team"]
 if "eval_bouwer_team" in st.session_state and st.session_state["eval_bouwer_team"]["renners"]:
     teams[f"🛠️ Bouwer ({speler_naam})"] = st.session_state["eval_bouwer_team"]
 
@@ -282,7 +282,7 @@ if df_results.empty:
     st.stop()
 
 if not teams:
-    st.info("👈 Laad je Systeem Solver of Bouwer team in via de zijbalk om je score te zien.")
+    st.info("👈 Laad je AI Solver of Bouwer team in via de zijbalk om je score te zien.")
     st.stop()
 
 # Match rijdersnamen in uitslagen naar stats-namen

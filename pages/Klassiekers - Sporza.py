@@ -9,7 +9,7 @@ from supabase import create_client, Client
 from datetime import datetime
 
 # --- CONFIGURATIE ---
-st.set_page_config(page_title="Sporza Klassiekers Systeem", layout="wide", page_icon="🚴")
+st.set_page_config(page_title="Sporza Klassiekers AI", layout="wide", page_icon="🚴")
 
 # --- CHECK INLOG & DATABASE SETUP ---
 if "ingelogde_speler" not in st.session_state:
@@ -372,7 +372,7 @@ with st.sidebar:
             st.error(f"Fout bij inladen: {e}")
 
     st.divider()
-    st.title("🚴 Sporza Systeem Coach")
+    st.title("🚴 Sporza AI Coach")
     ev_method = st.selectbox("🧮 Rekenmodel (EV)", ["1. Sporza Ranking (Dynamisch)", "2. Originele Curve (Macht 4)"])
     toon_uitslagen = st.checkbox("🏁 Koersen zijn begonnen (Toon uitslagen)", value=True)
     
@@ -493,9 +493,9 @@ else:
                 
                 sugg_keuze = []
                 if not sugg_df.empty:
-                    st.info(f"💡 **Top Systeem Suggesties (Totaal overgebleven budget voor {len(to_replace)} renner(s): € {max_affordable}M):**")
+                    st.info(f"💡 **Top AI Suggesties (Totaal overgebleven budget voor {len(to_replace)} renner(s): € {max_affordable}M):**")
                     st.dataframe(sugg_df[['Renner', 'Prijs', 'Waarde (EV/M)', 'Sporza_EV', 'Type']], hide_index=True, use_container_width=True)
-                    sugg_keuze = st.multiselect("👉 Of selecteer hier direct een Systeem-suggestie:", options=sugg_df['Renner'].tolist())
+                    sugg_keuze = st.multiselect("👉 Of selecteer hier direct een AI-suggestie:", options=sugg_df['Renner'].tolist())
 
                 to_add = list(set(to_add_manual + sugg_keuze))
                 
@@ -526,7 +526,7 @@ else:
                         new_ban_base = [r for r in df['Renner'].tolist() if r not in new_force_base]
                         
                         if len(new_force_base) == 20:
-                            with st.spinner("Systeem herberekent de optimale matrix & transfers..."):
+                            with st.spinner("AI herberekent de optimale matrix & transfers..."):
                                 new_res, new_plan = solve_sporza_dynamic(df, available_races, t_moments, new_force_base, new_ban_base, [])
                                 
                                 if new_res:
@@ -668,27 +668,27 @@ with tab4:
     st.dataframe(d_df.sort_values(by='Sporza_EV', ascending=False).style.format(format_dict), use_container_width=True, hide_index=True)
 
 with tab5:
-    st.header("ℹ️ Uitgebreide Handleiding & Systeem Uitleg")
+    st.header("ℹ️ Uitgebreide Handleiding & AI Uitleg")
 
     st.markdown("""
-    Deze applicatie gebruikt wiskundige optimalisatie (Integer Linear Programming) om het beruchte *Knapsack Problem* (rugzakprobleem) op te lossen. Voor de **Sporza Wielermanager** is dit extreem complex, omdat het Systeem niet alleen 20 renners moet kiezen, maar ook per koers moet bepalen wie er op de bank zit en of transfers de budgetboete waard zijn.
+    Deze applicatie gebruikt wiskundige optimalisatie (Integer Linear Programming) om het beruchte *Knapsack Problem* (rugzakprobleem) op te lossen. Voor de **Sporza Wielermanager** is dit extreem complex, omdat de AI niet alleen 20 renners moet kiezen, maar ook per koers moet bepalen wie er op de bank zit en of transfers de budgetboete waard zijn.
 
     Hieronder vind je een gedetailleerde uitleg van de werking en hoe je de tool optimaal gebruikt.
 
     ---
 
-    ### 🧠 1. Hoe berekent het Systeem de waarde van een renner? (Expected Value)
-    Sporza deelt punten anders uit dan andere spellen. Het Systeem berekent de **Expected Value (EV)** per koers op basis van:
-    * **Statistieken & Profiel:** Elke koers heeft een specifiek profiel (Kassei, Heuvel, Sprint, Allround). Het Systeem kijkt naar de bijbehorende skill van de renner.
+    ### 🧠 1. Hoe berekent de AI de waarde van een renner? (Expected Value)
+    Sporza deelt punten anders uit dan andere spellen. De AI berekent de **Expected Value (EV)** per koers op basis van:
+    * **Statistieken & Profiel:** Elke koers heeft een specifiek profiel (Kassei, Heuvel, Sprint, Allround). De AI kijkt naar de bijbehorende skill van de renner.
     * **Koers Categorieën:** Sporza maakt onderscheid in punten: *Monumenten* (max 125pt), *WorldTour* (max 100pt) en *Niet-WT* (max 80pt). De EV past zich hierop aan.
-    * **Kopman Bonus:** Bij Sporza krijgt de kopman vaste bonuspunten als hij top 6 rijdt (+30, +25, etc.), geen vermenigvuldiger (zoals x2). Het Systeem neemt de statistische kans hierop mee in de berekening.
-    * **Rekenmodellen:** Je kunt in de zijbalk kiezen hoe agressief het Systeem de statistieken vertaalt naar punten (bijv. de Originele Curve).
+    * **Kopman Bonus:** Bij Sporza krijgt de kopman vaste bonuspunten als hij top 6 rijdt (+30, +25, etc.), geen vermenigvuldiger (zoals x2). De AI neemt de statistische kans hierop mee in de berekening.
+    * **Rekenmodellen:** Je kunt in de zijbalk kiezen hoe agressief de AI de statistieken vertaalt naar punten (bijv. de Originele Curve).
 
     ---
 
     ### 🪑 2. De 12-Starters Regel (Bankzitters)
     In Sporza mag je 20 renners in je team hebben, maar **slechts 12 mogen er daadwerkelijk starten** per koers. 
-    Het Systeem berekent volautomatisch wie jouw 12 beste renners zijn voor bijvoorbeeld de Ronde van Vlaanderen, en zet de overige renners op de Bank (🪑). Punten van bankzitters tellen niet mee. Hierdoor 'weet' het Systeem dat een té brede selectie zonde van het budget is en zal hij vaker investeren in absolute piekmomenten.
+    De AI berekent volautomatisch wie jouw 12 beste renners zijn voor bijvoorbeeld de Ronde van Vlaanderen, en zet de overige renners op de Bank (🪑). Punten van bankzitters tellen niet mee. Hierdoor 'weet' de AI dat een té brede selectie zonde van het budget is en zal hij vaker investeren in absolute piekmomenten.
 
     ---
 
@@ -698,7 +698,7 @@ with tab5:
     * **Transfer 4:** Kost 1 Miljoen (Totaalbudget zakt naar 119 Miljoen)
     * **Transfer 5:** Kost nog eens 2 Miljoen extra (Totaalbudget zakt naar 117 Miljoen)
     
-    Het Systeem berekent tegelijkertijd je start-team én al je geplande wissels in de toekomst. Hij weegt af of het rendabel is om budget in te leveren voor een extra transfer, en zorgt dat je na *elke* wissel altijd een geldig team overhoudt.
+    De AI berekent tegelijkertijd je start-team én al je geplande wissels in de toekomst. Hij weegt af of het rendabel is om budget in te leveren voor een extra transfer, en zorgt dat je na *elke* wissel altijd een geldig team overhoudt.
 
     ---
 
@@ -709,9 +709,9 @@ with tab5:
 
     ### 🛠️ 5. Finetuning & Handmatige Ingrepen
     Soms wil je de algoritmes overrulen met je eigen wielerkennis:
-    * **Team Finetuner (Dashboard):** In het hoofdscherm kun je handmatig een geselecteerde renner aanklikken om te verwijderen. Het Systeem toont direct de 5 beste alternatieven die je je nog kunt veroorloven en kijkt zelfs of de toekomstige geplande transfers en de 'max-4' regel nog wel wiskundig passen.
-    * **Renners Forceren:** Via 'Moet in start-team' (zijbalk) dwing je het Systeem om een renner te kopen.
-    * **Renners Uitsluiten:** Geloof je niet in de vorm van een renner? Gebruik 'Niet in start-team' of 'Compleet negeren' om het Systeem te dwingen een alternatief te zoeken.
+    * **Team Finetuner (Dashboard):** In het hoofdscherm kun je handmatig een geselecteerde renner aanklikken om te verwijderen. De AI toont direct de 5 beste alternatieven die je je nog kunt veroorloven en kijkt zelfs of de toekomstige geplande transfers en de 'max-4' regel nog wel wiskundig passen.
+    * **Renners Forceren:** Via 'Moet in start-team' (zijbalk) dwing je de AI om een renner te kopen.
+    * **Renners Uitsluiten:** Geloof je niet in de vorm van een renner? Gebruik 'Niet in start-team' of 'Compleet negeren' om de AI te dwingen een alternatief te zoeken.
 
     ---
 

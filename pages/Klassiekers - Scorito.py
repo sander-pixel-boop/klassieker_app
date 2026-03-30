@@ -12,7 +12,7 @@ from supabase import create_client, Client
 from datetime import datetime
 
 # --- CONFIGURATIE ---
-st.set_page_config(page_title="Scorito Klassiekers Systeem", layout="wide", page_icon="🏆")
+st.set_page_config(page_title="Scorito Klassiekers AI", layout="wide", page_icon="🏆")
 
 # --- CHECK INLOG & DATABASE SETUP ---
 if "ingelogde_speler" not in st.session_state:
@@ -573,7 +573,7 @@ with st.sidebar:
                 drop_choices = []
                 if drops_needed > 0:
                     st.warning(f"🚨 Je overschrijdt de limiet (max 3). Er moeten {drops_needed} geplande wissel(s) vervallen.")
-                    ai_auto_drop = st.checkbox("🤖 Laat het Systeem de minst pijnlijke wissel(s) opofferen", value=True)
+                    ai_auto_drop = st.checkbox("🤖 Laat de AI de minst pijnlijke wissel(s) opofferen", value=True)
                     if not ai_auto_drop:
                         opts = {i: f"{t['uit']} -> {t['in']} (na {t['moment']})" for i, t in enumerate(planned_transfers_copy)}
                         drop_choices = st.multiselect("Selecteer annuleringen:", options=list(opts.keys()), format_func=lambda x: opts[x], max_selections=drops_needed)
@@ -762,7 +762,7 @@ else:
                     st.info(f"💡 **Top Suggesties (Budget per renner: € {max_affordable/1000000:.1f}M):**")
                     sugg_df['Type'] = sugg_df.apply(bepaal_klassieker_type, axis=1)
                     st.dataframe(sugg_df[['Renner', 'Prijs', 'Waarde (EV/M)', 'Scorito_EV', 'Type']], hide_index=True, use_container_width=True)
-                    sugg_keuze = st.multiselect("👉 Of selecteer hier direct een Systeem-suggestie:", options=sugg_df['Renner'].tolist())
+                    sugg_keuze = st.multiselect("👉 Of selecteer hier direct een AI-suggestie:", options=sugg_df['Renner'].tolist())
 
                 to_add = list(set(to_add_manual + sugg_keuze))
                 
@@ -920,7 +920,7 @@ with tab4:
     st.dataframe(d_df.sort_values(by='Scorito_EV', ascending=False).style.format(format_dict), use_container_width=True, hide_index=True)
 
 with tab5:
-    st.header("ℹ️ Uitgebreide Handleiding & Systeem Uitleg")
+    st.header("ℹ️ Uitgebreide Handleiding & AI Uitleg")
     
     st.markdown("""
     Deze applicatie gebruikt wiskundige optimalisatie (Integer Linear Programming) om het beruchte *Knapsack Problem* (rugzakprobleem) op te lossen. Het doel is simpel: bouw een team met de hoogst mogelijke verwachte punten, zonder de budget- en spellimieten te overschrijden.
@@ -929,22 +929,22 @@ with tab5:
 
     ---
 
-    ### 🧠 1. Hoe berekent het Systeem de waarde van een renner? (Expected Value)
-    Scorito draait om punten scoren. Het Systeem voorspelt deze punten via de **Expected Value (EV)**. De EV van een renner wordt per koers opgebouwd uit:
-    * **Statistieken & Profiel:** Elke koers heeft een specifiek profiel (Kassei, Heuvel, Sprint, Allround). Het Systeem kijkt naar de bijbehorende skill van de renner (bijv. de `COB`-statistiek voor Roubaix).
-    * **Kopman Multipliers:** In Scorito halen kopmannen de meeste punten (3x, 2.5x, 2x). Het Systeem bepaalt per koers volautomatisch wie je 3 beste renners zijn en past deze multipliers toe op hun verwachte punten.
-    * **Rekenmodellen:** Je kunt in de zijbalk kiezen hoe agressief het Systeem de statistieken vertaalt naar punten:
+    ### 🧠 1. Hoe berekent de AI de waarde van een renner? (Expected Value)
+    Scorito draait om punten scoren. De AI voorspelt deze punten via de **Expected Value (EV)**. De EV van een renner wordt per koers opgebouwd uit:
+    * **Statistieken & Profiel:** Elke koers heeft een specifiek profiel (Kassei, Heuvel, Sprint, Allround). De AI kijkt naar de bijbehorende skill van de renner (bijv. de `COB`-statistiek voor Roubaix).
+    * **Kopman Multipliers:** In Scorito halen kopmannen de meeste punten (3x, 2.5x, 2x). De AI bepaalt per koers volautomatisch wie je 3 beste renners zijn en past deze multipliers toe op hun verwachte punten.
+    * **Rekenmodellen:** Je kunt in de zijbalk kiezen hoe agressief de AI de statistieken vertaalt naar punten:
         1. *Scorito Ranking:* Kijkt puur of een renner in de top-20 van een koers kan eindigen en deelt de vaste Scorito-punten uit.
         2. *Originele Curve (Macht 4):* Geeft een exponentiële bonus aan absolute topspecialisten ten opzichte van subtoppers.
-        3. *Extreme Curve (Macht 10):* Dwingt het Systeem om uitsluitend absolute wereldtoppers te selecteren en gokt minder op breedte.
+        3. *Extreme Curve (Macht 10):* Dwingt de AI om uitsluitend absolute wereldtoppers te selecteren en gokt minder op breedte.
         4. *Tiers:* Verdeelt renners in vaste categorieën (Kopman, outsider, knecht).
 
     ---
 
     ### 🔁 2. De Dynamische Wisselstrategie
-    In Scorito mag je maximaal 3 renners wisselen. Waar veel spelers standaard na Parijs-Roubaix wisselen, laat deze Systeem je de **tijdlijn** volledig zelf bepalen.
+    In Scorito mag je maximaal 3 renners wisselen. Waar veel spelers standaard na Parijs-Roubaix wisselen, laat deze AI je de **tijdlijn** volledig zelf bepalen.
 
-    * **De 4 Tijdvakken:** Zodra je wisselmomenten instelt (bijv. na KBK en na PR), snapt het Systeem dat het seizoen is opgedeeld in blokken.
+    * **De 4 Tijdvakken:** Zodra je wisselmomenten instelt (bijv. na KBK en na PR), snapt de AI dat het seizoen is opgedeeld in blokken.
     * **Sluitende Begroting:** De wiskundige solver garandeert dat je op *geen enkel moment* over de €45 miljoen gaat. De som van je startteam mag max €45M zijn, maar ook de som van je team ná wissel 1, én na wissel 2.
 
     ---
@@ -955,16 +955,16 @@ with tab5:
     1. Klik in de zijbalk op **🚑 Directe Noodwissel (Blessure)**.
     2. Kies de **laatst verreden koers** (Dit is het moment dat de wissel virtueel wordt doorgevoerd).
     3. Selecteer de geblesseerde renner en klik op Bereken.
-    4. Het Systeem leest direct jouw actuele team uit, haalt de geblesseerde renner eruit, kijkt naar je resterende budget, en zoekt binnen 2 seconden de absolute topvervanger die in de **resterende koersen** de meeste punten pakt.
-    5. *Let op:* Had je al 3 wissels gepland staan verderop in het seizoen? Dan zal het Systeem één van die toekomstige wissels automatisch of op jouw verzoek opofferen om onder de limiet van 3 transfers te blijven.
+    4. De AI leest direct jouw actuele team uit, haalt de geblesseerde renner eruit, kijkt naar je resterende budget, en zoekt binnen 2 seconden de absolute topvervanger die in de **resterende koersen** de meeste punten pakt.
+    5. *Let op:* Had je al 3 wissels gepland staan verderop in het seizoen? Dan zal de AI één van die toekomstige wissels automatisch of op jouw verzoek opofferen om onder de limiet van 3 transfers te blijven.
 
     ---
 
     ### 🛠️ 4. Finetuning & Handmatige Ingrepen
     Soms wil je de algoritmes overrulen met je eigen wielerkennis:
-    * **Team Finetuner (Dashboard):** In het hoofdscherm kun je handmatig een geselecteerde renner aanklikken om te verwijderen. Het Systeem toont direct de 5 beste alternatieven die je je nog kunt veroorloven en kijkt zelfs of de toekomstige geplande transfers nog wel wiskundig passen.
-    * **Renners Forceren:** Via 'Moet in start-team' (zijbalk) dwing je het Systeem om een renner te kopen.
-    * **Renners Uitsluiten:** Geloof je niet in de vorm van een renner? Gebruik 'Niet in start-team' of 'Compleet negeren' om het Systeem te dwingen een alternatief te zoeken.
+    * **Team Finetuner (Dashboard):** In het hoofdscherm kun je handmatig een geselecteerde renner aanklikken om te verwijderen. De AI toont direct de 5 beste alternatieven die je je nog kunt veroorloven en kijkt zelfs of de toekomstige geplande transfers nog wel wiskundig passen.
+    * **Renners Forceren:** Via 'Moet in start-team' (zijbalk) dwing je de AI om een renner te kopen.
+    * **Renners Uitsluiten:** Geloof je niet in de vorm van een renner? Gebruik 'Niet in start-team' of 'Compleet negeren' om de AI te dwingen een alternatief te zoeken.
 
     ---
 
