@@ -314,6 +314,8 @@ with tab1:
                 top_3_pure_names = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()[:3]
                 for idx, naam in enumerate(top_3_pure_names):
                     st.session_state.etappe_keuzes[eid_str][idx] = naam
+                    # Forceer de streamlite UI selectbox cache om ook deze waarde aan te nemen
+                    st.session_state[f"sel_{eid_str}_{idx}"] = naam
             st.rerun()
 
     # ── Mini progress bar: all 21 stages as coloured dots ────────────
@@ -409,6 +411,8 @@ with tab1:
             if st.button("🤖 Top 3 overnemen", use_container_width=True):
                 for idx, naam in enumerate(top_3_pure_names):
                     st.session_state.etappe_keuzes[eid][idx] = naam
+                    # Forceer de streamlite UI selectbox cache om ook deze waarde aan te nemen
+                    st.session_state[f"sel_{eid}_{idx}"] = naam
                 st.rerun()
 
         c1, c2, c3 = st.columns(3)
