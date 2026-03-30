@@ -5,7 +5,7 @@ import json
 import unicodedata
 import os
 from thefuzz import process, fuzz
-from supabase import create_client, Client
+from supabase import create_client
 from datetime import datetime
 
 # --- CONFIGURATIE ---
