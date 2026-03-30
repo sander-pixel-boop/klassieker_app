@@ -258,32 +258,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # TAB 1 – ETAPPE VOORSPELLINGEN + KOPMAN PER ETAPPE
 # ══════════════════════════════════════════════════════════════════════
 with tab1:
-    st.markdown("### 🪄 Magic Auto-Fill")
-    if st.button("🤖 Vul alle 21 etappes in met suggesties", use_container_width=True, help="Overschrijft alle huidige keuzes met de gesuggereerde Top 3 per etappe"):
-        for e in GIRO_ETAPPES:
-            eid_str = str(e["id"])
-            cw = st.session_state.giro_weights_v2[eid_str]
-
-            som_input = sum(cw.values())
-            w = {k: v / som_input for k, v in cw.items()} if som_input > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
-
-            df_stage = df.copy()
-            df_stage['StageScore'] = (
-                df_stage['SPR'] * w['SPR'] +
-                df_stage['GC']  * w['GC']  +
-                df_stage['ITT'] * w['ITT']  +
-                df_stage['MTN'] * w['MTN']
-            )
-            top_3_pure_names = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()[:3]
-            for idx, naam in enumerate(top_3_pure_names):
-                st.session_state.etappe_keuzes[eid_str][idx] = naam
-        st.rerun()
-
-    st.divider()
-
     # ── Etappe navigator ─────────────────────────────────────────────
-    # One stable editor, no expanders that collapse on widget change.
-
     # Persist which stage is active across reruns
     if "aktieve_etappe_idx" not in st.session_state:
         st.session_state.aktieve_etappe_idx = 0
@@ -296,8 +271,8 @@ with tab1:
         km_badge = f"🎖️ {kopman}" if kopman else "🤖 Auto"
         return n_picks, km_badge
 
-    # Top nav: previous / stage selector / next
-    nav_left, nav_mid, nav_right = st.columns([1, 4, 1])
+    # Top nav: previous / stage selector / next / auto-fill
+    nav_left, nav_mid, nav_right, nav_auto = st.columns([1, 4, 1, 2])
     with nav_left:
         if st.button("◀ Vorige", use_container_width=True, disabled=st.session_state.aktieve_etappe_idx == 0):
             st.session_state.aktieve_etappe_idx -= 1
@@ -320,6 +295,26 @@ with tab1:
         if nieuw_idx != st.session_state.aktieve_etappe_idx:
             st.session_state.aktieve_etappe_idx = nieuw_idx
             st.rerun()
+    with nav_auto:
+        if st.button("🪄 Vul alles met suggesties", use_container_width=True, help="Overschrijft alle huidige keuzes met de gesuggereerde Top 3 per etappe"):
+            for e in GIRO_ETAPPES:
+                eid_str = str(e["id"])
+                cw = st.session_state.giro_weights_v2[eid_str]
+
+                som_input = sum(cw.values())
+                w = {k: v / som_input for k, v in cw.items()} if som_input > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+
+                df_stage = df.copy()
+                df_stage['StageScore'] = (
+                    df_stage['SPR'] * w['SPR'] +
+                    df_stage['GC']  * w['GC']  +
+                    df_stage['ITT'] * w['ITT']  +
+                    df_stage['MTN'] * w['MTN']
+                )
+                top_3_pure_names = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()[:3]
+                for idx, naam in enumerate(top_3_pure_names):
+                    st.session_state.etappe_keuzes[eid_str][idx] = naam
+            st.rerun()
 
     # ── Mini progress bar: all 21 stages as coloured dots ────────────
     dots = []
@@ -334,125 +329,124 @@ with tab1:
         else:
             dots.append(f"<span title='E{eid_dot} – geen picks' style='font-size:18px;cursor:default;'>⚪</span>")
     st.markdown(" ".join(dots) + "  <small style='color:grey;'>🔵 actief &nbsp; 🟢 ingevuld &nbsp; ⚪ leeg</small>", unsafe_allow_html=True)
-
-    st.divider()
+    st.markdown("---", unsafe_allow_html=True) # more compact line
 
     # ── Active stage editor ───────────────────────────────────────────
     etappe = GIRO_ETAPPES[st.session_state.aktieve_etappe_idx]
     eid    = str(etappe["id"])
     cw     = st.session_state.giro_weights_v2[eid]
-
-    # Header
     n_picks, km_badge = etappe_samenvatting(eid)
-    st.subheader(f"Etappe {etappe['id']}: {etappe['route']}")
-    col_meta1, col_meta2, col_meta3 = st.columns(3)
-    col_meta1.metric("Type",    etappe["type"])
-    col_meta2.metric("Datum",   etappe["date"])
-    col_meta3.metric("Kopman",  km_badge)
 
-    # Route & profile images
-    giro_link = "https://www.giroditalia.it/en/the-route/"
-    map_path  = f"giro262/giro26-{etappe['id']}-map.jpg"
-    prof_path = f"giro262/giro26-{etappe['id']}-hp.jpg"
-    i1, i2 = st.columns(2)
-    i1.markdown(get_clickable_image_html(map_path,  f"Kaart+{etappe['id']}", giro_link), unsafe_allow_html=True)
-    i2.markdown(get_clickable_image_html(prof_path, f"Profiel+{etappe['id']}", giro_link), unsafe_allow_html=True)
+    # Use a two-column layout to make it more compact
+    col_left, col_right = st.columns([1, 1], gap="large")
 
-    st.divider()
+    with col_left:
+        # Header & Meta
+        st.subheader(f"E{etappe['id']}: {etappe['route']}")
+        col_meta1, col_meta2 = st.columns(2)
+        col_meta1.metric("Type",    etappe["type"])
+        col_meta2.metric("Datum",   etappe["date"])
 
-    # ── Weging ───────────────────────────────────────────────────────
-    st.markdown("##### ⚙️ Etappeprofiel weging")
-    wc1, wc2, wc3, wc4 = st.columns(4)
-    new_spr = wc1.number_input("Sprint (SPR)",      0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{eid}")
-    new_gc  = wc2.number_input("Klassement (GC)",   0.0, 1.0, float(cw["GC"]),  0.1, key=f"wgc_{eid}")
-    new_itt = wc3.number_input("Tijdrit (ITT)",     0.0, 1.0, float(cw["ITT"]), 0.1, key=f"witt_{eid}")
-    new_mtn = wc4.number_input("Klim/Aanval (MTN)", 0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{eid}")
-    st.session_state.giro_weights_v2[eid] = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
+        # Route & profile images
+        giro_link = "https://www.giroditalia.it/en/the-route/"
+        map_path  = f"giro262/giro26-{etappe['id']}-map.jpg"
+        prof_path = f"giro262/giro26-{etappe['id']}-hp.jpg"
+        i1, i2 = st.columns(2)
+        i1.markdown(get_clickable_image_html(map_path,  f"Kaart+{etappe['id']}", giro_link), unsafe_allow_html=True)
+        i2.markdown(get_clickable_image_html(prof_path, f"Profiel+{etappe['id']}", giro_link), unsafe_allow_html=True)
 
-    som_input = new_spr + new_gc + new_itt + new_mtn
-    if abs(som_input - 1.0) > 0.01 and som_input > 0:
-        st.caption(f"ℹ️ Weging telt op tot {som_input*100:.0f}% — wordt automatisch herschaald naar 100%.")
-        active_w = {k: v / som_input for k, v in {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}.items()}
-    elif som_input == 0:
-        st.error("Weging mag niet 0% zijn.")
-        active_w = {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
-    else:
-        active_w = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
+        # ── Weging ───────────────────────────────────────────────────────
+        st.markdown("##### ⚙️ Etappeprofiel weging")
+        wc1, wc2, wc3, wc4 = st.columns(4)
+        new_spr = wc1.number_input("SPR",      0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{eid}")
+        new_gc  = wc2.number_input("GC",       0.0, 1.0, float(cw["GC"]),  0.1, key=f"wgc_{eid}")
+        new_itt = wc3.number_input("ITT",      0.0, 1.0, float(cw["ITT"]), 0.1, key=f"witt_{eid}")
+        new_mtn = wc4.number_input("MTN",      0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{eid}")
+        st.session_state.giro_weights_v2[eid] = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
 
-    # ── Suggesties ─────────────────────────────────────────────────
-    df_stage = df.copy()
-    df_stage['StageScore'] = (
-        df_stage['SPR'] * active_w['SPR'] +
-        df_stage['GC']  * active_w['GC']  +
-        df_stage['ITT'] * active_w['ITT']  +
-        df_stage['MTN'] * active_w['MTN']
-    )
-    top_5            = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False]).head(5)
-    top_5_namen      = [f"{row['Naam']} ({int(row['StageScore'])})" for _, row in top_5.iterrows()]
-    top_3_pure_names = top_5['Naam'].tolist()[:3]
-    st.info(f"💡 **Top 5 Suggesties:** {', '.join(top_5_namen)}")
+        som_input = new_spr + new_gc + new_itt + new_mtn
+        if abs(som_input - 1.0) > 0.01 and som_input > 0:
+            st.caption(f"ℹ️ Wordt automatisch herschaald naar 100%.")
+            active_w = {k: v / som_input for k, v in {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}.items()}
+        elif som_input == 0:
+            st.error("Weging mag niet 0% zijn.")
+            active_w = {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+        else:
+            active_w = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
 
-    st.divider()
+    with col_right:
+        # ── Suggesties ─────────────────────────────────────────────────
+        df_stage = df.copy()
+        df_stage['StageScore'] = (
+            df_stage['SPR'] * active_w['SPR'] +
+            df_stage['GC']  * active_w['GC']  +
+            df_stage['ITT'] * active_w['ITT']  +
+            df_stage['MTN'] * active_w['MTN']
+        )
+        top_5            = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False]).head(5)
+        top_5_namen      = [f"{row['Naam']} ({int(row['StageScore'])})" for _, row in top_5.iterrows()]
+        top_3_pure_names = top_5['Naam'].tolist()[:3]
 
-    # ── Voorspelling ─────────────────────────────────────────────────
-    sorteer_optie = st.radio(
-        "Sorteer renners op:",
-        ["🔤 Alfabetisch", "📊 Etappe Score"],
-        horizontal=True,
-        key="sorteer_tab1"
-    )
-    if "Alfabetisch" in sorteer_optie:
-        renners_opties_stage = ["-"] + sorted(df['Naam'].tolist())
-    else:
-        renners_opties_stage = ["-"] + df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()
+        st.markdown("##### 💡 Top 5 Suggesties")
+        st.info(", ".join(top_5_namen))
 
-    pred_head, pred_btn = st.columns([3, 1])
-    with pred_head:
-        st.markdown("##### 🏁 Jouw Voorspelling (top 3)")
-    with pred_btn:
-        if st.button("🤖 Top 3 suggesties overnemen", use_container_width=True):
-            for idx, naam in enumerate(top_3_pure_names):
-                st.session_state.etappe_keuzes[eid][idx] = naam
-            st.rerun()
+        # ── Voorspelling ─────────────────────────────────────────────────
+        sorteer_optie = st.radio(
+            "Sorteer keuzelijst op:",
+            ["🔤 Alfabetisch", "📊 Etappe Score"],
+            horizontal=True,
+            key="sorteer_tab1"
+        )
+        if "Alfabetisch" in sorteer_optie:
+            renners_opties_stage = ["-"] + sorted(df['Naam'].tolist())
+        else:
+            renners_opties_stage = ["-"] + df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()
 
-    c1, c2, c3 = st.columns(3)
-    for i, col in enumerate([c1, c2, c3]):
-        current_val = st.session_state.etappe_keuzes[eid][i]
-        d_idx = renners_opties_stage.index(current_val) if current_val in renners_opties_stage else 0
-        keuze = col.selectbox(f"Positie {i+1}", renners_opties_stage, index=d_idx, key=f"sel_{eid}_{i}")
-        st.session_state.etappe_keuzes[eid][i] = keuze if keuze != "-" else None
+        pred_head, pred_btn = st.columns([1, 1])
+        with pred_head:
+            st.markdown("##### 🏁 Jouw Voorspelling")
+        with pred_btn:
+            if st.button("🤖 Top 3 overnemen", use_container_width=True):
+                for idx, naam in enumerate(top_3_pure_names):
+                    st.session_state.etappe_keuzes[eid][idx] = naam
+                st.rerun()
 
-    st.divider()
+        c1, c2, c3 = st.columns(3)
+        for i, col in enumerate([c1, c2, c3]):
+            current_val = st.session_state.etappe_keuzes[eid][i]
+            d_idx = renners_opties_stage.index(current_val) if current_val in renners_opties_stage else 0
+            keuze = col.selectbox(f"Positie {i+1}", renners_opties_stage, index=d_idx, key=f"sel_{eid}_{i}", label_visibility="collapsed")
+            st.session_state.etappe_keuzes[eid][i] = keuze if keuze != "-" else None
 
-    # ── Kopman ───────────────────────────────────────────────────────
-    st.markdown("##### 🎖️ Kopman — dubbele punten (x2)")
+        # ── Kopman ───────────────────────────────────────────────────────
+        st.markdown(f"##### 🎖️ Kopman (Actueel: {km_badge})")
 
-    if huidig_team_namen:
-        auto_kopman = bepaal_auto_kopman(huidig_team_namen, etappe["id"], df)
-        auto_hint   = f"Auto ({auto_kopman})" if auto_kopman else "Auto (geen team)"
-    else:
-        auto_kopman = None
-        auto_hint   = "Auto (stel eerst een team in via Tab 2)"
+        if huidig_team_namen:
+            auto_kopman = bepaal_auto_kopman(huidig_team_namen, etappe["id"], df)
+            auto_hint   = f"Auto ({auto_kopman})" if auto_kopman else "Auto (geen team)"
+        else:
+            auto_kopman = None
+            auto_hint   = "Auto (stel eerst team in)"
 
-    kopman_opties = ["🤖 " + auto_hint] + sorted(huidig_team_namen)
-    huidige_keuze = st.session_state.kopman_keuzes.get(eid)
-    kopman_idx    = kopman_opties.index(huidige_keuze) if huidige_keuze and huidige_keuze in kopman_opties else 0
+        kopman_opties = ["🤖 " + auto_hint] + sorted(huidig_team_namen)
+        huidige_keuze = st.session_state.kopman_keuzes.get(eid)
+        kopman_idx    = kopman_opties.index(huidige_keuze) if huidige_keuze and huidige_keuze in kopman_opties else 0
 
-    gekozen = st.selectbox(
-        "Kopman voor deze etappe:",
-        options=kopman_opties,
-        index=kopman_idx,
-        key=f"kopman_sel_{eid}",
-        help="'Auto' = best scorende renner op basis van het etappeprofiel. Kies een naam om handmatig te overriden."
-    )
+        gekozen = st.selectbox(
+            "Kopman voor deze etappe:",
+            options=kopman_opties,
+            index=kopman_idx,
+            key=f"kopman_sel_{eid}",
+            label_visibility="collapsed"
+        )
 
-    if gekozen.startswith("🤖"):
-        st.session_state.kopman_keuzes[eid] = None
-        if auto_kopman:
-            st.success(f"Automatische kopman: **{auto_kopman}**")
-    else:
-        st.session_state.kopman_keuzes[eid] = gekozen
-        st.success(f"Handmatige kopman: **{gekozen}**")
+        if gekozen.startswith("🤖"):
+            st.session_state.kopman_keuzes[eid] = None
+            if auto_kopman:
+                st.caption(f"Automatische kopman: **{auto_kopman}**")
+        else:
+            st.session_state.kopman_keuzes[eid] = gekozen
+            st.caption(f"Handmatige kopman: **{gekozen}**")
 
 # ══════════════════════════════════════════════════════════════════════
 # TAB 2 – FINAAL TEAM SAMENSTELLEN
