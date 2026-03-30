@@ -181,26 +181,23 @@ else:
             'WAP': 'WP'
         }
         
-        uitslag_parsed = []
-        for index, row in df_raw_uitslagen.iterrows():
-            koers_origineel = str(row['Race']).strip().upper()
-            
-            koers = sporza_naar_scorito_map.get(koers_origineel, koers_origineel)
-            
+        def process_result_row(row):
             rank_str = str(row['Rnk']).strip().upper()
             if rank_str in ['DNS', 'NAN', '']:
-                continue 
-                
+                return None
+
+            koers_origineel = str(row['Race']).strip().upper()
+            koers = sporza_naar_scorito_map.get(koers_origineel, koers_origineel)
             rider_name = str(row['Rider']).strip()
             gekoppelde_naam = match_uitslag_naam(rider_name, alle_renners)
-            
             rank = int(rank_str) if rank_str.isdigit() else 999 
-            uitslag_parsed.append({
+            return {
                 "Koers": koers, 
                 "Rank": rank, 
                 "Renner": gekoppelde_naam
-            })
-                        
+            }
+
+        uitslag_parsed = df_raw_uitslagen.apply(process_result_row, axis=1).dropna().tolist()
         df_uitslagen = pd.DataFrame(uitslag_parsed)
         
         if df_uitslagen.empty:
