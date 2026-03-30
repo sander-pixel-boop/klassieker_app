@@ -245,6 +245,29 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # TAB 1 – ETAPPE VOORSPELLINGEN + KOPMAN PER ETAPPE
 # ══════════════════════════════════════════════════════════════════════
 with tab1:
+    st.markdown("### 🪄 Magic Auto-Fill")
+    if st.button("🤖 Vul alle 21 etappes in met AI", use_container_width=True, help="Overschrijft alle huidige keuzes met de AI Top 3 per etappe"):
+        for e in GIRO_ETAPPES:
+            eid_str = str(e["id"])
+            cw = st.session_state.giro_weights_v2[eid_str]
+
+            som_input = sum(cw.values())
+            w = {k: v / som_input for k, v in cw.items()} if som_input > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+
+            df_stage = df.copy()
+            df_stage['StageScore'] = (
+                df_stage['SPR'] * w['SPR'] +
+                df_stage['GC']  * w['GC']  +
+                df_stage['ITT'] * w['ITT']  +
+                df_stage['MTN'] * w['MTN']
+            )
+            top_3_pure_names = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()[:3]
+            for idx, naam in enumerate(top_3_pure_names):
+                st.session_state.etappe_keuzes[eid_str][idx] = naam
+        st.rerun()
+
+    st.divider()
+
     # ── Etappe navigator ─────────────────────────────────────────────
     # One stable editor, no expanders that collapse on widget change.
 
