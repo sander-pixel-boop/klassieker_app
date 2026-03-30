@@ -1,13 +1,10 @@
 import streamlit as st
 import pandas as pd
-import json
 import unicodedata
 import os
 import base64
 import pulp
-from thefuzz import process, fuzz
 from supabase import create_client
-from datetime import datetime
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Giro Etappe Bouwer", layout="wide", page_icon="🇮🇹")
@@ -76,19 +73,21 @@ def laad_profiel_scores():
 laad_profiel_scores()
 
 # --- HULPFUNCTIES ---
-def normalize_name_logic(text):
-    if not isinstance(text, str): return ""
-    text = text.lower().strip()
-    nfkd_form = unicodedata.normalize('NFKD', text)
-    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
-
-def match_naam_slim(naam, dict_met_namen):
-    naam_norm = normalize_name_logic(naam)
-    lijst_met_namen = list(dict_met_namen.keys())
-    if naam_norm in lijst_met_namen: return dict_met_namen[naam_norm]
-    bests = process.extractBests(naam_norm, lijst_met_namen, scorer=fuzz.token_set_ratio, limit=1)
-    if bests and bests[0][1] >= 80: return dict_met_namen[bests[0][0]]
-    return naam
+def bereken_alle_stage_scores(df_input, wegingen):
+    """
+    Berekent de stage score voor alle renners in df_input op basis van de wegingen
+    en voegt deze toe als een nieuwe kolom 'StageScore'.
+    """
+    df_out = df_input.copy()
+    som_input = sum(wegingen.values()) or 1.0
+    w = {k: v / som_input for k, v in wegingen.items()}
+    df_out['StageScore'] = (
+        df_out.get('SPR', 0) * w.get('SPR', 0) +
+        df_out.get('GC',  0) * w.get('GC',  0) +
+        df_out.get('ITT', 0) * w.get('ITT', 0) +
+        df_out.get('MTN', 0) * w.get('MTN', 0)
+    )
+    return df_out
 
 def get_clickable_image_html(image_path, fallback_text, link):
     if os.path.exists(image_path):
@@ -103,39 +102,14 @@ def get_clickable_image_html(image_path, fallback_text, link):
         img_src = f"https://placehold.co/600x400/eeeeee/000000?text={fallback_text}"
     return f'<a href="{link}" target="_blank"><img src="{img_src}" width="100%" style="border-radius:8px;"></a>'
 
-def bereken_stage_scores(df, weights):
-    """Geeft dict {renner: stagescore} op basis van wegingen."""
-    s = sum(weights.values()) or 1.0
-    w = {k: v / s for k, v in weights.items()}
-    scores = {}
-    for _, row in df.iterrows():
-        scores[row['Naam']] = (
-            row.get('SPR', 0) * w.get('SPR', 0) +
-            row.get('GC',  0) * w.get('GC',  0) +
-            row.get('ITT', 0) * w.get('ITT', 0) +
-            row.get('MTN', 0) * w.get('MTN', 0)
-        )
-    return scores
-
 def bepaal_auto_kopman(team_renners, etappe_id, df):
     """Berekent de automatische kopman puur op basis van het etappeprofiel."""
     w = next((e['w'] for e in GIRO_ETAPPES if e['id'] == etappe_id), {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25})
-    s = sum(w.values()) or 1.0
-    w = {k: v / s for k, v in w.items()}
-    best, best_score = None, -1
-    for r in team_renners:
-        rij = df[df['Naam'] == r]
-        if rij.empty: continue
-        score = (
-            rij.iloc[0].get('SPR', 0) * w.get('SPR', 0) +
-            rij.iloc[0].get('GC',  0) * w.get('GC',  0) +
-            rij.iloc[0].get('ITT', 0) * w.get('ITT', 0) +
-            rij.iloc[0].get('MTN', 0) * w.get('MTN', 0)
-        )
-        if score > best_score:
-            best_score = score
-            best = r
-    return best
+    df_team = df[df['Naam'].isin(team_renners)]
+    if df_team.empty: return None
+    df_gescoord = bereken_alle_stage_scores(df_team, w)
+    best = df_gescoord.loc[df_gescoord['StageScore'].idxmax()]
+    return best['Naam']
 
 def solve_final_team(df, draft_counts, max_bud=100.0, max_ren=16):
     prob = pulp.LpProblem("Giro_Builder", pulp.LpMaximize)
@@ -172,6 +146,16 @@ def load_all_data():
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
     df['EV'] = ((df['GC']/100)**4 * 400 + (df['SPR']/100)**4 * 250 +
                 (df['ITT']/100)**4 * 80  + (df['MTN']/100)**4 * 100).fillna(0).round(0)
+
+    def bepaal_rol(row):
+        if row['GC'] >= 85: return 'Klassementsrenner'
+        if row['SPR'] >= 85: return 'Sprinter'
+        if row['ITT'] >= 85 and row['GC'] < 75: return 'Tijdrijder'
+        if row['MTN'] >= 80 and row['GC'] < 80: return 'Aanvaller / Klimmer'
+        return 'Knecht / Vrijbuiter'
+
+    df['Type'] = df.apply(bepaal_rol, axis=1)
+
     # Zorg voor consistente Naam kolom
     if naam_col_p != 'Naam': df = df.rename(columns={naam_col_p: 'Naam'})
     elif 'Renner' in df.columns and 'Naam' not in df.columns: df = df.rename(columns={'Renner': 'Naam'})
@@ -357,13 +341,7 @@ with tab1:
         active_w = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
 
     # ── AI suggesties ─────────────────────────────────────────────────
-    df_stage = df.copy()
-    df_stage['StageScore'] = (
-        df_stage['SPR'] * active_w['SPR'] +
-        df_stage['GC']  * active_w['GC']  +
-        df_stage['ITT'] * active_w['ITT']  +
-        df_stage['MTN'] * active_w['MTN']
-    )
+    df_stage = bereken_alle_stage_scores(df, active_w)
     top_5            = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False]).head(5)
     top_5_namen      = [f"{row['Naam']} ({int(row['StageScore'])})" for _, row in top_5.iterrows()]
     top_3_pure_names = top_5['Naam'].tolist()[:3]
@@ -378,10 +356,27 @@ with tab1:
         horizontal=True,
         key="sorteer_tab1"
     )
+
+    # Voeg een sterretje toe voor geselecteerde renners in het finale team
+    def get_display_name(naam):
+        if naam == "-": return naam
+        if naam in st.session_state.finaal_team:
+            return f"⭐ {naam}"
+        return naam
+
+    # Helper om echte naam terug te halen uit de display naam
+    def get_real_name(display_name):
+        if display_name == "-": return None
+        if display_name.startswith("⭐ "):
+            return display_name[2:]
+        return display_name
+
     if "Alfabetisch" in sorteer_optie:
-        renners_opties_stage = ["-"] + sorted(df['Naam'].tolist())
+        renners_opties_stage_raw = ["-"] + sorted(df['Naam'].tolist())
     else:
-        renners_opties_stage = ["-"] + df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()
+        renners_opties_stage_raw = ["-"] + df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()
+
+    renners_opties_stage = [get_display_name(r) for r in renners_opties_stage_raw]
 
     pred_head, pred_btn = st.columns([3, 1])
     with pred_head:
@@ -395,9 +390,10 @@ with tab1:
     c1, c2, c3 = st.columns(3)
     for i, col in enumerate([c1, c2, c3]):
         current_val = st.session_state.etappe_keuzes[eid][i]
-        d_idx = renners_opties_stage.index(current_val) if current_val in renners_opties_stage else 0
-        keuze = col.selectbox(f"Positie {i+1}", renners_opties_stage, index=d_idx, key=f"sel_{eid}_{i}")
-        st.session_state.etappe_keuzes[eid][i] = keuze if keuze != "-" else None
+        display_val = get_display_name(current_val) if current_val else "-"
+        d_idx = renners_opties_stage.index(display_val) if display_val in renners_opties_stage else 0
+        keuze_display = col.selectbox(f"Positie {i+1}", renners_opties_stage, index=d_idx, key=f"sel_{eid}_{i}")
+        st.session_state.etappe_keuzes[eid][i] = get_real_name(keuze_display)
 
     st.divider()
 
@@ -461,7 +457,7 @@ with tab2:
     st.divider()
     st.subheader("2. Finaal Team Selecteren (16 Renners)")
 
-    c_auto, c_space = st.columns([1, 2])
+    c_auto, c_wis, c_space = st.columns([1, 1, 1])
     with c_auto:
         if st.button("🤖 Bereken Optimaal Team", type="primary", use_container_width=True):
             res = solve_final_team(df, draft_counts, 100.0, 16)
@@ -470,6 +466,10 @@ with tab2:
                 st.rerun()
             else:
                 st.error("Kon geen geldig team berekenen binnen het budget.")
+    with c_wis:
+        if st.button("🗑️ Wis Team", use_container_width=True):
+            st.session_state.finaal_team = []
+            st.rerun()
 
     def update_finaal_team():
         st.session_state.finaal_team = st.session_state._finaal_team_selector
@@ -498,7 +498,7 @@ with tab2:
                 st.bar_chart(huidig_team_df[plot_cols].mean())
         with col_tabel:
             st.dataframe(
-                huidig_team_df[['Naam', 'Ploeg', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV']].sort_values('Prijs', ascending=False),
+                huidig_team_df[['Naam', 'Ploeg', 'Type', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV']].sort_values('Prijs', ascending=False),
                 hide_index=True, use_container_width=True
             )
     else:
@@ -573,16 +573,9 @@ with tab3:
                 matrix_data[renner][col_name] = "-"
 
             voorspeld = [n for n in st.session_state.etappe_keuzes[eid] if n and n in st.session_state.finaal_team]
-            som_input = sum(cw.values())
-            w = {k: v / som_input for k, v in cw.items()} if som_input > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+            w = cw if sum(cw.values()) > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
 
-            team_stage_df = huidig_team_df.copy()
-            team_stage_df['StageScore'] = (
-                team_stage_df.get('SPR', 0) * w['SPR'] +
-                team_stage_df.get('GC',  0) * w['GC']  +
-                team_stage_df.get('ITT', 0) * w['ITT']  +
-                team_stage_df.get('MTN', 0) * w['MTN']
-            )
+            team_stage_df = bereken_alle_stage_scores(huidig_team_df, w)
 
             voorspeld_df = team_stage_df[team_stage_df['Naam'].isin(voorspeld)] if voorspeld else pd.DataFrame()
             rest_df      = team_stage_df[~team_stage_df['Naam'].isin(voorspeld)].sort_values('StageScore', ascending=False)
@@ -615,16 +608,9 @@ with tab3:
             cw  = st.session_state.giro_weights_v2[eid]
 
             voorspeld    = [n for n in st.session_state.etappe_keuzes[eid] if n and n in st.session_state.finaal_team]
-            som_input    = sum(cw.values())
-            w = {k: v / som_input for k, v in cw.items()} if som_input > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+            w = cw if sum(cw.values()) > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
 
-            team_stage_df = huidig_team_df.copy()
-            team_stage_df['StageScore'] = (
-                team_stage_df.get('SPR', 0) * w['SPR'] +
-                team_stage_df.get('GC',  0) * w['GC']  +
-                team_stage_df.get('ITT', 0) * w['ITT']  +
-                team_stage_df.get('MTN', 0) * w['MTN']
-            )
+            team_stage_df = bereken_alle_stage_scores(huidig_team_df, w)
             voorspeld_df = team_stage_df[team_stage_df['Naam'].isin(voorspeld)] if voorspeld else pd.DataFrame()
             rest_df      = team_stage_df[~team_stage_df['Naam'].isin(voorspeld)].sort_values('StageScore', ascending=False)
             top_9_df     = pd.concat([voorspeld_df, rest_df]).head(9)
@@ -674,7 +660,7 @@ with tab3:
 # ══════════════════════════════════════════════════════════════════════
 with tab4:
     st.subheader("Volledige Startlijst & Prijzen")
-    cols_show = [c for c in ['Naam', 'Ploeg', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV'] if c in df.columns]
+    cols_show = [c for c in ['Naam', 'Ploeg', 'Type', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV'] if c in df.columns]
     st.dataframe(df[cols_show].sort_values('Prijs', ascending=False), hide_index=True, use_container_width=True)
 
 # ══════════════════════════════════════════════════════════════════════
