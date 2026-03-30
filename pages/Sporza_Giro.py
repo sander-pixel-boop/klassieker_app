@@ -276,6 +276,8 @@ with st.sidebar:
                     st.session_state.giro_weights           = db_data.get("weights",      {str(e["id"]): e["w"].copy() for e in GIRO_ETAPPES})
                     st.session_state.giro_reasoning         = db_data.get("reasoning",    {})
                     st.rerun()
+    else:
+        st.info("Log in met een account om cloud-opslag te gebruiken.")
 
     st.divider()
 

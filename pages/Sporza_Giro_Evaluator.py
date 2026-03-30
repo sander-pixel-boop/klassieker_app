@@ -224,28 +224,31 @@ with st.sidebar:
 
     teams = {}  # naam -> {"renners": [], "keuzes": {}}
 
-    with col1:
-        if st.button("🤖 AI Solver", use_container_width=True):
-            res = supabase.table(TABEL_NAAM).select("sporza_giro_team26").eq("username", speler_naam).execute()
-            if res.data and res.data[0].get("sporza_giro_team26"):
-                d = res.data[0]["sporza_giro_team26"]
-                st.session_state["eval_ai_team"] = {
-                    "renners": d.get("selected_riders", []),
-                    "keuzes": d.get("predictions", {str(i): [None]*10 for i in range(1, 22)})
-                }
-                st.success("AI team geladen!")
+    if speler_naam != "gast":
+        with col1:
+            if st.button("🤖 AI Solver", use_container_width=True):
+                res = supabase.table(TABEL_NAAM).select("sporza_giro_team26").eq("username", speler_naam).execute()
+                if res.data and res.data[0].get("sporza_giro_team26"):
+                    d = res.data[0]["sporza_giro_team26"]
+                    st.session_state["eval_ai_team"] = {
+                        "renners": d.get("selected_riders", []),
+                        "keuzes": d.get("predictions", {str(i): [None]*10 for i in range(1, 22)})
+                    }
+                    st.success("AI team geladen!")
 
-    with col2:
-        if st.button("🛠️ Bouwer", use_container_width=True):
-            res = supabase.table(TABEL_NAAM).select("sporza_giro_team26_v2").eq("username", speler_naam).execute()
-            if res.data and res.data[0].get("sporza_giro_team26_v2"):
-                d = res.data[0]["sporza_giro_team26_v2"]
-                st.session_state["eval_bouwer_team"] = {
-                    "renners":       d.get("team", []),
-                    "keuzes":        d.get("etappe_keuzes",  {str(i): [None, None, None] for i in range(1, 22)}),
-                    "kopman_keuzes": d.get("kopman_keuzes",  {str(i): None               for i in range(1, 22)}),
-                }
-                st.success("Bouwer team geladen!")
+        with col2:
+            if st.button("🛠️ Bouwer", use_container_width=True):
+                res = supabase.table(TABEL_NAAM).select("sporza_giro_team26_v2").eq("username", speler_naam).execute()
+                if res.data and res.data[0].get("sporza_giro_team26_v2"):
+                    d = res.data[0]["sporza_giro_team26_v2"]
+                    st.session_state["eval_bouwer_team"] = {
+                        "renners":       d.get("team", []),
+                        "keuzes":        d.get("etappe_keuzes",  {str(i): [None, None, None] for i in range(1, 22)}),
+                        "kopman_keuzes": d.get("kopman_keuzes",  {str(i): None               for i in range(1, 22)}),
+                    }
+                    st.success("Bouwer team geladen!")
+    else:
+        st.info("Log in met een account om cloud-opslag te gebruiken.")
 
     st.divider()
     st.markdown("#### ⚙️ Instellingen")

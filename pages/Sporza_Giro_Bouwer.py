@@ -204,25 +204,28 @@ with st.sidebar:
 
     st.divider()
 
-    if st.button("💾 Opslaan", type="primary", use_container_width=True):
-        data = {
-            "team":          st.session_state.finaal_team,
-            "etappe_keuzes": st.session_state.etappe_keuzes,
-            "weights":       st.session_state.giro_weights_v2,
-            "kopman_keuzes": st.session_state.kopman_keuzes,
-        }
-        supabase.table(TABEL_NAAM).update({DB_KOLOM: data}).eq("username", speler_naam).execute()
-        st.success("Opgeslagen!")
+    if speler_naam != "gast":
+        if st.button("💾 Opslaan", type="primary", use_container_width=True):
+            data = {
+                "team":          st.session_state.finaal_team,
+                "etappe_keuzes": st.session_state.etappe_keuzes,
+                "weights":       st.session_state.giro_weights_v2,
+                "kopman_keuzes": st.session_state.kopman_keuzes,
+            }
+            supabase.table(TABEL_NAAM).update({DB_KOLOM: data}).eq("username", speler_naam).execute()
+            st.success("Opgeslagen!")
 
-    if st.button("🔄 Inladen", use_container_width=True):
-        res = supabase.table(TABEL_NAAM).select(DB_KOLOM).eq("username", speler_naam).execute()
-        if res.data and res.data[0].get(DB_KOLOM):
-            db_data = res.data[0][DB_KOLOM]
-            st.session_state.etappe_keuzes  = db_data.get("etappe_keuzes",  _default_keuzes.copy())
-            st.session_state.giro_weights_v2 = db_data.get("weights",       _default_weights.copy())
-            st.session_state.finaal_team    = db_data.get("team",           [])
-            st.session_state.kopman_keuzes  = db_data.get("kopman_keuzes",  _default_kopman.copy())
-            st.rerun()
+        if st.button("🔄 Inladen", use_container_width=True):
+            res = supabase.table(TABEL_NAAM).select(DB_KOLOM).eq("username", speler_naam).execute()
+            if res.data and res.data[0].get(DB_KOLOM):
+                db_data = res.data[0][DB_KOLOM]
+                st.session_state.etappe_keuzes  = db_data.get("etappe_keuzes",  _default_keuzes.copy())
+                st.session_state.giro_weights_v2 = db_data.get("weights",       _default_weights.copy())
+                st.session_state.finaal_team    = db_data.get("team",           [])
+                st.session_state.kopman_keuzes  = db_data.get("kopman_keuzes",  _default_kopman.copy())
+                st.rerun()
+    else:
+        st.info("Log in met een account om cloud-opslag te gebruiken.")
 
     # Kopman snelknoppen
     if huidig_team_namen:
