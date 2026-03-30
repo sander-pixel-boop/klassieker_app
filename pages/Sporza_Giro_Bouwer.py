@@ -220,6 +220,9 @@ with st.sidebar:
             if st.button("🔄 Reset\nalle kopmannen", use_container_width=True,
                          help="Zet alle etappes terug naar automatisch"):
                 st.session_state.kopman_keuzes = _default_kopman.copy()
+                for key in list(st.session_state.keys()):
+                    if key.startswith("kopman_sel_"):
+                        del st.session_state[key]
                 st.rerun()
         with col_k2:
             ingesteld = sum(1 for v in st.session_state.kopman_keuzes.values() if v is not None)
@@ -258,6 +261,11 @@ with tab1:
             top_3_pure_names = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()[:3]
             for idx, naam in enumerate(top_3_pure_names):
                 st.session_state.etappe_keuzes[eid_str][idx] = naam
+
+        # Clear selectbox keys from session_state so they rerender with the new default indices
+        for key in list(st.session_state.keys()):
+            if key.startswith("sel_"):
+                del st.session_state[key]
         st.rerun()
 
     st.divider()
@@ -403,6 +411,12 @@ with tab1:
         if st.button("🤖 Suggesties Top 3 overnemen", use_container_width=True):
             for idx, naam in enumerate(top_3_pure_names):
                 st.session_state.etappe_keuzes[eid][idx] = naam
+
+            # Clear selectbox keys from session_state for this stage so they re-render correctly
+            for i in range(3):
+                key = f"sel_{eid}_{i}"
+                if key in st.session_state:
+                    del st.session_state[key]
             st.rerun()
 
     c1, c2, c3 = st.columns(3)
