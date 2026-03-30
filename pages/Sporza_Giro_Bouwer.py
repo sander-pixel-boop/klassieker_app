@@ -246,7 +246,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # ══════════════════════════════════════════════════════════════════════
 with tab1:
     st.markdown("### 🪄 Magic Auto-Fill")
-    if st.button("🤖 Vul alle 21 etappes in met AI", use_container_width=True, help="Overschrijft alle huidige keuzes met de AI Top 3 per etappe"):
+    if st.button("🤖 Vul alle 21 etappes in met Suggesties", use_container_width=True, help="Overschrijft alle huidige keuzes met de Suggesties Top 3 per etappe"):
         for e in GIRO_ETAPPES:
             eid_str = str(e["id"])
             cw = st.session_state.giro_weights_v2[eid_str]
@@ -254,13 +254,7 @@ with tab1:
             som_input = sum(cw.values())
             w = {k: v / som_input for k, v in cw.items()} if som_input > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
 
-            df_stage = df.copy()
-            df_stage['StageScore'] = (
-                df_stage['SPR'] * w['SPR'] +
-                df_stage['GC']  * w['GC']  +
-                df_stage['ITT'] * w['ITT']  +
-                df_stage['MTN'] * w['MTN']
-            )
+            df_stage = bereken_alle_stage_scores(df, w)
             top_3_pure_names = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()[:3]
             for idx, naam in enumerate(top_3_pure_names):
                 st.session_state.etappe_keuzes[eid_str][idx] = naam
@@ -322,7 +316,7 @@ with tab1:
             dots.append(f"<span title='E{eid_dot} – geen picks' style='font-size:18px;cursor:default;'>⚪</span>")
     st.markdown(" ".join(dots) + "  <small style='color:grey;'>🔵 actief &nbsp; 🟢 ingevuld &nbsp; ⚪ leeg</small>", unsafe_allow_html=True)
 
-    st.divider()
+    st.markdown("---")
 
     # ── Active stage editor ───────────────────────────────────────────
     etappe = GIRO_ETAPPES[st.session_state.aktieve_etappe_idx]
@@ -332,29 +326,30 @@ with tab1:
     # Header
     n_picks, km_badge = etappe_samenvatting(eid)
     st.subheader(f"Etappe {etappe['id']}: {etappe['route']}")
-    col_meta1, col_meta2, col_meta3 = st.columns(3)
-    col_meta1.metric("Type",    etappe["type"])
-    col_meta2.metric("Datum",   etappe["date"])
-    col_meta3.metric("Kopman",  km_badge)
 
-    # Route & profile images
-    giro_link = "https://www.giroditalia.it/en/the-route/"
-    map_path  = f"giro262/giro26-{etappe['id']}-map.jpg"
-    prof_path = f"giro262/giro26-{etappe['id']}-hp.jpg"
-    i1, i2 = st.columns(2)
-    i1.markdown(get_clickable_image_html(map_path,  f"Kaart+{etappe['id']}", giro_link), unsafe_allow_html=True)
-    i2.markdown(get_clickable_image_html(prof_path, f"Profiel+{etappe['id']}", giro_link), unsafe_allow_html=True)
+    col_info, col_img = st.columns([1, 1])
 
-    st.divider()
+    with col_info:
+        col_meta1, col_meta2, col_meta3 = st.columns(3)
+        col_meta1.metric("Type",    etappe["type"])
+        col_meta2.metric("Datum",   etappe["date"])
+        col_meta3.metric("Kopman",  km_badge)
 
-    # ── Weging ───────────────────────────────────────────────────────
-    st.markdown("##### ⚙️ Etappeprofiel weging")
-    wc1, wc2, wc3, wc4 = st.columns(4)
-    new_spr = wc1.number_input("Sprint (SPR)",      0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{eid}")
-    new_gc  = wc2.number_input("Klassement (GC)",   0.0, 1.0, float(cw["GC"]),  0.1, key=f"wgc_{eid}")
-    new_itt = wc3.number_input("Tijdrit (ITT)",     0.0, 1.0, float(cw["ITT"]), 0.1, key=f"witt_{eid}")
-    new_mtn = wc4.number_input("Klim/Aanval (MTN)", 0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{eid}")
-    st.session_state.giro_weights_v2[eid] = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
+        st.markdown("##### ⚙️ Etappeprofiel weging")
+        wc1, wc2, wc3, wc4 = st.columns(4)
+        new_spr = wc1.number_input("Sprint (SPR)",      0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{eid}")
+        new_gc  = wc2.number_input("Klassement (GC)",   0.0, 1.0, float(cw["GC"]),  0.1, key=f"wgc_{eid}")
+        new_itt = wc3.number_input("Tijdrit (ITT)",     0.0, 1.0, float(cw["ITT"]), 0.1, key=f"witt_{eid}")
+        new_mtn = wc4.number_input("Klim/Aanval (MTN)", 0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{eid}")
+        st.session_state.giro_weights_v2[eid] = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
+
+    with col_img:
+        giro_link = "https://www.giroditalia.it/en/the-route/"
+        map_path  = f"giro262/giro26-{etappe['id']}-map.jpg"
+        prof_path = f"giro262/giro26-{etappe['id']}-hp.jpg"
+        i1, i2 = st.columns(2)
+        i1.markdown(get_clickable_image_html(map_path,  f"Kaart+{etappe['id']}", giro_link), unsafe_allow_html=True)
+        i2.markdown(get_clickable_image_html(prof_path, f"Profiel+{etappe['id']}", giro_link), unsafe_allow_html=True)
 
     som_input = new_spr + new_gc + new_itt + new_mtn
     if abs(som_input - 1.0) > 0.01 and som_input > 0:
@@ -366,16 +361,13 @@ with tab1:
     else:
         active_w = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
 
-    # ── AI suggesties ─────────────────────────────────────────────────
+    # ── Suggesties & Voorspelling ──────────────────────────────────
     df_stage = bereken_alle_stage_scores(df, active_w)
     top_5            = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False]).head(5)
     top_5_namen      = [f"{row['Naam']} ({int(row['StageScore'])})" for _, row in top_5.iterrows()]
     top_3_pure_names = top_5['Naam'].tolist()[:3]
-    st.info(f"💡 **AI Top 5:** {', '.join(top_5_namen)}")
+    st.info(f"💡 **Suggesties Top 5:** {', '.join(top_5_namen)}")
 
-    st.divider()
-
-    # ── Voorspelling ─────────────────────────────────────────────────
     sorteer_optie = st.radio(
         "Sorteer renners op:",
         ["🔤 Alfabetisch", "📊 Etappe Score"],
@@ -408,7 +400,7 @@ with tab1:
     with pred_head:
         st.markdown("##### 🏁 Jouw Voorspelling (top 3)")
     with pred_btn:
-        if st.button("🤖 AI Top 3 overnemen", use_container_width=True):
+        if st.button("🤖 Suggesties Top 3 overnemen", use_container_width=True):
             for idx, naam in enumerate(top_3_pure_names):
                 st.session_state.etappe_keuzes[eid][idx] = naam
             st.rerun()
@@ -672,7 +664,7 @@ with tab3:
                     elif naam in voorspeld:
                         rol = "Basis (Jouw Voorspelling)"
                     else:
-                        rol = "Basis (AI Opvulling)"
+                        rol = "Basis (Suggestie Opvulling)"
                     opstelling.append({
                         "Rol":             rol,
                         "Renner":          naam,
@@ -721,7 +713,7 @@ with tab5:
 
     1. **Tab 1 – Voorspellingen:** Kies per etappe welke renners jij verwacht te scoren
        én stel je kopman in.
-    2. **Tab 2 – Finaal Team:** Selecteer je definitieve 16 renners of laat de AI ze
+    2. **Tab 2 – Finaal Team:** Selecteer je definitieve 16 renners of laat de Suggesties ze
        automatisch kiezen op basis van jouw voorspellingen.
     3. **Tab 3 – Opstellingen:** Bekijk de dagelijkse 9-koppige opstelling plus
        een volledig kopman-overzicht voor alle 21 etappes.
