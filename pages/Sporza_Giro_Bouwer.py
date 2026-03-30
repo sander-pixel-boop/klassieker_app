@@ -258,6 +258,29 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # TAB 1 – ETAPPE VOORSPELLINGEN + KOPMAN PER ETAPPE
 # ══════════════════════════════════════════════════════════════════════
 with tab1:
+    st.markdown("### 🪄 Magic Auto-Fill")
+    if st.button("🤖 Vul alle 21 etappes in met suggesties", use_container_width=True, help="Overschrijft alle huidige keuzes met de gesuggereerde Top 3 per etappe"):
+        for e in GIRO_ETAPPES:
+            eid_str = str(e["id"])
+            cw = st.session_state.giro_weights_v2[eid_str]
+
+            som_input = sum(cw.values())
+            w = {k: v / som_input for k, v in cw.items()} if som_input > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+
+            df_stage = df.copy()
+            df_stage['StageScore'] = (
+                df_stage['SPR'] * w['SPR'] +
+                df_stage['GC']  * w['GC']  +
+                df_stage['ITT'] * w['ITT']  +
+                df_stage['MTN'] * w['MTN']
+            )
+            top_3_pure_names = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()[:3]
+            for idx, naam in enumerate(top_3_pure_names):
+                st.session_state.etappe_keuzes[eid_str][idx] = naam
+        st.rerun()
+
+    st.divider()
+
     # ── Etappe navigator ─────────────────────────────────────────────
     # One stable editor, no expanders that collapse on widget change.
 
@@ -356,7 +379,7 @@ with tab1:
     else:
         active_w = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
 
-    # ── AI suggesties ─────────────────────────────────────────────────
+    # ── Suggesties ─────────────────────────────────────────────────
     df_stage = df.copy()
     df_stage['StageScore'] = (
         df_stage['SPR'] * active_w['SPR'] +
@@ -367,7 +390,7 @@ with tab1:
     top_5            = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False]).head(5)
     top_5_namen      = [f"{row['Naam']} ({int(row['StageScore'])})" for _, row in top_5.iterrows()]
     top_3_pure_names = top_5['Naam'].tolist()[:3]
-    st.info(f"💡 **AI Top 5:** {', '.join(top_5_namen)}")
+    st.info(f"💡 **Top 5 Suggesties:** {', '.join(top_5_namen)}")
 
     st.divider()
 
@@ -387,7 +410,7 @@ with tab1:
     with pred_head:
         st.markdown("##### 🏁 Jouw Voorspelling (top 3)")
     with pred_btn:
-        if st.button("🤖 AI Top 3 overnemen", use_container_width=True):
+        if st.button("🤖 Top 3 suggesties overnemen", use_container_width=True):
             for idx, naam in enumerate(top_3_pure_names):
                 st.session_state.etappe_keuzes[eid][idx] = naam
             st.rerun()
@@ -660,7 +683,7 @@ with tab3:
                     elif naam in voorspeld:
                         rol = "Basis (Jouw Voorspelling)"
                     else:
-                        rol = "Basis (AI Opvulling)"
+                        rol = "Basis (Automatische Opvulling)"
                     opstelling.append({
                         "Rol":             rol,
                         "Renner":          naam,
@@ -709,7 +732,7 @@ with tab5:
 
     1. **Tab 1 – Voorspellingen:** Kies per etappe welke renners jij verwacht te scoren
        én stel je kopman in.
-    2. **Tab 2 – Finaal Team:** Selecteer je definitieve 16 renners of laat de AI ze
+    2. **Tab 2 – Finaal Team:** Selecteer je definitieve 16 renners of laat het systeem ze
        automatisch kiezen op basis van jouw voorspellingen.
     3. **Tab 3 – Opstellingen:** Bekijk de dagelijkse 9-koppige opstelling plus
        een volledig kopman-overzicht voor alle 21 etappes.
