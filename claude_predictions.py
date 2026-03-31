@@ -17,7 +17,7 @@ SETUP
 import json
 import pandas as pd
 import streamlit as st
-
+from thefuzz import process
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -64,11 +64,12 @@ def _fuzzy_resolve(name: str, valid_names: list[str]) -> str | None:
     """
     if name in valid_names:
         return name
-    name_lower = name.lower()
-    # Substring match (both directions)
-    for v in valid_names:
-        if name_lower in v.lower() or v.lower() in name_lower:
-            return v
+
+    # Use thefuzz to find the closest match
+    match = process.extractOne(name, valid_names)
+    if match and match[1] >= 85:
+        return match[0]
+
     return None
 
 
