@@ -5,7 +5,7 @@ import os
 import hashlib
 from datetime import datetime
 from thefuzz import process, fuzz
-from supabase import create_client
+from utils.db import init_connection
 from utils.crypto import generate_signature
 
 # 1. Paginaconfiguratie
@@ -19,12 +19,6 @@ if "ingelogde_speler" not in st.session_state:
 speler_naam = st.session_state["ingelogde_speler"]
 
 # 3. Database Connectie
-@st.cache_resource
-def init_connection():
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    return create_client(url, key)
-
 supabase = init_connection()
 tabel_naam = st.secrets["TABEL_NAAM"]
 

@@ -1,16 +1,10 @@
 import streamlit as st
 import hashlib
-from supabase import create_client
+from utils.db import init_connection
 
 st.set_page_config(page_title="Wieler Spellen Solver", page_icon="🚴‍♂️", layout="wide")
 
 # --- DATABASE CONNECTIE ---
-@st.cache_resource
-def init_connection():
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    return create_client(url, key)
-
 supabase = init_connection()
 TABEL_NAAM = "gebruikers_data_test"
 
