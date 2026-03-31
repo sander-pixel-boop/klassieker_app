@@ -364,7 +364,7 @@ with tab1:
     # ── Suggesties & Voorspelling ──────────────────────────────────
     df_stage = bereken_alle_stage_scores(df, active_w)
     top_5            = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False]).head(5)
-    top_5_namen      = [f"{row['Naam']} ({int(row['StageScore'])})" for _, row in top_5.iterrows()]
+    top_5_namen      = [f"{n} ({int(s)})" for n, s in top_5[['Naam', 'StageScore']].values]
     top_3_pure_names = top_5['Naam'].tolist()[:3]
     st.info(f"💡 **Suggesties Top 5:** {', '.join(top_5_namen)}")
 
