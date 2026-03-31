@@ -17,19 +17,8 @@ TABEL_NAAM = "gebruikers_data_test"
 def hash_wachtwoord(wachtwoord):
     return hashlib.sha256(wachtwoord.encode()).hexdigest()
 
-# --- CSS HACK: VERBERG ZIJBALK VOOR INLOGGEN ---
-def hide_sidebar():
-    st.markdown("""
-        <style>
-            [data-testid="collapsedControl"] {display: none;}
-            [data-testid="stSidebar"] {display: none;}
-        </style>
-    """, unsafe_allow_html=True)
-
 # --- INLOG PAGINA (Landingspagina Lay-out) ---
 def login_page():
-    hide_sidebar()
-    
     st.markdown("<h1 style='text-align: center; margin-bottom: 50px;'>🚴‍♂️ Wieler Spellen Solver</h1>", unsafe_allow_html=True)
     
     col_links, col_spacer, col_rechts = st.columns([1.2, 0.2, 1])
@@ -135,7 +124,7 @@ sporza_giro_evaluator = st.Page("pages/Sporza_Giro_Evaluator.py", title="[Beta] 
 
 # --- KEUZE: WEL OF NIET INGELOGD ---
 if "ingelogde_speler" not in st.session_state:
-    pg = st.navigation([login])
+    pg = st.navigation([login], position="hidden")
 else:
     pg = st.navigation({
         "Info": [home],
