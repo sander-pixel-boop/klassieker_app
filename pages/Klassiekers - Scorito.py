@@ -122,18 +122,17 @@ def get_numeric_status(is_on_startlist, is_starter, is_verreden=False, rank_str=
         return 999
 
 def format_race_status(val, limit):
-    if pd.isna(val): return ""
+    if pd.isna(val) or val == '': return ""
     try:
         v = int(float(val))
+        if v == 999: return ""
+        if v == 998: return "✅"
+        if v == 997: return "❌"
+        if v == 996: return "DNF"
+        if v <= limit: return f"**{v}**"
+        return str(v)
     except:
         return str(val)
-        
-    if v == 999: return "-"
-    if v == 998: return "🪑"
-    if v == 997: return "✅"
-    if v == 996: return "❌ DNF"
-    if v <= limit: return f"🏅 {v}"
-    return str(v)
 
 # --- AANGEPASTE DATA LADEN ---
 @st.cache_data
