@@ -55,38 +55,46 @@ def login_page():
             tab1, tab2 = st.tabs(["Inloggen", "Account Aanmaken"])
             
             with tab1:
-                inlog_naam = st.text_input("Gebruikersnaam", key="inlog_naam")
-                inlog_ww = st.text_input("Wachtwoord", type="password", key="inlog_ww")
-                if st.button("Inloggen", type="primary", use_container_width=True):
-                    if inlog_naam and inlog_ww:
-                        res = supabase.table(TABEL_NAAM).select("password").eq("username", inlog_naam.lower()).execute()
-                        if res.data and res.data[0].get("password") == hash_wachtwoord(inlog_ww):
-                            st.session_state["ingelogde_speler"] = inlog_naam.lower()
-                            st.rerun()
+                with st.form("login_form"):
+                    inlog_naam = st.text_input("Gebruikersnaam", key="inlog_naam")
+                    inlog_ww = st.text_input("Wachtwoord", type="password", key="inlog_ww")
+                    submitted = st.form_submit_button("Inloggen", type="primary", use_container_width=True)
+
+                    if submitted:
+                        if inlog_naam and inlog_ww:
+                            with st.spinner("Aanmelden..."):
+                                res = supabase.table(TABEL_NAAM).select("password").eq("username", inlog_naam.lower()).execute()
+                                if res.data and res.data[0].get("password") == hash_wachtwoord(inlog_ww):
+                                    st.session_state["ingelogde_speler"] = inlog_naam.lower()
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Onjuiste gebruikersnaam of wachtwoord.")
                         else:
-                            st.error("❌ Onjuiste gebruikersnaam of wachtwoord.")
-                    else:
-                        st.warning("Vul beide velden in.")
+                            st.warning("Vul beide velden in.")
                         
             with tab2:
-                nieuw_naam = st.text_input("Kies een Gebruikersnaam", key="nieuw_naam")
-                nieuw_ww = st.text_input("Kies een Wachtwoord", type="password", key="nieuw_ww")
-                if st.button("Maak account aan", use_container_width=True):
-                    if nieuw_naam and nieuw_ww:
-                        bestaat_al = supabase.table(TABEL_NAAM).select("username").eq("username", nieuw_naam.lower()).execute()
-                        if bestaat_al.data:
-                            st.error("❌ Deze gebruikersnaam is al in gebruik. Kies een andere.")
+                with st.form("register_form"):
+                    nieuw_naam = st.text_input("Kies een Gebruikersnaam", key="nieuw_naam")
+                    nieuw_ww = st.text_input("Kies een Wachtwoord", type="password", key="nieuw_ww")
+                    submitted_reg = st.form_submit_button("Maak account aan", use_container_width=True)
+
+                    if submitted_reg:
+                        if nieuw_naam and nieuw_ww:
+                            with st.spinner("Account aanmaken..."):
+                                bestaat_al = supabase.table(TABEL_NAAM).select("username").eq("username", nieuw_naam.lower()).execute()
+                                if bestaat_al.data:
+                                    st.error("❌ Deze gebruikersnaam is al in gebruik. Kies een andere.")
+                                else:
+                                    try:
+                                        supabase.table(TABEL_NAAM).insert({
+                                            "username": nieuw_naam.lower(),
+                                            "password": hash_wachtwoord(nieuw_ww)
+                                        }).execute()
+                                        st.success("✅ Account succesvol aangemaakt! Je kunt nu inloggen.")
+                                    except Exception as e:
+                                        st.error(f"Fout bij aanmaken account: {e}")
                         else:
-                            try:
-                                supabase.table(TABEL_NAAM).insert({
-                                    "username": nieuw_naam.lower(),
-                                    "password": hash_wachtwoord(nieuw_ww)
-                                }).execute()
-                                st.success("✅ Account succesvol aangemaakt! Je kunt nu inloggen.")
-                            except Exception as e:
-                                st.error(f"Fout bij aanmaken account: {e}")
-                    else:
-                        st.warning("Vul beide velden in.")
+                            st.warning("Vul beide velden in.")
         
         st.write("")
         if st.button("🚪 Doorgaan als gast (zonder cloud-opslag)", use_container_width=True):
