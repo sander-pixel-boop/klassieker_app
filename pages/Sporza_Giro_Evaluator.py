@@ -4,7 +4,7 @@ import plotly.express as px
 import unicodedata
 import os
 from thefuzz import process, fuzz
-from supabase import create_client
+from utils.db import init_connection
 from datetime import datetime
 
 # --- CONFIGURATIE ---
@@ -15,12 +15,6 @@ if "ingelogde_speler" not in st.session_state:
     st.stop()
 
 speler_naam = st.session_state["ingelogde_speler"]
-
-@st.cache_resource
-def init_connection():
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    return create_client(url, key)
 
 supabase = init_connection()
 TABEL_NAAM = "gebruikers_data_test"

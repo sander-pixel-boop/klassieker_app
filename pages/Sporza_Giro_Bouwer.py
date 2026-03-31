@@ -4,7 +4,7 @@ import unicodedata
 import os
 import base64
 import pulp
-from supabase import create_client
+from utils.db import init_connection
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Giro Etappe Bouwer", layout="wide", page_icon="🇮🇹")
@@ -14,12 +14,6 @@ if "ingelogde_speler" not in st.session_state:
     st.stop()
 
 speler_naam = st.session_state["ingelogde_speler"]
-
-@st.cache_resource
-def init_connection():
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    return create_client(url, key)
 
 supabase = init_connection()
 TABEL_NAAM = "gebruikers_data_test"
