@@ -426,7 +426,7 @@ with tab2:
                 df_stage['MTN'] * active_weights['MTN']
             )
             top_5       = df_stage.sort_values(by=['StageScore', 'Giro_EV'], ascending=[False, False]).head(5)
-            top_5_namen = [f"{row['Renner']} ({int(row['StageScore'])})" for _, row in top_5.iterrows()]
+            top_5_namen = [f"{r} ({int(s)})" for r, s in top_5[['Renner', 'StageScore']].values]
             st.info(f"💡 **Stat Top 5:** {', '.join(top_5_namen)}")
 
             # Claude reasoning + picks
