@@ -302,6 +302,9 @@ gereden_etappes = sorted(df_results_matched['Stage'].unique())
 alle_resultaten = []   # per team per etappe: totaalscore
 alle_details = []      # per team per etappe per renner: detail
 
+# Cache etappe dataframes to avoid re-filtering in loops
+df_etappes_dict = {etappe_id: df_results_matched[df_results_matched['Stage'] == etappe_id] for etappe_id in gereden_etappes}
+
 for team_naam, team_data in teams.items():
     team_renners  = team_data["renners"]
     etappe_keuzes = team_data["keuzes"]
@@ -309,7 +312,7 @@ for team_naam, team_data in teams.items():
     cumulatief = 0
 
     for etappe_id in gereden_etappes:
-        df_etappe = df_results_matched[df_results_matched['Stage'] == etappe_id]
+        df_etappe = df_etappes_dict[etappe_id]
 
         # Gebruik de handmatige kopman als die beschikbaar is
         kopman_override = kopman_keuzes.get(str(etappe_id))
