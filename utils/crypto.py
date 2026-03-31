@@ -1,5 +1,6 @@
 import json
 import hashlib
+import streamlit as st
 
 def generate_signature(data_dict):
     """
@@ -7,5 +8,5 @@ def generate_signature(data_dict):
     Keys are sorted to ensure deterministic output.
     """
     data_str = json.dumps(data_dict, sort_keys=True)
-    salt = "GeheimeKlassiekerSleutel2026"
+    salt = st.secrets["CRYPTO_SALT"]
     return hashlib.sha256((data_str + salt).encode('utf-8')).hexdigest()

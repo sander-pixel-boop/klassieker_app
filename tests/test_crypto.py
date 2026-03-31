@@ -1,4 +1,12 @@
 import pytest
+from unittest.mock import MagicMock
+import sys
+
+# Mock streamlit before importing utils.crypto
+mock_st = MagicMock()
+mock_st.secrets = {"CRYPTO_SALT": "GeheimeKlassiekerSleutel2026"}
+sys.modules["streamlit"] = mock_st
+
 from utils.crypto import generate_signature
 
 def test_generate_signature_basic():
@@ -33,3 +41,13 @@ def test_generate_signature_with_salt_verification():
     # Based on: json.dumps({"test": True}, sort_keys=True) + "GeheimeKlassiekerSleutel2026"
     expected_sig = "a1362e9a9fc4c46280bf83d5b952e452ae805d3653e93d95a825ea5e6a515e0a"
     assert generate_signature(data) == expected_sig
+
+def test_generate_signature_with_different_salt():
+    # Verify that changing the salt changes the signature
+    mock_st.secrets["CRYPTO_SALT"] = "DifferentSalt"
+    data = {"test": True}
+    sig1 = "a1362e9a9fc4c46280bf83d5b952e452ae805d3653e93d95a825ea5e6a515e0a"
+    assert generate_signature(data) != sig1
+
+    # Reset salt for other tests if necessary (though they might run in parallel or different order)
+    mock_st.secrets["CRYPTO_SALT"] = "GeheimeKlassiekerSleutel2026"
