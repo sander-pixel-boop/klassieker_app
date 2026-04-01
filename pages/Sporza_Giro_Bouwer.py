@@ -472,12 +472,13 @@ with tab2:
     c_auto, c_wis, c_space = st.columns([1, 1, 1])
     with c_auto:
         if st.button("🤖 Bereken Optimaal Team", type="primary", use_container_width=True):
-            res = solve_final_team(df, draft_counts, 100.0, 16)
-            if res:
-                st.session_state.finaal_team = res
-                st.rerun()
-            else:
-                st.error("Kon geen geldig team berekenen binnen het budget.")
+            with st.spinner("Optimaal team berekenen... Dit kan even duren."):
+                res = solve_final_team(df, draft_counts, 100.0, 16)
+                if res:
+                    st.session_state.finaal_team = res
+                    st.rerun()
+                else:
+                    st.error("Kon geen geldig team berekenen binnen het budget.")
     with c_wis:
         if st.button("🗑️ Wis Team", use_container_width=True):
             st.session_state.finaal_team = []

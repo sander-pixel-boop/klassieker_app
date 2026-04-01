@@ -290,16 +290,18 @@ with st.sidebar:
 
     st.divider()
     if st.button("🚀 BEREKEN TEAM (Puur Statistische Suggesties)", type="primary", use_container_width=True):
-        res = solve_giro_team(df, max_budget, max_renners, max_per_ploeg, force_base, ban_base, "Giro_EV")
-        if res:
-            st.session_state.giro_selected_riders = res
-            st.rerun()
+        with st.spinner("Puur statistisch team berekenen... Dit kan even duren."):
+            res = solve_giro_team(df, max_budget, max_renners, max_per_ploeg, force_base, ban_base, "Giro_EV")
+            if res:
+                st.session_state.giro_selected_riders = res
+                st.rerun()
 
     if st.button("🚀 BEREKEN TEAM (Suggesties + Voorspellingen)", use_container_width=True):
-        res = solve_giro_team(df, max_budget, max_renners, max_per_ploeg, force_base, ban_base, "Combined_EV")
-        if res:
-            st.session_state.giro_selected_riders = res
-            st.rerun()
+        with st.spinner("Team inclusief voorspellingen berekenen... Dit kan even duren."):
+            res = solve_giro_team(df, max_budget, max_renners, max_per_ploeg, force_base, ban_base, "Combined_EV")
+            if res:
+                st.session_state.giro_selected_riders = res
+                st.rerun()
 
     st.divider()
     st.markdown("#### 📥 Exporteer")

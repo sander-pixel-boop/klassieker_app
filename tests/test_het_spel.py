@@ -7,6 +7,7 @@ mock_st = MagicMock()
 # Explicitly mock st.tabs to return three dummy MagicMocks
 mock_st.tabs.return_value = (MagicMock(), MagicMock(), MagicMock())
 
+mock_st.secrets = {"CRYPTO_SALT": "test_salt", "SUPABASE_URL": "http://test", "SUPABASE_KEY": "test", "TABEL_NAAM": "test_tabel"}
 sys.modules['streamlit'] = mock_st
 sys.modules['supabase'] = MagicMock()
 
