@@ -39,8 +39,8 @@ def login_page():
             
             with tab1:
                 with st.form("login_form"):
-                    inlog_naam = st.text_input("Gebruikersnaam", key="inlog_naam")
-                    inlog_ww = st.text_input("Wachtwoord", type="password", key="inlog_ww")
+                    inlog_naam = st.text_input("Gebruikersnaam", key="inlog_naam", placeholder="Voer je gebruikersnaam in")
+                    inlog_ww = st.text_input("Wachtwoord", type="password", key="inlog_ww", placeholder="Voer je wachtwoord in")
                     submitted = st.form_submit_button("Inloggen", type="primary", use_container_width=True)
 
                     if submitted:
@@ -57,8 +57,8 @@ def login_page():
                         
             with tab2:
                 with st.form("register_form"):
-                    nieuw_naam = st.text_input("Kies een Gebruikersnaam", key="nieuw_naam")
-                    nieuw_ww = st.text_input("Kies een Wachtwoord", type="password", key="nieuw_ww")
+                    nieuw_naam = st.text_input("Kies een Gebruikersnaam", key="nieuw_naam", placeholder="Bijv. WoutVanAert", help="Kies een unieke naam om je teams mee op te slaan.")
+                    nieuw_ww = st.text_input("Kies een Wachtwoord", type="password", key="nieuw_ww", placeholder="Minimaal 6 tekens", help="Zorg voor een sterk wachtwoord.")
                     submitted_reg = st.form_submit_button("Maak account aan", use_container_width=True)
 
                     if submitted_reg:
@@ -80,7 +80,7 @@ def login_page():
                             st.warning("Vul beide velden in.")
         
         st.write("")
-        if st.button("🚪 Doorgaan als gast (zonder cloud-opslag)", use_container_width=True):
+        if st.button("🚪 Doorgaan als gast (zonder cloud-opslag)", use_container_width=True, help="Als gast kun je lokaal teams bouwen, maar je voortgang wordt niet opgeslagen in de cloud."):
             st.session_state["ingelogde_speler"] = "gast"
             st.rerun()
 
