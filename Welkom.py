@@ -39,8 +39,8 @@ def login_page():
             
             with tab1:
                 with st.form("login_form"):
-                    inlog_naam = st.text_input("Gebruikersnaam", key="inlog_naam")
-                    inlog_ww = st.text_input("Wachtwoord", type="password", key="inlog_ww")
+                    inlog_naam = st.text_input("Gebruikersnaam", key="inlog_naam", placeholder="Bijv. wielerfan123", help="Voer je accountnaam in")
+                    inlog_ww = st.text_input("Wachtwoord", type="password", key="inlog_ww", placeholder="Je wachtwoord", help="Voer je wachtwoord in")
                     submitted = st.form_submit_button("Inloggen", type="primary", use_container_width=True)
 
                     if submitted:
@@ -57,8 +57,8 @@ def login_page():
                         
             with tab2:
                 with st.form("register_form"):
-                    nieuw_naam = st.text_input("Kies een Gebruikersnaam", key="nieuw_naam")
-                    nieuw_ww = st.text_input("Kies een Wachtwoord", type="password", key="nieuw_ww")
+                    nieuw_naam = st.text_input("Kies een Gebruikersnaam", key="nieuw_naam", placeholder="Kies een unieke naam", help="Let op: dit wordt je login naam.")
+                    nieuw_ww = st.text_input("Kies een Wachtwoord", type="password", key="nieuw_ww", placeholder="Minimaal 8 tekens aangeraden", help="Kies een veilig wachtwoord dat je goed kunt onthouden.")
                     submitted_reg = st.form_submit_button("Maak account aan", use_container_width=True)
 
                     if submitted_reg:
@@ -80,7 +80,7 @@ def login_page():
                             st.warning("Vul beide velden in.")
         
         st.write("")
-        if st.button("🚪 Doorgaan als gast (zonder cloud-opslag)", use_container_width=True):
+        if st.button("🚪 Doorgaan als gast (zonder cloud-opslag)", use_container_width=True, help="Speel anoniem mee. Let op: Je team en wijzigingen worden NIET in de cloud opgeslagen en gaan verloren als je de app sluit."):
             st.session_state["ingelogde_speler"] = "gast"
             st.rerun()
 
