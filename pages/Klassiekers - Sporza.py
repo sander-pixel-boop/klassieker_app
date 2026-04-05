@@ -508,12 +508,15 @@ else:
                     comp_display.insert(1, 'Actie', comp_display['Renner'].apply(mark_status))
                     comp_display[available_races] = comp_display[available_races].applymap(lambda x: '✅' if x == 1 else '-')
                     
-                    def style_compare(row):
-                        if row['Actie'] == '❌ Eruit': return ['background-color: rgba(255, 99, 71, 0.2)'] * len(row)
-                        if row['Actie'] == '📥 Erin': return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
-                        return [''] * len(row)
+                    def style_compare(data):
+                        styles = pd.DataFrame('', index=data.index, columns=data.columns)
+                        eruit_mask = data['Actie'] == '❌ Eruit'
+                        erin_mask = data['Actie'] == '📥 Erin'
+                        styles.loc[eruit_mask, :] = 'background-color: rgba(255, 99, 71, 0.2)'
+                        styles.loc[erin_mask, :] = 'background-color: rgba(144, 238, 144, 0.2)'
+                        return styles
                         
-                    st.dataframe(comp_display.style.apply(style_compare, axis=1), hide_index=True, use_container_width=True)
+                    st.dataframe(comp_display.style.apply(style_compare, axis=None), hide_index=True, use_container_width=True)
 
                     if st.button("🚀 VOER WIJZIGING DOOR", type="primary", use_container_width=True):
                         new_force_base = kept_riders + to_add
@@ -595,13 +598,16 @@ else:
                 idx = display_matrix.columns.get_loc(moment) + 1
                 display_matrix.insert(idx, f'🔁 {moment}', '|')
 
-        def color_rows(row):
-            if 'Verkocht' in row['Rol']: return ['background-color: rgba(255, 99, 71, 0.2)'] * len(row)
-            if 'Gekocht' in row['Rol']: return ['background-color: rgba(144, 238, 144, 0.2)'] * len(row)
-            return [''] * len(row)
+        def color_rows(data):
+            styles = pd.DataFrame('', index=data.index, columns=data.columns)
+            verkocht_mask = data['Rol'].astype(str).str.contains('Verkocht', na=False)
+            gekocht_mask = data['Rol'].astype(str).str.contains('Gekocht', na=False)
+            styles.loc[verkocht_mask, :] = 'background-color: rgba(255, 99, 71, 0.2)'
+            styles.loc[gekocht_mask, :] = 'background-color: rgba(144, 238, 144, 0.2)'
+            return styles
 
         format_dict = {c: lambda x: format_race_status(x, 30) for c in available_races}
-        st.dataframe(display_matrix.style.apply(color_rows, axis=1).format(format_dict), use_container_width=True)
+        st.dataframe(display_matrix.style.apply(color_rows, axis=None).format(format_dict), use_container_width=True)
 
     with tab3:
         st.header("👑 Kopmannen Advies")
