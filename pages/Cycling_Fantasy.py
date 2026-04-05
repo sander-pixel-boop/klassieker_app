@@ -210,7 +210,8 @@ with st.sidebar:
                 exclude_list = st.multiselect("🚫 Negeren:", options=[r for r in df_race['Renner'].tolist() if r not in force_list])
             
             if st.button("🚀 BEREKEN TEAM", type="primary", use_container_width=True):
-                st.session_state.cf_team = solve_cf_team(df_race, max_bud, force_list, exclude_list)
+                with st.spinner("Team berekenen... Dit kan even duren."):
+                    st.session_state.cf_team = solve_cf_team(df_race, max_bud, force_list, exclude_list)
 
 st.title("🚲 Cycling Fantasy Optimizer")
 tab1, tab2, tab3 = st.tabs(["🚀 Optimaal Team", "📋 Database", "📖 Uitleg"])
