@@ -132,7 +132,7 @@ def load_all_data():
     naam_col_p = 'Naam' if 'Naam' in df_p.columns else 'Renner'
     naam_col_s = 'Naam' if 'Naam' in df_s.columns else 'Renner'
     df = pd.merge(df_p, df_s, left_on=naam_col_p, right_on=naam_col_s, how='left')
-    df['Prijs'] = pd.to_numeric(df['Prijs'], errors='coerce').fillna(0)
+    df['Prijs'] = pd.to_numeric(df['Prijs'], errors='coerce').fillna(0.0).astype(float)
     df.loc[df['Prijs'] > 1000, 'Prijs'] = df['Prijs'] / 1000000
     df.loc[df['Prijs'] == 0.8, 'Prijs'] = 0.75
     for col in ['GC', 'SPR', 'ITT', 'MTN']:
