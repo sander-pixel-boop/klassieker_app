@@ -12,14 +12,19 @@ import os
 st.set_page_config(page_title="Cycling Fantasy AI", layout="wide", page_icon="🚲")
 
 # --- PADEN NAAR BRONBESTANDEN (IN MAIN) ---
-# Omdat dit script in pages/ staat, zoeken we in de root map.
-# Streamlit Cloud voert uit vanuit de root, dus directe bestandsnamen werken meestal.
 STATS_PATH = "renners_stats.csv"
 PRICES_PATH = "cf_prijzen.csv"
 
 # --- STATISCHE DATA LADEN (STATS + PRIJZEN) ---
 @st.cache_data
-def load_static_data():
+def load_static_data() -> pd.DataFrame:
+    """
+    Loads static rider stats and prices from CSV files,
+    cleans the data, and merges them using fuzzy matching.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing rider names, stats, and prices.
+    """
     try:
         # 1. Stats laden uit de root
         if not os.path.exists(STATS_PATH):
@@ -81,7 +86,16 @@ def load_static_data():
         return pd.DataFrame()
 
 # --- PDF PARSER VOOR PCS STARTLIJSTEN ---
-def parse_pcs_pdf(uploaded_file):
+def parse_pcs_pdf(uploaded_file) -> pd.DataFrame:
+    """
+    Parses a PDF file from ProCyclingStats to extract a list of rider names.
+
+    Args:
+        uploaded_file: The uploaded PDF file object.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the extracted rider names under the 'Renner' column.
+    """
     try:
         pdf_reader = PdfReader(uploaded_file)
         text = ""
@@ -109,7 +123,18 @@ def parse_pcs_pdf(uploaded_file):
         return pd.DataFrame()
 
 # --- STARTLIJST VERWERKEN ---
-def process_startlist(uploaded_file, df_static):
+def process_startlist(uploaded_file, df_static: pd.DataFrame) -> pd.DataFrame:
+    """
+    Processes an uploaded startlist file (PDF, CSV, or Excel) and matches the names
+    against the static rider database.
+
+    Args:
+        uploaded_file: The uploaded file object.
+        df_static (pd.DataFrame): The static rider database.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the matched riders from the startlist.
+    """
     try:
         if uploaded_file.name.lower().endswith('.pdf'):
             df_start = parse_pcs_pdf(uploaded_file)
@@ -124,7 +149,7 @@ def process_startlist(uploaded_file, df_static):
         
         full_names = df_static['Renner'].tolist()
         
-        def match_name_upload(name):
+        def match_name_upload(name: str):
             if not name or pd.isna(name): return None
             match = process.extractOne(str(name), full_names, scorer=fuzz.token_set_ratio)
             return match[0] if match and match[1] > 75 else None
@@ -139,24 +164,47 @@ def process_startlist(uploaded_file, df_static):
         return pd.DataFrame()
 
 # --- CF EV CALCULATOR ---
-def calculate_cf_ev(df, stat, method):
+def calculate_cf_ev(df: pd.DataFrame, stat: str, method: str) -> pd.DataFrame:
+    """
+    Calculates the Expected Value (EV) for each rider based on the chosen statistic and method.
+
+    Args:
+        df (pd.DataFrame): The dataframe containing the riders.
+        stat (str): The column name of the statistic to use for evaluation.
+        method (str): The method to calculate EV ('Ranking (CF Punten)' or 'Macht 4 Curve').
+
+    Returns:
+        pd.DataFrame: The dataframe with added 'CF_EV' and 'Waarde (EV/Credit)' columns.
+    """
     df = df.copy()
     df = df.sort_values(by=[stat, 'AVG'], ascending=[False, False]).reset_index(drop=True)
     cf_pts = [45, 25, 22, 19, 17, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
     
-    df['CF_EV'] = 0.0
-    for i, idx in enumerate(df.index):
-        if "Ranking (CF Punten)" in method:
-            val = cf_pts[i] if i < len(cf_pts) else 0.0
-        else:
-            val = (df.loc[idx, stat] / 100)**4 * 45
-        df.at[idx, 'CF_EV'] = val
+    if "Ranking (CF Punten)" in method:
+        # Vectorized assignment for ranking method
+        cf_ev_values = cf_pts + [0.0] * max(0, len(df) - len(cf_pts))
+        df['CF_EV'] = pd.Series(cf_ev_values[:len(df)], dtype=float)
+    else:
+        # Vectorized power of 4 curve
+        df['CF_EV'] = (df[stat] / 100)**4 * 45
         
     df['Waarde (EV/Credit)'] = (df['CF_EV'] / df['Prijs']).replace([float('inf'), -float('inf')], 0).fillna(0).round(4)
     return df
 
 # --- SOLVER ---
-def solve_cf_team(dataframe, total_budget, force_list, exclude_list):
+def solve_cf_team(dataframe: pd.DataFrame, total_budget: int, force_list: list, exclude_list: list) -> list:
+    """
+    Solves the Knapsack problem to find the optimal team of 9 riders within the budget constraints.
+
+    Args:
+        dataframe (pd.DataFrame): The dataframe containing riders with their EV and prices.
+        total_budget (int): The maximum budget available for the team.
+        force_list (list): A list of rider names that must be included in the team.
+        exclude_list (list): A list of rider names that must be excluded from the team.
+
+    Returns:
+        list: A list of the optimal 9 rider names, or None if no optimal solution is found.
+    """
     prob = pulp.LpProblem("CF_Solver", pulp.LpMaximize)
     rider_vars = pulp.LpVariable.dicts("Riders", dataframe.index, cat='Binary')
     
@@ -172,7 +220,7 @@ def solve_cf_team(dataframe, total_budget, force_list, exclude_list):
     prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=10))
     if pulp.LpStatus[prob.status] == 'Optimal':
         return [dataframe.loc[i, 'Renner'] for i in dataframe.index if rider_vars[i].varValue > 0.5]
-    return None
+    return []
 
 # --- HOOFDCODE ---
 df_static = load_static_data()
@@ -184,7 +232,7 @@ if df_static.empty:
 with st.sidebar:
     st.title("🚲 CF AI Coach")
     st.header("📂 1. Upload Startlijst")
-    uploaded_file = st.file_uploader("Upload PCS PDF, CSV of Excel", type=['pdf', 'csv', 'xlsx', 'xls'])
+    uploaded_file = st.file_uploader("Upload PCS PDF, CSV of Excel", type=['pdf', 'csv', 'xlsx', 'xls'], help="Upload de startlijst van de koers in PDF, CSV, of Excel formaat.")
     
     st.header("⚙️ 2. Instellingen")
     stat_mapping = {
@@ -195,9 +243,9 @@ with st.sidebar:
         'Klimmen (MTN)': 'MTN', 
         'Tijdrit (ITT)': 'ITT'
     }
-    koers_type = st.selectbox("🏁 Type Koers:", list(stat_mapping.keys()))
-    ev_method = st.selectbox("🧮 Rekenmodel", ["1. Ranking (CF Punten)", "2. Macht 4 Curve"])
-    max_bud = st.number_input("💰 Budget (Credits)", value=5000, step=200)
+    koers_type = st.selectbox("🏁 Type Koers:", list(stat_mapping.keys()), help="Selecteer het type koers om de bijbehorende statistieken te gebruiken.")
+    ev_method = st.selectbox("🧮 Rekenmodel", ["1. Ranking (CF Punten)", "2. Macht 4 Curve"], help="Kies de berekeningsmethode voor de verwachte waarde (EV).")
+    max_bud = st.number_input("💰 Budget (Credits)", value=5000, step=200, help="Vul het beschikbare budget in credits in.")
     
     df_race = pd.DataFrame()
     if uploaded_file:
@@ -206,10 +254,10 @@ with st.sidebar:
             df_race = calculate_cf_ev(raw_race, stat_mapping[koers_type], ev_method)
             st.divider()
             with st.expander("🔒 Forceer / Uitsluit"):
-                force_list = st.multiselect("🟢 Moet in team:", options=df_race['Renner'].tolist())
-                exclude_list = st.multiselect("🚫 Negeren:", options=[r for r in df_race['Renner'].tolist() if r not in force_list])
+                force_list = st.multiselect("🟢 Moet in team:", options=df_race['Renner'].tolist(), help="Kies renners die verplicht in je team moeten.")
+                exclude_list = st.multiselect("🚫 Negeren:", options=[r for r in df_race['Renner'].tolist() if r not in force_list], help="Kies renners die niet in je team mogen.")
             
-            if st.button("🚀 BEREKEN TEAM", type="primary", use_container_width=True):
+            if st.button("🚀 BEREKEN TEAM", type="primary", use_container_width=True, help="Klik om het optimale team te berekenen."):
                 with st.spinner("Team berekenen... Dit kan even duren."):
                     st.session_state.cf_team = solve_cf_team(df_race, max_bud, force_list, exclude_list)
 
@@ -226,7 +274,7 @@ with tab1:
         
         m1, m2, m3 = st.columns(3)
         m1.metric("💰 Budget", f"{team_df['Prijs'].sum():.0f} / {max_bud}")
-        m2.metric("🚴 Renners", "9 / 9")
+        m2.metric("🚴 Renners", f"{len(team_df)} / 9")
         m3.metric("🎯 Team EV", f"{team_df['CF_EV'].sum():.1f}")
         
         st.success("💡 **Tie-Breaker:** Gebruik de volgorde hieronder exact zo in de Cycling Fantasy app!")

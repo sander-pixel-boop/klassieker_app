@@ -36,11 +36,14 @@ def test_bepaal_klassieker_type(sporza_module):
     # Test Invalid Types (should be caught by except and result in 0, 0, 0 -> None)
     assert bepaal_klassieker_type({'SPR': 'a', 'COB': 'b', 'HLL': 'c'}) is None
 
-    # Test Ties (returns None because > is strictly greater)
-    assert bepaal_klassieker_type({'SPR': 90, 'COB': 90, 'HLL': 0}) is None
-    assert bepaal_klassieker_type({'SPR': 90, 'COB': 0, 'HLL': 90}) is None
-    assert bepaal_klassieker_type({'SPR': 0, 'COB': 90, 'HLL': 90}) is None
-    assert bepaal_klassieker_type({'SPR': 90, 'COB': 90, 'HLL': 90}) is None
+    # Test Ties (returns joined string when not 85+)
+    assert bepaal_klassieker_type({'SPR': 80, 'COB': 80, 'HLL': 0}) == 'Kasseien / Sprinter'
+    assert bepaal_klassieker_type({'SPR': 80, 'COB': 0, 'HLL': 80}) == 'Heuvel / Sprinter'
+    assert bepaal_klassieker_type({'SPR': 0, 'COB': 80, 'HLL': 80}) == 'Kasseien / Heuvel'
+
+    # Test Elite (>85) ties
+    assert bepaal_klassieker_type({'SPR': 90, 'COB': 90, 'HLL': 0}) == 'Kasseien / Sprinter'
+    assert bepaal_klassieker_type({'SPR': 90, 'COB': 90, 'HLL': 90}) == 'Allround / Multispecialist'
 
     # Test String values that can be parsed as int
     assert bepaal_klassieker_type({'SPR': '90', 'COB': '80', 'HLL': '70'}) == 'Sprinter'

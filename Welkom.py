@@ -9,10 +9,66 @@ supabase = init_connection()
 TABEL_NAAM = "gebruikers_data_test"
 
 def hash_wachtwoord(wachtwoord):
+    """
+    Hashes a given password using SHA-256.
+
+    Args:
+        wachtwoord (str): The plain-text password to hash.
+
+    Returns:
+        str: The hashed password.
+    """
     return hashlib.sha256(wachtwoord.encode()).hexdigest()
+
+def check_login(username, password):
+    """
+    Checks if the given username and password match a record in the database.
+
+    Args:
+        username (str): The entered username.
+        password (str): The entered plain-text password.
+
+    Returns:
+        bool: True if login is successful, False otherwise.
+    """
+    try:
+        res = supabase.table(TABEL_NAAM).select("password").eq("username", username.lower()).execute()
+        if res.data and res.data[0].get("password") == hash_wachtwoord(password):
+            return True
+        return False
+    except Exception as e:
+        return False
+
+def create_account(username, password):
+    """
+    Creates a new user account in the database.
+
+    Args:
+        username (str): The desired username.
+        password (str): The desired plain-text password.
+
+    Returns:
+        tuple[bool, str]: A tuple containing a boolean success flag and a message.
+    """
+    try:
+        bestaat_al = supabase.table(TABEL_NAAM).select("username").eq("username", username.lower()).execute()
+        if bestaat_al.data:
+            return False, "❌ Deze gebruikersnaam is al in gebruik. Kies een andere."
+
+        supabase.table(TABEL_NAAM).insert({
+            "username": username.lower(),
+            "password": hash_wachtwoord(password)
+        }).execute()
+        return True, "✅ Account succesvol aangemaakt! Je kunt nu inloggen."
+    except Exception as e:
+        return False, f"❌ Kan geen verbinding maken met de database. Probeer het later opnieuw. Details: {e}"
+
 
 # --- INLOG PAGINA (Landingspagina Lay-out) ---
 def login_page():
+    """
+    Renders the login and registration page.
+    """
     st.markdown("<h1 style='text-align: center; margin-bottom: 50px;'>🚴‍♂️ Wieler Spellen Solver</h1>", unsafe_allow_html=True)
     
     col_links, col_spacer, col_rechts = st.columns([1.2, 0.2, 1])
@@ -46,66 +102,56 @@ def login_page():
             
             with tab1:
                 with st.form("login_form"):
-                    inlog_naam = st.text_input("Gebruikersnaam", key="inlog_naam", placeholder="bijv. woutje123")
-                    inlog_ww = st.text_input("Wachtwoord", type="password", key="inlog_ww", placeholder="Jouw geheime wachtwoord")
+                    inlog_naam = st.text_input("Gebruikersnaam", key="inlog_naam", placeholder="bijv. woutje123", help="Voer je gebruikersnaam in.")
+                    inlog_ww = st.text_input("Wachtwoord", type="password", key="inlog_ww", placeholder="Jouw geheime wachtwoord", help="Voer je wachtwoord in.")
                     submitted = st.form_submit_button("Inloggen", type="primary", use_container_width=True)
 
                     if submitted:
                         if inlog_naam and inlog_ww:
                             with st.spinner("Aanmelden..."):
-                                try:
-                                    res = supabase.table(TABEL_NAAM).select("password").eq("username", inlog_naam.lower()).execute()
-                                    if res.data and res.data[0].get("password") == hash_wachtwoord(inlog_ww):
-                                        st.session_state["ingelogde_speler"] = inlog_naam.lower()
-                                        st.rerun()
-                                    else:
-                                        st.error("❌ Onjuiste gebruikersnaam of wachtwoord.")
-                                except Exception as e:
-                                    st.error("❌ Kan geen verbinding maken met de database. Probeer het later opnieuw.")
+                                success = check_login(inlog_naam, inlog_ww)
+                                if success:
+                                    st.session_state["ingelogde_speler"] = inlog_naam.lower()
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Onjuiste gebruikersnaam, wachtwoord, of databaseverbinding mislukt.")
                         else:
                             st.warning("Vul beide velden in.")
                         
             with tab2:
                 with st.form("register_form"):
-                    nieuw_naam = st.text_input("Kies een Gebruikersnaam", key="nieuw_naam", placeholder="Kies een unieke naam")
-                    nieuw_ww = st.text_input("Kies een Wachtwoord", type="password", key="nieuw_ww", placeholder="Minimaal 8 tekens aanbevolen")
+                    nieuw_naam = st.text_input("Kies een Gebruikersnaam", key="nieuw_naam", placeholder="Kies een unieke naam", help="Kies een gebruikersnaam die nog niet bestaat.")
+                    nieuw_ww = st.text_input("Kies een Wachtwoord", type="password", key="nieuw_ww", placeholder="Minimaal 8 tekens aanbevolen", help="Kies een sterk wachtwoord.")
                     submitted_reg = st.form_submit_button("Maak account aan", use_container_width=True)
 
                     if submitted_reg:
                         if nieuw_naam and nieuw_ww:
                             with st.spinner("Account aanmaken..."):
-                                try:
-                                    bestaat_al = supabase.table(TABEL_NAAM).select("username").eq("username", nieuw_naam.lower()).execute()
-                                    if bestaat_al.data:
-                                        st.error("❌ Deze gebruikersnaam is al in gebruik. Kies een andere.")
-                                    else:
-                                        try:
-                                            supabase.table(TABEL_NAAM).insert({
-                                                "username": nieuw_naam.lower(),
-                                                "password": hash_wachtwoord(nieuw_ww)
-                                            }).execute()
-                                            st.success("✅ Account succesvol aangemaakt! Je kunt nu inloggen.")
-                                        except Exception as e:
-                                            st.error(f"Fout bij aanmaken account: {e}")
-                                except Exception as e:
-                                    st.error("❌ Kan geen verbinding maken met de database. Probeer het later opnieuw.")
+                                success, msg = create_account(nieuw_naam, nieuw_ww)
+                                if success:
+                                    st.success(msg)
+                                else:
+                                    st.error(msg)
                         else:
                             st.warning("Vul beide velden in.")
         
         st.write("")
-        if st.button("🚪 Doorgaan als gast (zonder cloud-opslag)", use_container_width=True):
+        if st.button("🚪 Doorgaan als gast (zonder cloud-opslag)", use_container_width=True, help="Log in als gastgebruiker. Je data wordt niet opgeslagen in de cloud."):
             st.session_state["ingelogde_speler"] = "gast"
             st.rerun()
 
 
 # --- HOME PAGINA (INGELOGD) ---
 def home_page():
+    """
+    Renders the home page for logged-in users.
+    """
     speler = st.session_state.get("ingelogde_speler", "bezoeker").capitalize()
     st.write(f"# Welkom bij het Dashboard, {speler}! 🚴‍♂️")
     st.markdown("*Kies een spel in het menu aan de linkerkant om je selectie te bouwen.*")
     st.divider()
     
-    if st.button("Uitloggen", type="secondary"):
+    if st.button("Uitloggen", type="secondary", help="Log uit en keer terug naar het inlogscherm."):
         del st.session_state["ingelogde_speler"]
         st.rerun()
 

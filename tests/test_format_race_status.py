@@ -19,7 +19,8 @@ for node in tree.body:
 if not func_ast:
     raise ValueError("Function 'format_race_status' not found in pages/Klassiekers - Scorito.py")
 
-namespace = {"pd": pd, "np": np}
+from typing import Any
+namespace = {"pd": pd, "np": np, "Any": Any}
 exec(compile(func_ast, filename="<ast>", mode="exec"), namespace)
 format_race_status = namespace["format_race_status"]
 

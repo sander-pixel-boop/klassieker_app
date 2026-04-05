@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
-from thefuzz import process, fuzz
 import unicodedata
+from typing import List, Tuple, Dict, Any, Optional
+from thefuzz import process, fuzz
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Model Evaluator", layout="wide", page_icon="📊")
@@ -86,14 +87,16 @@ MIJN_EIGEN_KOPMANNEN = {
 }
 
 # --- HULPFUNCTIES VOOR NAAM-MATCHING ---
-def normalize_name_logic(text):
+def normalize_name_logic(text: str) -> str:
+    """Normalizes a name by removing diacritics and converting to lowercase."""
     if not isinstance(text, str):
         return ""
     text = text.lower().strip()
     nfkd_form = unicodedata.normalize('NFKD', text)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
-def match_uitslag_naam(naam, alle_renners):
+def match_uitslag_naam(naam: str, alle_renners: List[str]) -> str:
+    """Matches a name from the results file to the known list of riders using fuzzy matching."""
     naam_norm = normalize_name_logic(naam)
     bekende_gevallen = {
         "philipsen": "jasper philipsen",
@@ -119,16 +122,18 @@ def match_uitslag_naam(naam, alle_renners):
         return candidates[0]
     return naam
 
-def get_file_mod_time(filepath):
+def get_file_mod_time(filepath: str) -> float:
+    """Gets the modification time of a file."""
     return os.path.getmtime(filepath) if os.path.exists(filepath) else 0
 
 @st.cache_data
-def load_data(stats_mod_time):
+def load_data(stats_mod_time: float) -> Tuple[pd.DataFrame, List[str]]:
+    """Loads rider statistics and creates a list of all riders."""
     try:
         df_stats = pd.read_csv("renners_stats.csv", sep='\t')
         if len(df_stats.columns) < 3:
             df_stats = pd.read_csv("renners_stats.csv", sep=None, engine='python')
-    except:
+    except Exception:
         df_stats = pd.read_csv("renners_stats.csv", sep=None, engine='python')
 
     if 'Naam' in df_stats.columns:
@@ -145,6 +150,39 @@ def load_data(stats_mod_time):
         
     alle_renners = sorted(df_stats['Renner'].dropna().unique())
     return df_stats, alle_renners
+
+def process_results(df_raw_uitslagen: pd.DataFrame, alle_renners: List[str]) -> pd.DataFrame:
+    """Processes raw results and maps them to standard race names and rider names."""
+    sporza_naar_scorito_map = {
+        'OML': 'OHN',
+        'STR': 'SB', 'STD': 'SB', 'STRADE': 'SB',
+        'PN': 'PN', 'P-N': 'PN', 'PARIS-NICE': 'PN', 'PN GC': 'PN', 'PN-GC': 'PN', 'PNI': 'PN',
+        'TA': 'TA', 'T-A': 'TA', 'TIRRENO': 'TA', 'TA GC': 'TA', 'TA-GC': 'TA', 'TIR': 'TA',
+        'RVB': 'BDP',
+        'IFF': 'GW',
+        'BRP': 'BP',
+        'AGT': 'AGR',
+        'WAP': 'WP'
+    }
+
+    def process_result_row(row: pd.Series) -> Optional[Dict[str, Any]]:
+        rank_str = str(row['Rnk']).strip().upper()
+        if rank_str in ['DNS', 'NAN', '']:
+            return None
+
+        koers_origineel = str(row['Race']).strip().upper()
+        koers = sporza_naar_scorito_map.get(koers_origineel, koers_origineel)
+        rider_name = str(row['Rider']).strip()
+        gekoppelde_naam = match_uitslag_naam(rider_name, alle_renners)
+        rank = int(rank_str) if rank_str.isdigit() else 999
+        return {
+            "Koers": koers,
+            "Rank": rank,
+            "Renner": gekoppelde_naam
+        }
+
+    uitslag_parsed = df_raw_uitslagen.apply(process_result_row, axis=1).dropna().tolist()
+    return pd.DataFrame(uitslag_parsed)
 
 stats_time = get_file_mod_time("renners_stats.csv")
 df_stats, alle_renners = load_data(stats_time)
@@ -169,36 +207,7 @@ else:
     if 'Race' not in df_raw_uitslagen.columns or 'Rnk' not in df_raw_uitslagen.columns or 'Rider' not in df_raw_uitslagen.columns:
         st.error("Het bestand uitslagen.csv mist de vereiste kolommen: Race, Rnk, Rider.")
     else:
-        sporza_naar_scorito_map = {
-            'OML': 'OHN', 
-            'STR': 'SB', 'STD': 'SB', 'STRADE': 'SB',
-            'PN': 'PN', 'P-N': 'PN', 'PARIS-NICE': 'PN', 'PN GC': 'PN', 'PN-GC': 'PN', 'PNI': 'PN',
-            'TA': 'TA', 'T-A': 'TA', 'TIRRENO': 'TA', 'TA GC': 'TA', 'TA-GC': 'TA', 'TIR': 'TA',
-            'RVB': 'BDP', 
-            'IFF': 'GW', 
-            'BRP': 'BP', 
-            'AGT': 'AGR', 
-            'WAP': 'WP'
-        }
-        
-        def process_result_row(row):
-            rank_str = str(row['Rnk']).strip().upper()
-            if rank_str in ['DNS', 'NAN', '']:
-                return None
-
-            koers_origineel = str(row['Race']).strip().upper()
-            koers = sporza_naar_scorito_map.get(koers_origineel, koers_origineel)
-            rider_name = str(row['Rider']).strip()
-            gekoppelde_naam = match_uitslag_naam(rider_name, alle_renners)
-            rank = int(rank_str) if rank_str.isdigit() else 999 
-            return {
-                "Koers": koers, 
-                "Rank": rank, 
-                "Renner": gekoppelde_naam
-            }
-
-        uitslag_parsed = df_raw_uitslagen.apply(process_result_row, axis=1).dropna().tolist()
-        df_uitslagen = pd.DataFrame(uitslag_parsed)
+        df_uitslagen = process_results(df_raw_uitslagen, alle_renners)
         
         if df_uitslagen.empty:
             st.error("Kon geen enkele renner succesvol matchen. Controleer of de namen in uitslagen.csv kloppen.")
