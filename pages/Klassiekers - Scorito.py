@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import unicodedata
 import os
 import itertools
+from typing import List, Dict, Tuple, Any, Optional
 from thefuzz import process, fuzz
 from utils.db import init_connection
 from datetime import datetime
@@ -26,10 +27,17 @@ supabase = init_connection()
 TABEL_NAAM = "gebruikers_data_test"
 
 # --- HULPFUNCTIES ---
-def get_file_mod_time(filepath):
+def get_file_mod_time(filepath: str) -> float:
+    """Gets the modification time of a file."""
     return os.path.getmtime(filepath) if os.path.exists(filepath) else 0
 
-def get_verreden_koersen():
+def get_verreden_koersen() -> List[str]:
+    """
+    Reads the results file and determines which races have already been ridden.
+
+    Returns:
+        List[str]: A list of race codes that have been ridden.
+    """
     if os.path.exists("uitslagen.csv"):
         try:
             df_u = pd.read_csv("uitslagen.csv", sep='\t', engine='python')
@@ -39,12 +47,22 @@ def get_verreden_koersen():
                 sporza_naar_scorito_map = {'OML': 'OHN', 'STR': 'SB', 'RVB': 'BDP', 'IFF': 'GW', 'BRP': 'BP', 'AGT': 'AGR', 'WAP': 'WP'}
                 races = [str(x).strip().upper() for x in df_u['Race'].unique()]
                 return [sporza_naar_scorito_map.get(r, r) for r in races]
-        except:
+        except Exception:
             pass
     return []
 
 @st.cache_data
-def get_uitslagen(file_mod_time, alle_renners):
+def get_uitslagen(file_mod_time: float, alle_renners: List[str]) -> pd.DataFrame:
+    """
+    Parses the results file and matches rider names to the database.
+
+    Args:
+        file_mod_time (float): The modification time of the file, used for caching.
+        alle_renners (List[str]): List of all known rider names for fuzzy matching.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing parsed race results.
+    """
     if not os.path.exists("uitslagen.csv"):
         return pd.DataFrame()
     try:
@@ -77,12 +95,24 @@ def get_uitslagen(file_mod_time, alle_renners):
                 "Renner": gekoppelde_naam
             })
         return pd.DataFrame(uitslag_parsed)
-    except:
+    except Exception:
         return pd.DataFrame()
 
-def evaluate_plan_ev(df_eval, base_team, plan, available_races):
+def evaluate_plan_ev(df_eval: pd.DataFrame, base_team: List[str], plan: List[Dict[str, str]], available_races: List[str]) -> float:
+    """
+    Evaluates the total expected value (EV) of a team and its transfer plan.
+
+    Args:
+        df_eval (pd.DataFrame): DataFrame with evaluated points per race.
+        base_team (List[str]): Initial base team.
+        plan (List[Dict[str, str]]): List of planned transfers.
+        available_races (List[str]): List of all available races in chronological order.
+
+    Returns:
+        float: Total EV of the plan.
+    """
     current_active = set(base_team)
-    totaal = 0
+    totaal = 0.0
     for race in available_races:
         for t in plan:
             if t['moment'] == race:
@@ -94,7 +124,8 @@ def evaluate_plan_ev(df_eval, base_team, plan, available_races):
                 totaal += res.values[0]
     return totaal
 
-def bepaal_klassieker_type(row):
+def bepaal_klassieker_type(row: pd.Series) -> str:
+    """Determines the rider type based on their stats."""
     cob, hll, spr = row.get('COB', 0), row.get('HLL', 0), row.get('SPR', 0)
     elite = []
     if cob >= 85: elite.append('Kassei')
@@ -107,7 +138,8 @@ def bepaal_klassieker_type(row):
         s = {'Kassei': cob, 'Heuvel': hll, 'Sprint': spr, 'Klimmer': row.get('MTN', 0), 'Tijdrit': row.get('ITT', 0), 'Klassement': row.get('GC', 0)}
         return max(s, key=s.get) if sum(s.values()) > 0 else 'Onbekend'
 
-def get_numeric_status(is_on_startlist, is_starter, is_verreden=False, rank_str=None):
+def get_numeric_status(is_on_startlist: bool, is_starter: bool, is_verreden: bool = False, rank_str: Optional[Any] = None) -> int:
+    """Determines a numerical status code for a rider's status in a race."""
     if is_verreden:
         if rank_str and str(rank_str) not in ['nan', 'None', 'DNS', '']:
             if str(rank_str).isdigit():
@@ -121,7 +153,8 @@ def get_numeric_status(is_on_startlist, is_starter, is_verreden=False, rank_str=
             return 997 if is_starter else 998
         return 999
 
-def format_race_status(val, limit):
+def format_race_status(val: Any, limit: int) -> str:
+    """Formats the numerical status code to a human-readable string or emoji."""
     if pd.isna(val) or val == '': return ""
     try:
         v = int(float(val))
@@ -131,12 +164,15 @@ def format_race_status(val, limit):
         if v == 996: return "DNF"
         if v <= limit: return f"**{v}**"
         return str(v)
-    except:
+    except Exception:
         return str(val)
 
 # --- AANGEPASTE DATA LADEN ---
 @st.cache_data
-def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
+def load_and_merge_data(prog_mod_time: float, scorito_mod_time: float, stats_mod_time: float) -> Tuple[pd.DataFrame, List[str], Dict[str, str]]:
+    """
+    Loads, cleans, and merges data from Sporza, Scorito, and Stats files.
+    """
     try:
         # 1. SPORZA LADEN (BASIS)
         df_prog = pd.read_csv("sporza_prijzen_startlijst.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
@@ -215,7 +251,8 @@ def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
         st.error(f"Fout in dataverwerking: {e}")
         return pd.DataFrame(), [], {}
 
-def calculate_dynamic_ev(df, available_races, koers_stat_map, method, skip_races=[]):
+def calculate_dynamic_ev(df: pd.DataFrame, available_races: List[str], koers_stat_map: Dict[str, str], method: str, skip_races: List[str] = []) -> pd.DataFrame:
+    """Calculates dynamic expected value based on the selected method."""
     df = df.copy()
     scorito_pts = [100, 90, 80, 72, 64, 58, 52, 46, 40, 36, 32, 28, 24, 20, 16, 14, 12, 10, 8, 6]
     
@@ -230,7 +267,7 @@ def calculate_dynamic_ev(df, available_races, koers_stat_map, method, skip_races
             for i, idx in enumerate(starters.index):
                 val = 0.0
                 if "Scorito Ranking" in method:
-                    val = scorito_pts[i] if i < len(scorito_pts) else 0.0
+                    val = float(scorito_pts[i]) if i < len(scorito_pts) else 0.0
                 elif "Originele Curve" in method:
                     val = (starters.loc[idx, stat] / 100)**4 * 100
                 elif "Extreme Curve" in method:
@@ -254,7 +291,8 @@ def calculate_dynamic_ev(df, available_races, koers_stat_map, method, skip_races
     return df
 
 # --- SOLVERS ---
-def solve_knapsack_dynamic(df, total_budget, min_budget, max_riders, force_base, ban_base, exclude_list):
+def solve_knapsack_dynamic(df: pd.DataFrame, total_budget: int, min_budget: int, max_riders: int, force_base: List[str], ban_base: List[str], exclude_list: List[str]) -> List[str]:
+    """Solves the initial base team knapsack problem."""
     prob = pulp.LpProblem("Scorito_Solver", pulp.LpMaximize)
     x = pulp.LpVariable.dicts("Base", df.index, cat='Binary')
     
@@ -274,7 +312,8 @@ def solve_knapsack_dynamic(df, total_budget, min_budget, max_riders, force_base,
         return [df.loc[i, 'Renner'] for i in df.index if x[i].varValue > 0.5]
     return []
 
-def find_emergency_replacements(df_eval, base_team, transfer_plan, injured_riders, last_race, max_budget, available_races):
+def find_emergency_replacements(df_eval: pd.DataFrame, base_team: List[str], transfer_plan: List[Dict], injured_riders: List[str], last_race: str, max_budget: int, available_races: List[str]) -> List[str]:
+    """Finds emergency replacements for injured riders."""
     all_historical_riders = set(base_team + [t['in'] for t in transfer_plan])
     candidates = df_eval[~df_eval['Renner'].isin(all_historical_riders)].copy()
     idx = available_races.index(last_race)
@@ -317,7 +356,8 @@ def find_emergency_replacements(df_eval, base_team, transfer_plan, injured_rider
         return [candidates.loc[i, 'Renner'] for i in candidates.index if vars[i].varValue > 0.5]
     return []
 
-def rebuild_team_and_transfers(df, max_bud, min_bud, max_ren, new_base_team, t_moments, use_transfers):
+def rebuild_team_and_transfers(df: pd.DataFrame, max_bud: int, min_bud: int, max_ren: int, new_base_team: List[str], t_moments: List[str], use_transfers: bool) -> Tuple[Optional[List[str]], Optional[List[Dict[str, str]]]]:
+    """Rebuilds the team and transfer plan based on new base team and transfer moments."""
     if not use_transfers: return new_base_team, []
     prob = pulp.LpProblem("Scorito_Rebuild_Solver", pulp.LpMaximize)
     x = pulp.LpVariable.dicts("Base", df.index, cat='Binary')
@@ -421,7 +461,7 @@ with st.sidebar:
             oud_plan = ld.get("transfer_plan", [])
             
             huidige_renners = df_raw['Renner'].tolist()
-            def update_naam(naam):
+            def update_naam(naam: str) -> str:
                 return match_uitslag_naam(naam, huidige_renners)
 
             st.session_state.selected_riders = [update_naam(r) for r in oude_selectie if update_naam(r) in huidige_renners]
@@ -573,7 +613,7 @@ else:
     all_display_riders = list(set(st.session_state.selected_riders + [t['in'] for t in st.session_state.transfer_plan]))
     current_df = df[df['Renner'].isin(all_display_riders)].copy()
 
-    def bepaal_rol_en_moment(naam):
+    def bepaal_rol_en_moment(naam: str) -> str:
         for t in st.session_state.transfer_plan:
             if naam == t['uit']: return f"Verkocht na {t['moment']}"
             if naam == t['in']: return f"Gekocht na {t['moment']}"
@@ -702,7 +742,7 @@ else:
                     compare_cols = ['Renner', 'Prijs', 'Waarde (EV/M)', 'Scorito_EV'] + available_races
                     comp_display = compare_df[compare_cols].copy()
                     
-                    def mark_status(renner):
+                    def mark_status(renner: str) -> str:
                         if renner in to_replace: return '❌ Eruit'
                         if renner in to_add: return '📥 Erin'
                         return ''
@@ -710,7 +750,7 @@ else:
                     comp_display.insert(1, 'Actie', comp_display['Renner'].apply(mark_status))
                     comp_display[available_races] = comp_display[available_races].applymap(lambda x: '✅' if x == 1 else '-')
                     
-                    def style_compare(data):
+                    def style_compare(data: pd.DataFrame) -> pd.DataFrame:
                         styles = pd.DataFrame('', index=data.index, columns=data.columns)
                         eruit_mask = data['Actie'] == '❌ Eruit'
                         erin_mask = data['Actie'] == '📥 Erin'
@@ -780,7 +820,7 @@ else:
         rename_map = {c: f"{c} ({int(active_matrix[c].sum())})" for c in available_races}
         display_matrix = display_matrix.rename(columns=rename_map)
 
-        def color_rows(data):
+        def color_rows(data: pd.DataFrame) -> pd.DataFrame:
             styles = pd.DataFrame('', index=data.index, columns=data.columns)
             verkocht_mask = data['Rol'].astype(str).str.contains('Verkocht', na=False)
             gekocht_mask = data['Rol'].astype(str).str.contains('Gekocht', na=False)

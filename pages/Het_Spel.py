@@ -4,6 +4,7 @@ import json
 import os
 import hashlib
 from datetime import datetime
+from typing import Tuple, List, Dict, Optional, Any
 from thefuzz import process, fuzz
 from utils.db import init_connection
 from utils.crypto import generate_signature
@@ -23,7 +24,14 @@ supabase = init_connection()
 tabel_naam = st.secrets["TABEL_NAAM"]
 
 # --- HULPFUNCTIES ---
-def is_team_locked():
+def is_team_locked() -> bool:
+    """
+    Checks if the basic team selection is locked. The team is locked
+    once the results for the first race ('NOK') are available.
+
+    Returns:
+        bool: True if the team is locked, False otherwise.
+    """
     if os.path.exists("uitslagen.csv"):
         try:
             df_u = pd.read_csv("uitslagen.csv", sep=None, engine='python')
@@ -32,13 +40,20 @@ def is_team_locked():
                 verreden = [str(x).strip().upper() for x in df_u['Race'].unique()]
                 if "NOK" in verreden:
                     return True
-        except:
+        except Exception:
             return False
     return False
 
 # --- DATA LADEN ---
 @st.cache_data
-def load_game_data():
+def load_game_data() -> Tuple[pd.DataFrame, List[str], Dict[str, str]]:
+    """
+    Loads pricing and statistics data, and merges them.
+
+    Returns:
+        Tuple[pd.DataFrame, List[str], Dict[str, str]]: A tuple containing the merged DataFrame,
+        a list of available races, and a dictionary mapping races to their primary statistic.
+    """
     try:
         df_p = pd.read_csv("sporza_prijzen_startlijst.csv", sep=None, engine='python')
         df_s = pd.read_csv("renners_stats.csv", sep=None, engine='python')
@@ -59,8 +74,46 @@ def load_game_data():
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
                 
         return df, available, koers_map
-    except:
+    except Exception:
+        # Fallback if files are missing or unreadable
         return pd.DataFrame({'Renner': ['Wout van Aert', 'Mathieu van der Poel', 'Tadej Pogačar']}), ["NOK", "MSR", "RVV"], {}
+
+def save_to_cloud(speler_naam: str, data: Dict[str, Any]) -> bool:
+    """
+    Saves the user's team configuration to the Supabase cloud.
+
+    Args:
+        speler_naam (str): The logged-in user's name.
+        data (Dict[str, Any]): The data to save.
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
+    try:
+        payload = {"username": speler_naam, "custom_team": {"data": data, "signature": generate_signature(data)}}
+        supabase.table(tabel_naam).upsert(payload, on_conflict="username").execute()
+        return True
+    except Exception as e:
+        st.error(f"Fout bij opslaan: {e}")
+        return False
+
+def load_from_cloud(speler_naam: str) -> Optional[Dict[str, Any]]:
+    """
+    Loads the user's team configuration from the Supabase cloud.
+
+    Args:
+        speler_naam (str): The logged-in user's name.
+
+    Returns:
+        Optional[Dict[str, Any]]: The loaded data, or None if not found or an error occurred.
+    """
+    try:
+        res = supabase.table(tabel_naam).select("custom_team").eq("username", speler_naam).execute()
+        if res.data:
+            return res.data[0]["custom_team"]["data"]
+    except Exception as e:
+        st.error(f"Fout bij inladen: {e}")
+    return None
 
 df, races, k_map = load_game_data()
 alle_renners = sorted(df['Renner'].dropna().unique()) if not df.empty else []
@@ -78,19 +131,19 @@ st.title(f"🎮 Custom Spel: {speler_naam.capitalize()}")
 with st.sidebar:
     st.header("Opslag")
     if speler_naam != "gast":
-        if st.button("💾 Opslaan in Cloud", type="primary", use_container_width=True):
+        if st.button("💾 Opslaan in Cloud", type="primary", use_container_width=True, help="Sla je huidige team op in de cloud."):
             data = {"base": st.session_state.game_base_team, "picks": st.session_state.game_picks}
-            payload = {"username": speler_naam, "custom_team": {"data": data, "signature": generate_signature(data)}}
-            supabase.table(tabel_naam).upsert(payload, on_conflict="username").execute()
-            st.success("Opgeslagen!")
+            if save_to_cloud(speler_naam, data):
+                st.success("Opgeslagen!")
 
-        if st.button("🔄 Laden uit Cloud", use_container_width=True):
-            res = supabase.table(tabel_naam).select("custom_team").eq("username", speler_naam).execute()
-            if res.data:
-                d = res.data[0]["custom_team"]["data"]
-                st.session_state.game_base_team = d.get("base", [])
-                st.session_state.game_picks = d.get("picks", {r: {"extras": [], "dark_horse": None, "kopman": None} for r in races})
+        if st.button("🔄 Laden uit Cloud", use_container_width=True, help="Laad je eerder opgeslagen team in."):
+            cloud_data = load_from_cloud(speler_naam)
+            if cloud_data:
+                st.session_state.game_base_team = cloud_data.get("base", [])
+                st.session_state.game_picks = cloud_data.get("picks", {r: {"extras": [], "dark_horse": None, "kopman": None} for r in races})
                 st.rerun()
+            else:
+                st.info("Geen opgeslagen data gevonden.")
     else:
         st.info("Log in met een account om cloud-opslag te gebruiken.")
 
@@ -146,7 +199,8 @@ with tab1:
             "Kies je 10 vaste renners:", 
             options=alle_renners, 
             default=st.session_state.game_base_team,
-            max_selections=10
+            max_selections=10,
+            help="Selecteer precies 10 renners die in elke koers in je team zullen zitten."
         )
         
         st.session_state.game_base_team = geselecteerd
@@ -156,7 +210,7 @@ with tab1:
 # Tab 2: Selecties per koers
 with tab2:
     st.subheader("Kopman, Extra's & Dark Horse")
-    koers_keuze = st.selectbox("Kies een koers:", races)
+    koers_keuze = st.selectbox("Kies een koers:", races, help="Selecteer een koers om je dagselectie te bepalen.")
     
     if koers_keuze:
         if koers_keuze not in st.session_state.game_picks:
@@ -173,7 +227,8 @@ with tab2:
             options=beschikbare_extras,
             default=[x for x in huidige_picks.get("extras", []) if x in beschikbare_extras],
             max_selections=3,
-            key=f"extras_{koers_keuze}"
+            key=f"extras_{koers_keuze}",
+            help="Kies specifieke renners voor deze koers."
         )
         st.session_state.game_picks[koers_keuze]["extras"] = gekozen_extras
 
@@ -213,7 +268,8 @@ with tab2:
             "Kies je Kopman (dubbele punten) uit je 13 actieve renners:",
             options=opties_kopman,
             index=idx_kopman,
-            key=f"kopman_{koers_keuze}"
+            key=f"kopman_{koers_keuze}",
+            help="Selecteer de renner die de meeste punten voor je zal scoren."
         )
         st.session_state.game_picks[koers_keuze]["kopman"] = gekozen_kopman if gekozen_kopman else None
 
