@@ -1,0 +1,1 @@
+# Simulate pandas error
