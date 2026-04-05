@@ -30,7 +30,14 @@ def login_page():
         st.divider()
         st.markdown("### 🧠 Features")
         st.markdown("✅ Wiskundige AI Solvers (Knapsack optimalisatie)\n✅ Verwachte Waarde (EV) berekeningen op basis van parcours\n✅ Dynamische wissel- en transferstrategieën\n✅ Live Model Evaluator")
-        st.markdown("*Data: [Wielerorakel.nl](https://wielerorakel.nl/)*")
+
+        st.divider()
+        st.markdown("### 🛠️ Beschikbare Dashboards")
+        st.markdown("- 🚴 **Cycling Fantasy:** Dashboard & Selectie")
+        st.markdown("- 🏆 **Scorito:** Klassiekers, Evaluator & Grand Tours")
+        st.markdown("- 🏁 **Sporza:** Klassiekers, Evaluator, AI Solver & Team Bouwer")
+
+        st.markdown("<br>*Data: [Wielerorakel.nl](https://wielerorakel.nl/)*", unsafe_allow_html=True)
 
     with col_rechts:
         with st.container(border=True):
