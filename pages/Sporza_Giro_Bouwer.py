@@ -50,15 +50,15 @@ def laad_profiel_scores():
         try:
             df_scores = pd.read_csv(bestand, sep=None, engine='python')
             df_scores.columns = df_scores.columns.str.strip()
-            for _, row in df_scores.iterrows():
+            for row in df_scores.itertuples():
                 try:
-                    s_id = int(row['id'])
+                    s_id = int(row.id)
                     for e in GIRO_ETAPPES:
                         if e['id'] == s_id:
-                            if 'SPR' in df_scores.columns: e['w']['SPR'] = float(row['SPR'])
-                            if 'GC'  in df_scores.columns: e['w']['GC']  = float(row['GC'])
-                            if 'ITT' in df_scores.columns: e['w']['ITT'] = float(row['ITT'])
-                            if 'MTN' in df_scores.columns: e['w']['MTN'] = float(row['MTN'])
+                            if 'SPR' in df_scores.columns: e['w']['SPR'] = float(row.SPR)
+                            if 'GC'  in df_scores.columns: e['w']['GC']  = float(row.GC)
+                            if 'ITT' in df_scores.columns: e['w']['ITT'] = float(row.ITT)
+                            if 'MTN' in df_scores.columns: e['w']['MTN'] = float(row.MTN)
                 except:
                     continue
         except Exception:
@@ -651,8 +651,8 @@ with tab3:
                     )
 
                 opstelling = []
-                for _, row in top_9_df.iterrows():
-                    naam = row['Naam']
+                for row in top_9_df.itertuples():
+                    naam = row.Naam
                     if naam == effectief_km:
                         rol = f"© Kopman ({kopman_bron})"
                     elif naam in voorspeld:
@@ -662,7 +662,7 @@ with tab3:
                     opstelling.append({
                         "Rol":             rol,
                         "Renner":          naam,
-                        "Verwachte Score": int(row['StageScore'])
+                        "Verwachte Score": int(row.StageScore)
                     })
 
                 st.dataframe(pd.DataFrame(opstelling), hide_index=True, use_container_width=True)
