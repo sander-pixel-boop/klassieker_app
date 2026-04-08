@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 import pulp
 import json
-import unicodedata
 import os
 from thefuzz import process, fuzz
 from utils.db import init_connection
+from utils.name_matching import normalize_name_logic
 from datetime import datetime
 
 # --- CONFIGURATIE ---
@@ -22,13 +22,6 @@ supabase = init_connection()
 TABEL_NAAM = "gebruikers_data_test"
 
 # --- HULPFUNCTIES ---
-def normalize_name_logic(text):
-    if not isinstance(text, str):
-        return ""
-    text = text.lower().strip()
-    nfkd_form = unicodedata.normalize('NFKD', text)
-    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
-
 def get_file_mod_time(filepath):
     return os.path.getmtime(filepath) if os.path.exists(filepath) else 0
 
