@@ -2,12 +2,8 @@ import streamlit as st
 import pandas as pd
 import pulp
 import json
-import plotly.express as px
-import plotly.graph_objects as go
-import unicodedata
 import os
 import itertools
-from thefuzz import process, fuzz
 from utils.db import init_connection
 from datetime import datetime
 from utils.name_matching import normalize_name_logic, match_naam_slim, match_uitslag_naam
