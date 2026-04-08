@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import os
 from thefuzz import process, fuzz
-import unicodedata
+from utils.name_matching import normalize_name_logic, match_uitslag_naam
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Model Evaluator", layout="wide", page_icon="📊")
@@ -87,39 +87,6 @@ MIJN_EIGEN_KOPMANNEN = {
 }
 
 # --- HULPFUNCTIES VOOR NAAM-MATCHING ---
-def normalize_name_logic(text):
-    if not isinstance(text, str):
-        return ""
-    text = text.lower().strip()
-    nfkd_form = unicodedata.normalize('NFKD', text)
-    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
-
-def match_uitslag_naam(naam, alle_renners):
-    naam_norm = normalize_name_logic(naam)
-    bekende_gevallen = {
-        "philipsen": "jasper philipsen",
-        "pedersen": "mads pedersen",
-        "pidcock": "thomas pidcock",
-        "van aert": "wout van aert", 
-        "van der poel": "mathieu van der poel",
-        "pogacar": "tadej pogacar",
-        "de lie": "arnaud de lie"
-    }
-    
-    for key, correct in bekende_gevallen.items():
-        if key in naam_norm:
-            for target in alle_renners:
-                if correct in normalize_name_logic(target):
-                    return target
-                
-    bests = process.extractBests(naam_norm, alle_renners, scorer=fuzz.token_set_ratio, limit=5)
-    if bests and bests[0][1] >= 75:
-        top_score = bests[0][1]
-        candidates = [b[0] for b in bests if b[1] >= top_score - 3]
-        candidates.sort(key=lambda x: (abs(len(normalize_name_logic(x)) - len(naam_norm)), -fuzz.ratio(naam_norm, normalize_name_logic(x))))
-        return candidates[0]
-    return naam
-
 def get_file_mod_time(filepath):
     return os.path.getmtime(filepath) if os.path.exists(filepath) else 0
 
