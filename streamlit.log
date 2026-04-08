@@ -8,3 +8,376 @@ Collecting usage statistics. To deactivate, set browser.gatherUsageStats to fals
   Network URL: http://192.168.0.2:8501
   External URL: http://34.46.237.233:8501
 
+[31m──[0m[31m────────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────────[0m[31m──[0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/interna[0m [31m [0m
+[31m [0m [2mls/[0m[1mblocks.py[0m:1115 in setitem                                                         [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1112 [0m[2m│   │   │   [0m[2m# GH48933: extract_array would convert a pd.Series value to np.nd[0m [31m [0m
+[31m [0m   [2m1113 [0m[2m│   │   │   [0mvalue = extract_array(value, extract_numpy=[94mTrue[0m)                  [31m [0m
+[31m [0m   [2m1114 [0m[2m│   │   [0m[94mtry[0m:                                                                  [31m [0m
+[31m [0m [31m❱ [0m1115 [2m│   │   │   [0mcasted = np_can_hold_element(values.dtype, value)                 [31m [0m
+[31m [0m   [2m1116 [0m[2m│   │   [0m[94mexcept[0m LossySetitemError:                                             [31m [0m
+[31m [0m   [2m1117 [0m[2m│   │   │   [0m[2m# current dtype cannot store value, coerce to common dtype[0m        [31m [0m
+[31m [0m   [2m1118 [0m[2m│   │   │   [0mnb = [1;4;96mself[0m[1;4m.coerce_to_target_dtype(value, raise_on_upcast=[0m[1;4;94mTrue[0m[1;4m)[0m     [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/dtypes/[0m [31m [0m
+[31m [0m [1mcast.py[0m:1750 in np_can_hold_element                                                  [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1747 [0m[2m│   │   │   [0m                                                                  [31m [0m
+[31m [0m   [2m1748 [0m[2m│   │   │   [0m[94mreturn[0m element                                                    [31m [0m
+[31m [0m   [2m1749 [0m[2m│   │   [0m                                                                      [31m [0m
+[31m [0m [31m❱ [0m1750 [2m│   │   [0m[1;4;94mraise[0m[1;4m LossySetitemError[0m                                               [31m [0m
+[31m [0m   [2m1751 [0m[2m│   [0m                                                                          [31m [0m
+[31m [0m   [2m1752 [0m[2m│   [0m[94mif[0m dtype.kind == [33m"[0m[33mf[0m[33m"[0m:                                                     [31m [0m
+[31m [0m   [2m1753 [0m[2m│   │   [0m[94mif[0m lib.is_integer(element) [95mor[0m lib.is_float(element):                  [31m [0m
+[31m────────────────────────────────────────────────────────────────────────────────────────[0m
+[1;91mLossySetitemError[0m
+
+[3mDuring handling of the above exception, another exception occurred:[0m
+
+[31m──[0m[31m────────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────────[0m[31m──[0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/runtime/s[0m [31m [0m
+[31m [0m [2mcriptrunner/[0m[1mexec_code.py[0m:129 in exec_func_with_error_handling                        [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/runtime/s[0m [31m [0m
+[31m [0m [2mcriptrunner/[0m[1mscript_runner.py[0m:689 in code_to_exec                                     [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/app/[0m[1mWelkom.py[0m:145 in <module>                                                       [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m142 [0m[2m│   │   [0m[33m"[0m[33mSporza - Grand Tours[0m[33m"[0m: [sporza_giro_ai, sporza_giro_bouwer, sporza_gi [31m [0m
+[31m [0m   [2m143 [0m[2m│   [0m})                                                                         [31m [0m
+[31m [0m   [2m144 [0m                                                                               [31m [0m
+[31m [0m [31m❱ [0m145 [1;4mpg.run()[0m                                                                       [31m [0m
+[31m [0m   [2m146 [0m                                                                               [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/navigatio[0m [31m [0m
+[31m [0m [2mn/[0m[1mpage.py[0m:490 in run                                                                 [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/app/pages/[0m[1mSporza_Giro_Bouwer.py[0m:158 in <module>                                     [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m155 [0m[2m│   [0m[94melif[0m [33m'[0m[33mRenner[0m[33m'[0m [95min[0m df.columns [95mand[0m [33m'[0m[33mNaam[0m[33m'[0m [95mnot[0m [95min[0m df.columns: df = df.rename(c [31m [0m
+[31m [0m   [2m156 [0m[2m│   [0m[94mreturn[0m df.drop_duplicates(subset=[[33m'[0m[33mNaam[0m[33m'[0m]).sort_values([33m'[0m[33mNaam[0m[33m'[0m)             [31m [0m
+[31m [0m   [2m157 [0m                                                                               [31m [0m
+[31m [0m [31m❱ [0m158 df = [1;4mload_all_data()[0m                                                           [31m [0m
+[31m [0m   [2m159 [0m                                                                               [31m [0m
+[31m [0m   [2m160 [0m[2m# --- SESSION STATE ---[0m                                                        [31m [0m
+[31m [0m   [2m161 [0m_default_keuzes  = {[96mstr[0m(e[[33m"[0m[33mid[0m[33m"[0m]): [[94mNone[0m, [94mNone[0m, [94mNone[0m] [94mfor[0m e [95min[0m GIRO_ETAPPES}    [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/runtime/c[0m [31m [0m
+[31m [0m [2maching/[0m[1mcache_utils.py[0m:281 in __call__                                                [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/runtime/c[0m [31m [0m
+[31m [0m [2maching/[0m[1mcache_utils.py[0m:326 in _get_or_create_cached_value                             [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/runtime/c[0m [31m [0m
+[31m [0m [2maching/[0m[1mcache_utils.py[0m:385 in _handle_cache_miss                                      [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/app/pages/[0m[1mSporza_Giro_Bouwer.py[0m:137 in load_all_data                                [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m134 [0m[2m│   [0mdf = pd.merge(df_p, df_s, left_on=naam_col_p, right_on=naam_col_s, how=[33m'[0m[33mle[0m [31m [0m
+[31m [0m   [2m135 [0m[2m│   [0mdf[[33m'[0m[33mPrijs[0m[33m'[0m] = pd.to_numeric(df[[33m'[0m[33mPrijs[0m[33m'[0m], errors=[33m'[0m[33mcoerce[0m[33m'[0m).fillna([94m0[0m)        [31m [0m
+[31m [0m   [2m136 [0m[2m│   [0mdf.loc[df[[33m'[0m[33mPrijs[0m[33m'[0m] > [94m1000[0m, [33m'[0m[33mPrijs[0m[33m'[0m] = df[[33m'[0m[33mPrijs[0m[33m'[0m] / [94m1000000[0m                [31m [0m
+[31m [0m [31m❱ [0m137 [2m│   [0m[1;4mdf.loc[df[[0m[1;4;33m'[0m[1;4;33mPrijs[0m[1;4;33m'[0m[1;4m] == [0m[1;4;94m0.8[0m[1;4m, [0m[1;4;33m'[0m[1;4;33mPrijs[0m[1;4;33m'[0m[1;4m][0m = [94m0.75[0m                                 [31m [0m
+[31m [0m   [2m138 [0m[2m│   [0m[94mfor[0m col [95min[0m [[33m'[0m[33mGC[0m[33m'[0m, [33m'[0m[33mSPR[0m[33m'[0m, [33m'[0m[33mITT[0m[33m'[0m, [33m'[0m[33mMTN[0m[33m'[0m]:                                    [31m [0m
+[31m [0m   [2m139 [0m[2m│   │   [0m[94mif[0m col [95mnot[0m [95min[0m df.columns: df[col] = [94m0[0m                                  [31m [0m
+[31m [0m   [2m140 [0m[2m│   │   [0mdf[col] = pd.to_numeric(df[col], errors=[33m'[0m[33mcoerce[0m[33m'[0m).fillna([94m0[0m).astype([96mint[0m [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/[0m[1mindexin[0m [31m [0m
+[31m [0m [1mg.py[0m:938 in __setitem__                                                              [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m 935 [0m[2m│   │   [0miloc: _iLocIndexer = (                                                [31m [0m
+[31m [0m   [2m 936 [0m[2m│   │   │   [0mcast([33m"[0m[33m_iLocIndexer[0m[33m"[0m, [96mself[0m) [94mif[0m [96mself[0m.name == [33m"[0m[33miloc[0m[33m"[0m [94melse[0m [96mself[0m.obj.i [31m [0m
+[31m [0m   [2m 937 [0m[2m│   │   [0m)                                                                     [31m [0m
+[31m [0m [31m❱ [0m 938 [2m│   │   [0m[1;4miloc._setitem_with_indexer(indexer, value, [0m[1;4;96mself[0m[1;4m.name)[0m                 [31m [0m
+[31m [0m   [2m 939 [0m[2m│   [0m                                                                          [31m [0m
+[31m [0m   [2m 940 [0m[2m│   [0m[94mdef[0m[90m [0m[92m_validate_key[0m([96mself[0m, key, axis: AxisInt) -> [94mNone[0m:                      [31m [0m
+[31m [0m   [2m 941 [0m[2;90m│   │   [0m[33m"""[0m                                                                   [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/[0m[1mindexin[0m [31m [0m
+[31m [0m [1mg.py[0m:1953 in _setitem_with_indexer                                                   [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1950 [0m[2m│   │   [0m[2m# align and set the values[0m                                            [31m [0m
+[31m [0m   [2m1951 [0m[2m│   │   [0m[94mif[0m take_split_path:                                                   [31m [0m
+[31m [0m   [2m1952 [0m[2m│   │   │   [0m[2m# We have to operate column-wise[0m                                  [31m [0m
+[31m [0m [31m❱ [0m1953 [2m│   │   │   [0m[1;4;96mself[0m[1;4m._setitem_with_indexer_split_path(indexer, value, name)[0m       [31m [0m
+[31m [0m   [2m1954 [0m[2m│   │   [0m[94melse[0m:                                                                 [31m [0m
+[31m [0m   [2m1955 [0m[2m│   │   │   [0m[96mself[0m._setitem_single_block(indexer, value, name)                  [31m [0m
+[31m [0m   [2m1956 [0m                                                                              [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/[0m[1mindexin[0m [31m [0m
+[31m [0m [1mg.py[0m:2044 in _setitem_with_indexer_split_path                                        [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m2041 [0m[2m│   │   [0m[94melse[0m:                                                                 [31m [0m
+[31m [0m   [2m2042 [0m[2m│   │   │   [0m[2m# scalar value[0m                                                    [31m [0m
+[31m [0m   [2m2043 [0m[2m│   │   │   [0m[94mfor[0m loc [95min[0m ilocs:                                                 [31m [0m
+[31m [0m [31m❱ [0m2044 [2m│   │   │   │   [0m[1;4;96mself[0m[1;4m._setitem_single_column(loc, value, pi)[0m                   [31m [0m
+[31m [0m   [2m2045 [0m[2m│   [0m                                                                          [31m [0m
+[31m [0m   [2m2046 [0m[2m│   [0m[94mdef[0m[90m [0m[92m_setitem_with_indexer_2d_value[0m([96mself[0m, indexer, value) -> [94mNone[0m:         [31m [0m
+[31m [0m   [2m2047 [0m[2m│   │   [0m[2m# We get here with np.ndim(value) == 2, excluding DataFrame,[0m          [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/[0m[1mindexin[0m [31m [0m
+[31m [0m [1mg.py[0m:2181 in _setitem_single_column                                                  [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m2178 [0m[2m│   │   │   │   [0m[96mself[0m.obj.iloc[:, loc] = construct_1d_array_from_inferred_fill [31m [0m
+[31m [0m   [2m2179 [0m[2m│   │   │   │   │   [0mvalue, [96mlen[0m([96mself[0m.obj)                                      [31m [0m
+[31m [0m   [2m2180 [0m[2m│   │   │   │   [0m)                                                             [31m [0m
+[31m [0m [31m❱ [0m2181 [2m│   │   │   [0m[1;4;96mself[0m[1;4m.obj._mgr.column_setitem(loc, plane_indexer, value)[0m           [31m [0m
+[31m [0m   [2m2182 [0m[2m│   [0m                                                                          [31m [0m
+[31m [0m   [2m2183 [0m[2m│   [0m[94mdef[0m[90m [0m[92m_setitem_single_block[0m([96mself[0m, indexer, value, name: [96mstr[0m) -> [94mNone[0m:       [31m [0m
+[31m [0m   [2m2184 [0m[2;90m│   │   [0m[33m"""[0m                                                                   [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/interna[0m [31m [0m
+[31m [0m [2mls/[0m[1mmanagers.py[0m:1520 in column_setitem                                                [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1517 [0m[2m│   │   [0m[94mif[0m inplace_only:                                                      [31m [0m
+[31m [0m   [2m1518 [0m[2m│   │   │   [0mcol_mgr.setitem_inplace(idx, value)                               [31m [0m
+[31m [0m   [2m1519 [0m[2m│   │   [0m[94melse[0m:                                                                 [31m [0m
+[31m [0m [31m❱ [0m1520 [2m│   │   │   [0mnew_mgr = [1;4mcol_mgr.setitem((idx,), value)[0m                          [31m [0m
+[31m [0m   [2m1521 [0m[2m│   │   │   [0m[96mself[0m.iset(loc, new_mgr._block.values, inplace=[94mTrue[0m)               [31m [0m
+[31m [0m   [2m1522 [0m[2m│   [0m                                                                          [31m [0m
+[31m [0m   [2m1523 [0m[2m│   [0m[94mdef[0m[90m [0m[92minsert[0m([96mself[0m, loc: [96mint[0m, item: Hashable, value: ArrayLike, refs=[94mNone[0m) - [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/interna[0m [31m [0m
+[31m [0m [2mls/[0m[1mmanagers.py[0m:604 in setitem                                                        [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m 601 [0m[2m│   │   │   [0m[2m# manager[0m                                                         [31m [0m
+[31m [0m   [2m 602 [0m[2m│   │   │   [0m[96mself[0m = [96mself[0m.copy(deep=[94mTrue[0m)                                       [31m [0m
+[31m [0m   [2m 603 [0m[2m│   │   [0m                                                                      [31m [0m
+[31m [0m [31m❱ [0m 604 [2m│   │   [0m[94mreturn[0m [1;4;96mself[0m[1;4m.apply([0m[1;4;33m"[0m[1;4;33msetitem[0m[1;4;33m"[0m[1;4m, indexer=indexer, value=value)[0m            [31m [0m
+[31m [0m   [2m 605 [0m[2m│   [0m                                                                          [31m [0m
+[31m [0m   [2m 606 [0m[2m│   [0m[94mdef[0m[90m [0m[92mdiff[0m([96mself[0m, n: [96mint[0m) -> Self:                                           [31m [0m
+[31m [0m   [2m 607 [0m[2m│   │   [0m[2m# only reached with self.ndim == 2[0m                                    [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/interna[0m [31m [0m
+[31m [0m [2mls/[0m[1mmanagers.py[0m:442 in apply                                                          [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m 439 [0m[2m│   │   │   [0m[94mif[0m [96mcallable[0m(f):                                                   [31m [0m
+[31m [0m   [2m 440 [0m[2m│   │   │   │   [0mapplied = b.apply(f, **kwargs)                                [31m [0m
+[31m [0m   [2m 441 [0m[2m│   │   │   [0m[94melse[0m:                                                             [31m [0m
+[31m [0m [31m❱ [0m 442 [2m│   │   │   │   [0mapplied = [1;4;96mgetattr[0m[1;4m(b, f)(**kwargs)[0m                             [31m [0m
+[31m [0m   [2m 443 [0m[2m│   │   │   [0mresult_blocks = extend_blocks(applied, result_blocks)             [31m [0m
+[31m [0m   [2m 444 [0m[2m│   │   [0m                                                                      [31m [0m
+[31m [0m   [2m 445 [0m[2m│   │   [0mout = [96mtype[0m([96mself[0m).from_blocks(result_blocks, [ax.view() [94mfor[0m ax [95min[0m [96mself[0m [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/interna[0m [31m [0m
+[31m [0m [2mls/[0m[1mblocks.py[0m:1118 in setitem                                                         [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1115 [0m[2m│   │   │   [0mcasted = np_can_hold_element(values.dtype, value)                 [31m [0m
+[31m [0m   [2m1116 [0m[2m│   │   [0m[94mexcept[0m LossySetitemError:                                             [31m [0m
+[31m [0m   [2m1117 [0m[2m│   │   │   [0m[2m# current dtype cannot store value, coerce to common dtype[0m        [31m [0m
+[31m [0m [31m❱ [0m1118 [2m│   │   │   [0mnb = [1;4;96mself[0m[1;4m.coerce_to_target_dtype(value, raise_on_upcast=[0m[1;4;94mTrue[0m[1;4m)[0m     [31m [0m
+[31m [0m   [2m1119 [0m[2m│   │   │   [0m[94mreturn[0m nb.setitem(indexer, value)                                 [31m [0m
+[31m [0m   [2m1120 [0m[2m│   │   [0m[94melse[0m:                                                                 [31m [0m
+[31m [0m   [2m1121 [0m[2m│   │   │   [0m[94mif[0m [96mself[0m.dtype == _dtype_obj:                                      [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/interna[0m [31m [0m
+[31m [0m [2mls/[0m[1mblocks.py[0m:468 in coerce_to_target_dtype                                           [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m 465 [0m[2m│   │   │   [0mraise_on_upcast = [94mFalse[0m                                           [31m [0m
+[31m [0m   [2m 466 [0m[2m│   │   [0m                                                                      [31m [0m
+[31m [0m   [2m 467 [0m[2m│   │   [0m[94mif[0m raise_on_upcast:                                                   [31m [0m
+[31m [0m [31m❱ [0m 468 [2m│   │   │   [0m[1;4;94mraise[0m[1;4m [0m[1;4;96mTypeError[0m[1;4m([0m[1;4;33mf[0m[1;4;33m"[0m[1;4;33mInvalid value [0m[1;4;33m'[0m[1;4;33m{[0m[1;4mother[0m[1;4;33m}[0m[1;4;33m'[0m[1;4;33m for dtype [0m[1;4;33m'[0m[1;4;33m{[0m[1;4;96mself[0m[1;4m.values[0m [31m [0m
+[31m [0m   [2m 469 [0m[2m│   │   [0m[94mif[0m [96mself[0m.values.dtype == new_dtype:                                    [31m [0m
+[31m [0m   [2m 470 [0m[2m│   │   │   [0m[94mraise[0m [96mAssertionError[0m(                                             [31m [0m
+[31m [0m   [2m 471 [0m[2m│   │   │   │   [0m[33mf[0m[33m"[0m[33mDid not expect new dtype [0m[33m{[0mnew_dtype[33m}[0m[33m to equal self.dtype [0m[33m"[0m  [31m [0m
+[31m────────────────────────────────────────────────────────────────────────────────────────[0m
+[1;91mTypeError: [0mInvalid value [32m'0.75'[0m for dtype [32m'int64'[0m
+[31m──[0m[31m────────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────────[0m[31m──[0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/interna[0m [31m [0m
+[31m [0m [2mls/[0m[1mblocks.py[0m:1115 in setitem                                                         [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1112 [0m[2m│   │   │   [0m[2m# GH48933: extract_array would convert a pd.Series value to np.nd[0m [31m [0m
+[31m [0m   [2m1113 [0m[2m│   │   │   [0mvalue = extract_array(value, extract_numpy=[94mTrue[0m)                  [31m [0m
+[31m [0m   [2m1114 [0m[2m│   │   [0m[94mtry[0m:                                                                  [31m [0m
+[31m [0m [31m❱ [0m1115 [2m│   │   │   [0mcasted = np_can_hold_element(values.dtype, value)                 [31m [0m
+[31m [0m   [2m1116 [0m[2m│   │   [0m[94mexcept[0m LossySetitemError:                                             [31m [0m
+[31m [0m   [2m1117 [0m[2m│   │   │   [0m[2m# current dtype cannot store value, coerce to common dtype[0m        [31m [0m
+[31m [0m   [2m1118 [0m[2m│   │   │   [0mnb = [1;4;96mself[0m[1;4m.coerce_to_target_dtype(value, raise_on_upcast=[0m[1;4;94mTrue[0m[1;4m)[0m     [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/dtypes/[0m [31m [0m
+[31m [0m [1mcast.py[0m:1750 in np_can_hold_element                                                  [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1747 [0m[2m│   │   │   [0m                                                                  [31m [0m
+[31m [0m   [2m1748 [0m[2m│   │   │   [0m[94mreturn[0m element                                                    [31m [0m
+[31m [0m   [2m1749 [0m[2m│   │   [0m                                                                      [31m [0m
+[31m [0m [31m❱ [0m1750 [2m│   │   [0m[1;4;94mraise[0m[1;4m LossySetitemError[0m                                               [31m [0m
+[31m [0m   [2m1751 [0m[2m│   [0m                                                                          [31m [0m
+[31m [0m   [2m1752 [0m[2m│   [0m[94mif[0m dtype.kind == [33m"[0m[33mf[0m[33m"[0m:                                                     [31m [0m
+[31m [0m   [2m1753 [0m[2m│   │   [0m[94mif[0m lib.is_integer(element) [95mor[0m lib.is_float(element):                  [31m [0m
+[31m────────────────────────────────────────────────────────────────────────────────────────[0m
+[1;91mLossySetitemError[0m
+
+[3mDuring handling of the above exception, another exception occurred:[0m
+
+[31m──[0m[31m────────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────────[0m[31m──[0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/runtime/s[0m [31m [0m
+[31m [0m [2mcriptrunner/[0m[1mexec_code.py[0m:129 in exec_func_with_error_handling                        [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/runtime/s[0m [31m [0m
+[31m [0m [2mcriptrunner/[0m[1mscript_runner.py[0m:689 in code_to_exec                                     [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/app/[0m[1mWelkom.py[0m:145 in <module>                                                       [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m142 [0m[2m│   │   [0m[33m"[0m[33mSporza - Grand Tours[0m[33m"[0m: [sporza_giro_ai, sporza_giro_bouwer, sporza_gi [31m [0m
+[31m [0m   [2m143 [0m[2m│   [0m})                                                                         [31m [0m
+[31m [0m   [2m144 [0m                                                                               [31m [0m
+[31m [0m [31m❱ [0m145 [1;4mpg.run()[0m                                                                       [31m [0m
+[31m [0m   [2m146 [0m                                                                               [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/navigatio[0m [31m [0m
+[31m [0m [2mn/[0m[1mpage.py[0m:490 in run                                                                 [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/app/pages/[0m[1mSporza_Giro_Bouwer.py[0m:158 in <module>                                     [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m155 [0m[2m│   [0m[94melif[0m [33m'[0m[33mRenner[0m[33m'[0m [95min[0m df.columns [95mand[0m [33m'[0m[33mNaam[0m[33m'[0m [95mnot[0m [95min[0m df.columns: df = df.rename(c [31m [0m
+[31m [0m   [2m156 [0m[2m│   [0m[94mreturn[0m df.drop_duplicates(subset=[[33m'[0m[33mNaam[0m[33m'[0m]).sort_values([33m'[0m[33mNaam[0m[33m'[0m)             [31m [0m
+[31m [0m   [2m157 [0m                                                                               [31m [0m
+[31m [0m [31m❱ [0m158 df = [1;4mload_all_data()[0m                                                           [31m [0m
+[31m [0m   [2m159 [0m                                                                               [31m [0m
+[31m [0m   [2m160 [0m[2m# --- SESSION STATE ---[0m                                                        [31m [0m
+[31m [0m   [2m161 [0m_default_keuzes  = {[96mstr[0m(e[[33m"[0m[33mid[0m[33m"[0m]): [[94mNone[0m, [94mNone[0m, [94mNone[0m] [94mfor[0m e [95min[0m GIRO_ETAPPES}    [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/runtime/c[0m [31m [0m
+[31m [0m [2maching/[0m[1mcache_utils.py[0m:281 in __call__                                                [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/runtime/c[0m [31m [0m
+[31m [0m [2maching/[0m[1mcache_utils.py[0m:326 in _get_or_create_cached_value                             [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/runtime/c[0m [31m [0m
+[31m [0m [2maching/[0m[1mcache_utils.py[0m:385 in _handle_cache_miss                                      [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/app/pages/[0m[1mSporza_Giro_Bouwer.py[0m:137 in load_all_data                                [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m134 [0m[2m│   [0mdf = pd.merge(df_p, df_s, left_on=naam_col_p, right_on=naam_col_s, how=[33m'[0m[33mle[0m [31m [0m
+[31m [0m   [2m135 [0m[2m│   [0mdf[[33m'[0m[33mPrijs[0m[33m'[0m] = pd.to_numeric(df[[33m'[0m[33mPrijs[0m[33m'[0m], errors=[33m'[0m[33mcoerce[0m[33m'[0m).fillna([94m0[0m)        [31m [0m
+[31m [0m   [2m136 [0m[2m│   [0mdf.loc[df[[33m'[0m[33mPrijs[0m[33m'[0m] > [94m1000[0m, [33m'[0m[33mPrijs[0m[33m'[0m] = df[[33m'[0m[33mPrijs[0m[33m'[0m] / [94m1000000[0m                [31m [0m
+[31m [0m [31m❱ [0m137 [2m│   [0m[1;4mdf.loc[df[[0m[1;4;33m'[0m[1;4;33mPrijs[0m[1;4;33m'[0m[1;4m] == [0m[1;4;94m0.8[0m[1;4m, [0m[1;4;33m'[0m[1;4;33mPrijs[0m[1;4;33m'[0m[1;4m][0m = [94m0.75[0m                                 [31m [0m
+[31m [0m   [2m138 [0m[2m│   [0m[94mfor[0m col [95min[0m [[33m'[0m[33mGC[0m[33m'[0m, [33m'[0m[33mSPR[0m[33m'[0m, [33m'[0m[33mITT[0m[33m'[0m, [33m'[0m[33mMTN[0m[33m'[0m]:                                    [31m [0m
+[31m [0m   [2m139 [0m[2m│   │   [0m[94mif[0m col [95mnot[0m [95min[0m df.columns: df[col] = [94m0[0m                                  [31m [0m
+[31m [0m   [2m140 [0m[2m│   │   [0mdf[col] = pd.to_numeric(df[col], errors=[33m'[0m[33mcoerce[0m[33m'[0m).fillna([94m0[0m).astype([96mint[0m [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/[0m[1mindexin[0m [31m [0m
+[31m [0m [1mg.py[0m:938 in __setitem__                                                              [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m 935 [0m[2m│   │   [0miloc: _iLocIndexer = (                                                [31m [0m
+[31m [0m   [2m 936 [0m[2m│   │   │   [0mcast([33m"[0m[33m_iLocIndexer[0m[33m"[0m, [96mself[0m) [94mif[0m [96mself[0m.name == [33m"[0m[33miloc[0m[33m"[0m [94melse[0m [96mself[0m.obj.i [31m [0m
+[31m [0m   [2m 937 [0m[2m│   │   [0m)                                                                     [31m [0m
+[31m [0m [31m❱ [0m 938 [2m│   │   [0m[1;4miloc._setitem_with_indexer(indexer, value, [0m[1;4;96mself[0m[1;4m.name)[0m                 [31m [0m
+[31m [0m   [2m 939 [0m[2m│   [0m                                                                          [31m [0m
+[31m [0m   [2m 940 [0m[2m│   [0m[94mdef[0m[90m [0m[92m_validate_key[0m([96mself[0m, key, axis: AxisInt) -> [94mNone[0m:                      [31m [0m
+[31m [0m   [2m 941 [0m[2;90m│   │   [0m[33m"""[0m                                                                   [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/[0m[1mindexin[0m [31m [0m
+[31m [0m [1mg.py[0m:1953 in _setitem_with_indexer                                                   [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1950 [0m[2m│   │   [0m[2m# align and set the values[0m                                            [31m [0m
+[31m [0m   [2m1951 [0m[2m│   │   [0m[94mif[0m take_split_path:                                                   [31m [0m
+[31m [0m   [2m1952 [0m[2m│   │   │   [0m[2m# We have to operate column-wise[0m                                  [31m [0m
+[31m [0m [31m❱ [0m1953 [2m│   │   │   [0m[1;4;96mself[0m[1;4m._setitem_with_indexer_split_path(indexer, value, name)[0m       [31m [0m
+[31m [0m   [2m1954 [0m[2m│   │   [0m[94melse[0m:                                                                 [31m [0m
+[31m [0m   [2m1955 [0m[2m│   │   │   [0m[96mself[0m._setitem_single_block(indexer, value, name)                  [31m [0m
+[31m [0m   [2m1956 [0m                                                                              [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/[0m[1mindexin[0m [31m [0m
+[31m [0m [1mg.py[0m:2044 in _setitem_with_indexer_split_path                                        [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m2041 [0m[2m│   │   [0m[94melse[0m:                                                                 [31m [0m
+[31m [0m   [2m2042 [0m[2m│   │   │   [0m[2m# scalar value[0m                                                    [31m [0m
+[31m [0m   [2m2043 [0m[2m│   │   │   [0m[94mfor[0m loc [95min[0m ilocs:                                                 [31m [0m
+[31m [0m [31m❱ [0m2044 [2m│   │   │   │   [0m[1;4;96mself[0m[1;4m._setitem_single_column(loc, value, pi)[0m                   [31m [0m
+[31m [0m   [2m2045 [0m[2m│   [0m                                                                          [31m [0m
+[31m [0m   [2m2046 [0m[2m│   [0m[94mdef[0m[90m [0m[92m_setitem_with_indexer_2d_value[0m([96mself[0m, indexer, value) -> [94mNone[0m:         [31m [0m
+[31m [0m   [2m2047 [0m[2m│   │   [0m[2m# We get here with np.ndim(value) == 2, excluding DataFrame,[0m          [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/[0m[1mindexin[0m [31m [0m
+[31m [0m [1mg.py[0m:2181 in _setitem_single_column                                                  [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m2178 [0m[2m│   │   │   │   [0m[96mself[0m.obj.iloc[:, loc] = construct_1d_array_from_inferred_fill [31m [0m
+[31m [0m   [2m2179 [0m[2m│   │   │   │   │   [0mvalue, [96mlen[0m([96mself[0m.obj)                                      [31m [0m
+[31m [0m   [2m2180 [0m[2m│   │   │   │   [0m)                                                             [31m [0m
+[31m [0m [31m❱ [0m2181 [2m│   │   │   [0m[1;4;96mself[0m[1;4m.obj._mgr.column_setitem(loc, plane_indexer, value)[0m           [31m [0m
+[31m [0m   [2m2182 [0m[2m│   [0m                                                                          [31m [0m
+[31m [0m   [2m2183 [0m[2m│   [0m[94mdef[0m[90m [0m[92m_setitem_single_block[0m([96mself[0m, indexer, value, name: [96mstr[0m) -> [94mNone[0m:       [31m [0m
+[31m [0m   [2m2184 [0m[2;90m│   │   [0m[33m"""[0m                                                                   [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/interna[0m [31m [0m
+[31m [0m [2mls/[0m[1mmanagers.py[0m:1520 in column_setitem                                                [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1517 [0m[2m│   │   [0m[94mif[0m inplace_only:                                                      [31m [0m
+[31m [0m   [2m1518 [0m[2m│   │   │   [0mcol_mgr.setitem_inplace(idx, value)                               [31m [0m
+[31m [0m   [2m1519 [0m[2m│   │   [0m[94melse[0m:                                                                 [31m [0m
+[31m [0m [31m❱ [0m1520 [2m│   │   │   [0mnew_mgr = [1;4mcol_mgr.setitem((idx,), value)[0m                          [31m [0m
+[31m [0m   [2m1521 [0m[2m│   │   │   [0m[96mself[0m.iset(loc, new_mgr._block.values, inplace=[94mTrue[0m)               [31m [0m
+[31m [0m   [2m1522 [0m[2m│   [0m                                                                          [31m [0m
+[31m [0m   [2m1523 [0m[2m│   [0m[94mdef[0m[90m [0m[92minsert[0m([96mself[0m, loc: [96mint[0m, item: Hashable, value: ArrayLike, refs=[94mNone[0m) - [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/interna[0m [31m [0m
+[31m [0m [2mls/[0m[1mmanagers.py[0m:604 in setitem                                                        [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m 601 [0m[2m│   │   │   [0m[2m# manager[0m                                                         [31m [0m
+[31m [0m   [2m 602 [0m[2m│   │   │   [0m[96mself[0m = [96mself[0m.copy(deep=[94mTrue[0m)                                       [31m [0m
+[31m [0m   [2m 603 [0m[2m│   │   [0m                                                                      [31m [0m
+[31m [0m [31m❱ [0m 604 [2m│   │   [0m[94mreturn[0m [1;4;96mself[0m[1;4m.apply([0m[1;4;33m"[0m[1;4;33msetitem[0m[1;4;33m"[0m[1;4m, indexer=indexer, value=value)[0m            [31m [0m
+[31m [0m   [2m 605 [0m[2m│   [0m                                                                          [31m [0m
+[31m [0m   [2m 606 [0m[2m│   [0m[94mdef[0m[90m [0m[92mdiff[0m([96mself[0m, n: [96mint[0m) -> Self:                                           [31m [0m
+[31m [0m   [2m 607 [0m[2m│   │   [0m[2m# only reached with self.ndim == 2[0m                                    [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/interna[0m [31m [0m
+[31m [0m [2mls/[0m[1mmanagers.py[0m:442 in apply                                                          [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m 439 [0m[2m│   │   │   [0m[94mif[0m [96mcallable[0m(f):                                                   [31m [0m
+[31m [0m   [2m 440 [0m[2m│   │   │   │   [0mapplied = b.apply(f, **kwargs)                                [31m [0m
+[31m [0m   [2m 441 [0m[2m│   │   │   [0m[94melse[0m:                                                             [31m [0m
+[31m [0m [31m❱ [0m 442 [2m│   │   │   │   [0mapplied = [1;4;96mgetattr[0m[1;4m(b, f)(**kwargs)[0m                             [31m [0m
+[31m [0m   [2m 443 [0m[2m│   │   │   [0mresult_blocks = extend_blocks(applied, result_blocks)             [31m [0m
+[31m [0m   [2m 444 [0m[2m│   │   [0m                                                                      [31m [0m
+[31m [0m   [2m 445 [0m[2m│   │   [0mout = [96mtype[0m([96mself[0m).from_blocks(result_blocks, [ax.view() [94mfor[0m ax [95min[0m [96mself[0m [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/interna[0m [31m [0m
+[31m [0m [2mls/[0m[1mblocks.py[0m:1118 in setitem                                                         [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1115 [0m[2m│   │   │   [0mcasted = np_can_hold_element(values.dtype, value)                 [31m [0m
+[31m [0m   [2m1116 [0m[2m│   │   [0m[94mexcept[0m LossySetitemError:                                             [31m [0m
+[31m [0m   [2m1117 [0m[2m│   │   │   [0m[2m# current dtype cannot store value, coerce to common dtype[0m        [31m [0m
+[31m [0m [31m❱ [0m1118 [2m│   │   │   [0mnb = [1;4;96mself[0m[1;4m.coerce_to_target_dtype(value, raise_on_upcast=[0m[1;4;94mTrue[0m[1;4m)[0m     [31m [0m
+[31m [0m   [2m1119 [0m[2m│   │   │   [0m[94mreturn[0m nb.setitem(indexer, value)                                 [31m [0m
+[31m [0m   [2m1120 [0m[2m│   │   [0m[94melse[0m:                                                                 [31m [0m
+[31m [0m   [2m1121 [0m[2m│   │   │   [0m[94mif[0m [96mself[0m.dtype == _dtype_obj:                                      [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/pandas/core/interna[0m [31m [0m
+[31m [0m [2mls/[0m[1mblocks.py[0m:468 in coerce_to_target_dtype                                           [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m 465 [0m[2m│   │   │   [0mraise_on_upcast = [94mFalse[0m                                           [31m [0m
+[31m [0m   [2m 466 [0m[2m│   │   [0m                                                                      [31m [0m
+[31m [0m   [2m 467 [0m[2m│   │   [0m[94mif[0m raise_on_upcast:                                                   [31m [0m
+[31m [0m [31m❱ [0m 468 [2m│   │   │   [0m[1;4;94mraise[0m[1;4m [0m[1;4;96mTypeError[0m[1;4m([0m[1;4;33mf[0m[1;4;33m"[0m[1;4;33mInvalid value [0m[1;4;33m'[0m[1;4;33m{[0m[1;4mother[0m[1;4;33m}[0m[1;4;33m'[0m[1;4;33m for dtype [0m[1;4;33m'[0m[1;4;33m{[0m[1;4;96mself[0m[1;4m.values[0m [31m [0m
+[31m [0m   [2m 469 [0m[2m│   │   [0m[94mif[0m [96mself[0m.values.dtype == new_dtype:                                    [31m [0m
+[31m [0m   [2m 470 [0m[2m│   │   │   [0m[94mraise[0m [96mAssertionError[0m(                                             [31m [0m
+[31m [0m   [2m 471 [0m[2m│   │   │   │   [0m[33mf[0m[33m"[0m[33mDid not expect new dtype [0m[33m{[0mnew_dtype[33m}[0m[33m to equal self.dtype [0m[33m"[0m  [31m [0m
+[31m────────────────────────────────────────────────────────────────────────────────────────[0m
+[1;91mTypeError: [0mInvalid value [32m'0.75'[0m for dtype [32m'int64'[0m
+2026-04-08 12:30:10.592 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-04-08 12:31:36.739 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-04-08 12:33:06.616 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-04-08 12:33:12.000 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-04-08 12:33:12.015 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
