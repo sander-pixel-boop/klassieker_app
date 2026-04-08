@@ -2,11 +2,11 @@ import streamlit as st
 import pandas as pd
 import pulp
 import json
-import unicodedata
 import os
 import base64
 from thefuzz import process, fuzz
 from utils.db import init_connection
+from utils.name_matching import match_naam_slim, normalize_name_logic
 from datetime import datetime
 from claude_predictions import genereer_claude_etappe_voorspellingen
 
@@ -71,37 +71,6 @@ def laad_profiel_scores():
 laad_profiel_scores()
 
 # --- HULPFUNCTIES ---
-def normalize_name_logic(text):
-    if not isinstance(text, str): return ""
-    text = text.lower().strip()
-    nfkd_form = unicodedata.normalize('NFKD', text)
-    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
-
-def match_naam_slim(naam, dict_met_namen):
-    naam_norm = normalize_name_logic(naam)
-    lijst_met_namen = list(dict_met_namen.keys())
-    bekende_gevallen = {
-        "philipsen":       "jasper philipsen",    "j. philipsen": "jasper philipsen",  "j philipsen": "jasper philipsen",
-        "pedersen":        "mads pedersen",        "m. pedersen":  "mads pedersen",     "m pedersen":  "mads pedersen",
-        "pidcock":         "thomas pidcock",       "t. pidcock":   "thomas pidcock",    "tom pidcock": "thomas pidcock",
-        "van aert":        "wout van aert",        "w. van aert":  "wout van aert",
-        "van der poel":    "mathieu van der poel", "m. van der poel": "mathieu van der poel",
-        "pogacar":         "tadej pogacar",        "t. pogacar":   "tadej pogacar",
-        "de lie":          "arnaud de lie",        "a. de lie":    "arnaud de lie",
-    }
-    if naam_norm in bekende_gevallen:
-        correct = bekende_gevallen[naam_norm]
-        for target in lijst_met_namen:
-            if correct in target: return dict_met_namen[target]
-    if naam_norm in lijst_met_namen: return dict_met_namen[naam_norm]
-    bests = process.extractBests(naam_norm, lijst_met_namen, scorer=fuzz.token_set_ratio, limit=5)
-    if bests and bests[0][1] >= 75:
-        top_score = bests[0][1]
-        candidates = [b[0] for b in bests if b[1] >= top_score - 3]
-        candidates.sort(key=lambda x: (abs(len(x) - len(naam_norm)), -fuzz.ratio(naam_norm, x)))
-        return dict_met_namen[candidates[0]]
-    return naam
-
 def get_clickable_image_html(image_path, fallback_text, link):
     if os.path.exists(image_path):
         try:
@@ -154,7 +123,7 @@ def load_giro_data():
             st.error("🚨 Fout in de startlijst: de kolom `Prijs` is niet gevonden.")
             return pd.DataFrame()
 
-        merged_df['Prijs'] = pd.to_numeric(merged_df['Prijs'], errors='coerce').fillna(0)
+        merged_df['Prijs'] = pd.to_numeric(merged_df['Prijs'], errors='coerce').fillna(0.0).astype(float)
         merged_df.loc[merged_df['Prijs'] > 1000, 'Prijs'] = merged_df['Prijs'] / 1000000
         merged_df.loc[merged_df['Prijs'] == 0.8, 'Prijs'] = 0.75
 

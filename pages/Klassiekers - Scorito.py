@@ -2,12 +2,8 @@ import streamlit as st
 import pandas as pd
 import pulp
 import json
-import plotly.express as px
-import plotly.graph_objects as go
-import unicodedata
 import os
 import itertools
-from thefuzz import process, fuzz
 from utils.db import init_connection
 from datetime import datetime
 from utils.name_matching import normalize_name_logic, match_naam_slim, match_uitslag_naam
@@ -60,16 +56,19 @@ def get_uitslagen(file_mod_time, alle_renners):
         }
             
         uitslag_parsed = []
-        for index, row in df_raw_uitslagen.iterrows():
-            koers_origineel = str(row['Race']).strip().upper()
+        match_cache = {}
+        for race, rnk, rider in zip(df_raw_uitslagen['Race'], df_raw_uitslagen['Rnk'], df_raw_uitslagen['Rider']):
+            koers_origineel = str(race).strip().upper()
             koers = sporza_naar_scorito_map.get(koers_origineel, koers_origineel)
             
-            rank_str = str(row['Rnk']).strip().upper()
+            rank_str = str(rnk).strip().upper()
             if rank_str in ['DNS', 'NAN', '']:
                 continue
             
-            rider_name = str(row['Rider']).strip()
-            gekoppelde_naam = match_uitslag_naam(rider_name, alle_renners)
+            rider_name = str(rider).strip()
+            if rider_name not in match_cache:
+                match_cache[rider_name] = match_uitslag_naam(rider_name, alle_renners)
+            gekoppelde_naam = match_cache[rider_name]
             
             uitslag_parsed.append({
                 "Race": koers,
@@ -447,14 +446,14 @@ with st.sidebar:
     
     if actieve_koersen:
         st.success(f"✅ Gereden koersen gedetecteerd (t/m {actieve_koersen[-1]})")
-        toon_uitslagen = st.checkbox("🏁 Koersen zijn begonnen (Toon uitslagen)", value=True)
+        toon_uitslagen = st.checkbox("🏁 Koersen zijn begonnen (Toon uitslagen)", value=True, help="Vervangt verwachte punten door echte uitslagen in de tabellen zodra een koers is gereden.")
         if st.checkbox("🔮 Toon alleen Resterende EV", value=True, help="Negeer behaalde punten."):
             skip_races = actieve_koersen
     else:
         toon_uitslagen = False
 
-    ev_method = st.selectbox("🧮 Rekenmodel (EV)", ["1. Scorito Ranking (Dynamisch)", "2. Originele Curve (Macht 4)", "3. Extreme Curve (Macht 10)", "4. Tiers & Spreiding (Realistisch)"])
-    use_transfers = st.checkbox("🔁 Bereken met wissel-strategie", value=True)
+    ev_method = st.selectbox("🧮 Rekenmodel (EV)", ["1. Scorito Ranking (Dynamisch)", "2. Originele Curve (Macht 4)", "3. Extreme Curve (Macht 10)", "4. Tiers & Spreiding (Realistisch)"], help="Kies hoe de AI punten berekent. 'Scorito Ranking' gebruikt een vlakkere verdeling, macht-curves geven extreme bonussen aan absolute specialisten.")
+    use_transfers = st.checkbox("🔁 Bereken met wissel-strategie", value=True, help="Laat de AI automatisch bepalen wie en wanneer je moet wisselen om binnen budget te blijven.")
     
     t_moments = ["GEEN", "GEEN", "GEEN"]
     if use_transfers:

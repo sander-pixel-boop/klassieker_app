@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import unicodedata
 import os
+import functools
 from thefuzz import process, fuzz
 from utils.db import init_connection
 from datetime import datetime
@@ -74,12 +75,19 @@ ETAPPE_WEIGHTS = {
 }
 
 # --- HULPFUNCTIES ---
+@functools.lru_cache(maxsize=1024)
 def normalize_name(text):
     if not isinstance(text, str): return ""
     text = text.lower().strip()
     return "".join(c for c in unicodedata.normalize('NFKD', text) if not unicodedata.combining(c))
 
-def match_naam(naam, alle_renners):
+@functools.lru_cache(maxsize=32)
+def get_norm_lijst(alle_renners_tuple):
+    return {normalize_name(r): r for r in alle_renners_tuple}
+
+@functools.lru_cache(maxsize=2048)
+def match_naam_cached(naam, alle_renners_tuple):
+    """Gecachte versie van naam matching om dure fuzzy matching te voorkomen."""
     naam_norm = normalize_name(naam)
     bekende = {
         "pogacar": "tadej pogačar", "van der poel": "mathieu van der poel",
@@ -88,14 +96,20 @@ def match_naam(naam, alle_renners):
     }
     for key, correct in bekende.items():
         if key in naam_norm:
-            for r in alle_renners:
+            for r in alle_renners_tuple:
                 if correct in normalize_name(r): return r
-    norm_lijst = {normalize_name(r): r for r in alle_renners}
+
+    norm_lijst = get_norm_lijst(alle_renners_tuple)
     if naam_norm in norm_lijst: return norm_lijst[naam_norm]
+
     bests = process.extractBests(naam_norm, list(norm_lijst.keys()), scorer=fuzz.token_set_ratio, limit=3)
     if bests and bests[0][1] >= 75:
         return norm_lijst[bests[0][0]]
     return naam
+
+def match_naam(naam, alle_renners):
+    """Wrapper voor backwards compatibility en om lists naar tuples te casten voor caching."""
+    return match_naam_cached(naam, tuple(alle_renners))
 
 @st.cache_data
 def load_stats():
@@ -175,9 +189,12 @@ def bepaal_starters_en_kopman(team_renners, etappe_id, etappe_keuzes, df_stats, 
 def bereken_etappe_score(starters, kopman, etappe_id, df_uitslag_etappe, alle_renners):
     """Berekent de totale score voor één etappe."""
     punten_per_renner = {}
+    # Cache de lijst van namen in de uitslag om herhaalde .tolist() en tuple conversies te voorkomen
+    uitslag_namen_tuple = tuple(df_uitslag_etappe['Renner_Matched'].values)
+
     for renner in starters:
         # Match naam in uitslag
-        gematcht = match_naam(renner, df_uitslag_etappe['Renner_Matched'].tolist())
+        gematcht = match_naam_cached(renner, uitslag_namen_tuple)
         rij = df_uitslag_etappe[df_uitslag_etappe['Renner_Matched'] == gematcht]
         if rij.empty:
             punten_per_renner[renner] = {"punten": 0, "positie": None, "kopman": renner == kopman}

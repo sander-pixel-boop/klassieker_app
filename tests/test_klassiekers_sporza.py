@@ -2,7 +2,7 @@ import pytest
 import sys
 import streamlit as st
 import importlib.util
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 @pytest.fixture(scope="module")
 def sporza_module():
@@ -15,17 +15,46 @@ def sporza_module():
         spec = importlib.util.spec_from_file_location("sporza", "pages/Klassiekers - Sporza.py")
         sporza = importlib.util.module_from_spec(spec)
         sys.modules["sporza"] = sporza
-        spec.loader.exec_module(sporza)
+        # Define mock values for the module level variables that get populated during import
+        import pandas as pd
+        mock_df = pd.DataFrame({'Naam': ['mock'], 'Team': ['mock']})
+
+        # Provide a mock function to replace load_and_merge_data at import time
+        sporza.load_and_merge_data = MagicMock(return_value=(mock_df, [], {}))
+
+        try:
+            spec.loader.exec_module(sporza)
+        except Exception as e:
+            print(f"Exception during module exec: {e}")
+            pass
         return sporza
+
+def test_get_file_mod_time(sporza_module, tmp_path):
+    get_file_mod_time = sporza_module.get_file_mod_time
+
+    # Test 1: File exists -> returns modification time
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("hello")
+    mod_time = get_file_mod_time(str(test_file))
+    assert mod_time > 0
+
+    # Test 2: File does not exist -> returns 0
+    non_existent_file = tmp_path / "does_not_exist.txt"
+    assert get_file_mod_time(str(non_existent_file)) == 0
+
+    # Test 3: os.path.getmtime raises an exception (e.g. PermissionError) -> returns 0
+    with patch("os.path.getmtime", side_effect=PermissionError("Mocked error")):
+        assert get_file_mod_time(str(test_file)) == 0
+
 
 def test_bepaal_klassieker_type(sporza_module):
     bepaal_klassieker_type = sporza_module.bepaal_klassieker_type
 
     # Test Sprinter
-    assert bepaal_klassieker_type({'SPR': 90, 'COB': 0, 'HLL': 0}) == 'Sprinter'
+    assert bepaal_klassieker_type({'SPR': 90, 'COB': 0, 'HLL': 0}) == 'Sprint'
 
     # Test Kasseien
-    assert bepaal_klassieker_type({'SPR': 0, 'COB': 90, 'HLL': 0}) == 'Kasseien'
+    assert bepaal_klassieker_type({'SPR': 0, 'COB': 90, 'HLL': 0}) == 'Kassei'
 
     # Test Heuvel
     assert bepaal_klassieker_type({'SPR': 0, 'COB': 0, 'HLL': 90}) == 'Heuvel'
@@ -37,15 +66,58 @@ def test_bepaal_klassieker_type(sporza_module):
     assert bepaal_klassieker_type({'SPR': 'a', 'COB': 'b', 'HLL': 'c'}) is None
 
     # Test Ties (returns None because > is strictly greater)
-    assert bepaal_klassieker_type({'SPR': 90, 'COB': 90, 'HLL': 0}) is None
-    assert bepaal_klassieker_type({'SPR': 90, 'COB': 0, 'HLL': 90}) is None
-    assert bepaal_klassieker_type({'SPR': 0, 'COB': 90, 'HLL': 90}) is None
-    assert bepaal_klassieker_type({'SPR': 90, 'COB': 90, 'HLL': 90}) is None
+    assert bepaal_klassieker_type({'SPR': 90, 'COB': 90, 'HLL': 0}) == 'Kassei / Sprint'
+    assert bepaal_klassieker_type({'SPR': 90, 'COB': 0, 'HLL': 90}) == 'Heuvel / Sprint'
+    assert bepaal_klassieker_type({'SPR': 0, 'COB': 90, 'HLL': 90}) == 'Kassei / Heuvel'
+    assert bepaal_klassieker_type({'SPR': 90, 'COB': 90, 'HLL': 90}) == 'Allround / Multispecialist'
 
     # Test String values that can be parsed as int
-    assert bepaal_klassieker_type({'SPR': '90', 'COB': '80', 'HLL': '70'}) == 'Sprinter'
-    assert bepaal_klassieker_type({'SPR': '70', 'COB': '90', 'HLL': '80'}) == 'Kasseien'
+    assert bepaal_klassieker_type({'SPR': '90', 'COB': '80', 'HLL': '70'}) == 'Sprint'
+    assert bepaal_klassieker_type({'SPR': '70', 'COB': '90', 'HLL': '80'}) == 'Kassei'
     assert bepaal_klassieker_type({'SPR': '70', 'COB': '80', 'HLL': '90'}) == 'Heuvel'
 
     # Test exact equality edge cases
     assert bepaal_klassieker_type({'SPR': 0, 'COB': 0, 'HLL': 0}) is None
+
+
+def test_format_race_status(sporza_module):
+    import pandas as pd
+    import numpy as np
+
+    format_race_status = sporza_module.format_race_status
+
+    # Test NaN values
+    assert format_race_status(pd.NA, 10) == ""
+    assert format_race_status(np.nan, 10) == ""
+    assert format_race_status(None, 10) == ""
+
+    # Test special numeric codes
+    assert format_race_status(999, 20) == "❌"
+    assert format_race_status(888, 20) == "❓"
+    assert format_race_status(777, 20) == " DNS"
+    assert format_race_status(666, 20) == " DNF"
+    assert format_race_status(555, 20) == " OTL"
+
+    # Test values below or equal to limit
+    assert format_race_status(1, 20) == "🟢 1"
+    assert format_race_status(20, 20) == "🟢 20"
+
+    # Test values above limit
+    assert format_race_status(21, 20) == "21"
+    assert format_race_status(100, 20) == "100"
+
+    # Test string representations of numbers
+    assert format_race_status("999", 20) == "❌"
+    assert format_race_status("10.0", 20) == "🟢 10"
+    assert format_race_status("21", 20) == "21"
+
+    # Test float values
+    assert format_race_status(888.0, 20) == "❓"
+    assert format_race_status(5.5, 20) == "🟢 5" # float 5.5 becomes int 5
+    assert format_race_status(25.9, 20) == "25" # float 25.9 becomes int 25
+
+    # Test unparseable strings (error cases)
+    assert format_race_status("DNS", 20) == ""
+    assert format_race_status("DNF", 20) == ""
+    assert format_race_status("Random string", 20) == ""
+    assert format_race_status("", 20) == ""

@@ -1,15 +1,12 @@
 import streamlit as st
-import hashlib
 from utils.db import init_connection
+from utils.crypto import hash_wachtwoord
 
 st.set_page_config(page_title="Wieler Spellen Solver", page_icon="🚴‍♂️", layout="wide")
 
 # --- DATABASE CONNECTIE ---
 supabase = init_connection()
 TABEL_NAAM = "gebruikers_data_test"
-
-def hash_wachtwoord(wachtwoord):
-    return hashlib.sha256(wachtwoord.encode()).hexdigest()
 
 # --- INLOG PAGINA (Landingspagina Lay-out) ---
 def login_page():

@@ -22,7 +22,39 @@ mock_st.cache_data = dummy_cache_data
 # Mock st.cache_resource as well
 mock_st.cache_resource = dummy_cache_data
 
-from pages.Het_Spel import is_team_locked
+from pages.Het_Spel import is_team_locked, load_game_data, load_csv_data
+
+@patch('pages.Het_Spel.init_connection')
+def test_load_game_data_exception_handling(mock_init_connection):
+    """
+    Test that load_game_data handles exceptions during database operations gracefully
+    and returns an empty list.
+    """
+    # Force init_connection to raise an Exception to simulate connection or query failure
+    mock_init_connection.side_effect = Exception("Mocked exception during DB connection")
+
+    # Execute the function
+    result = load_game_data()
+
+    # Verify that it caught the exception and returned the fallback empty list
+    assert result == []
+
+@patch('pages.Het_Spel.pd.read_csv')
+def test_load_csv_data_exception_handling(mock_read_csv):
+    """
+    Test that load_csv_data handles exceptions during file reading gracefully
+    and returns the fallback values.
+    """
+    # Force pd.read_csv to raise an Exception
+    mock_read_csv.side_effect = Exception("Mocked exception during read")
+
+    # Execute the function
+    df, races, k_map = load_csv_data()
+
+    # Verify that it caught the exception and returned the fallback values
+    assert df['Renner'].tolist() == ['Wout van Aert', 'Mathieu van der Poel', 'Tadej Pogačar']
+    assert races == ["NOK", "MSR", "RVV"]
+    assert k_map == {}
 
 @patch('pages.Het_Spel.os.path.exists')
 @patch('pages.Het_Spel.pd.read_csv')
