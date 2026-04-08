@@ -56,15 +56,15 @@ def get_uitslagen(file_mod_time, alle_renners):
         }
             
         uitslag_parsed = []
-        for index, row in df_raw_uitslagen.iterrows():
-            koers_origineel = str(row['Race']).strip().upper()
+        for row in df_raw_uitslagen.itertuples(index=False):
+            koers_origineel = str(row.Race).strip().upper()
             koers = sporza_naar_scorito_map.get(koers_origineel, koers_origineel)
             
-            rank_str = str(row['Rnk']).strip().upper()
+            rank_str = str(row.Rnk).strip().upper()
             if rank_str in ['DNS', 'NAN', '']:
                 continue
             
-            rider_name = str(row['Rider']).strip()
+            rider_name = str(row.Rider).strip()
             gekoppelde_naam = match_uitslag_naam(rider_name, alle_renners)
             
             uitslag_parsed.append({
