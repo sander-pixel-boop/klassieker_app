@@ -23,7 +23,10 @@ TABEL_NAAM = "gebruikers_data_test"
 
 # --- HULPFUNCTIES ---
 def get_file_mod_time(filepath):
-    return os.path.getmtime(filepath) if os.path.exists(filepath) else 0
+    try:
+        return os.path.getmtime(filepath)
+    except Exception:
+        return 0
 
 # --- OPMAAK & SORTEER LOGICA ---
 def get_numeric_status(is_on_startlist, is_starter, is_verreden=False, rank_str=None):
