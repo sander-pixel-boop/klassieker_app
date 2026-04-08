@@ -7,7 +7,25 @@ mock_st = MagicMock()
 mock_st.secrets = {"CRYPTO_SALT": "GeheimeKlassiekerSleutel2026"}
 sys.modules["streamlit"] = mock_st
 
-from utils.crypto import generate_signature
+from utils.crypto import generate_signature, hash_wachtwoord
+
+def test_hash_wachtwoord_basic():
+    ww = "test1234"
+    # SHA-256 for "test1234"
+    expected = "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244"
+    assert hash_wachtwoord(ww) == expected
+
+def test_hash_wachtwoord_deterministic():
+    ww = "cycling2024"
+    assert hash_wachtwoord(ww) == hash_wachtwoord(ww)
+
+def test_hash_wachtwoord_distinct():
+    assert hash_wachtwoord("wachtwoord1") != hash_wachtwoord("wachtwoord2")
+
+def test_hash_wachtwoord_empty():
+    # SHA-256 for empty string
+    expected = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    assert hash_wachtwoord("") == expected
 
 def test_generate_signature_basic():
     data = {"name": "Wout", "team": "Visma"}
