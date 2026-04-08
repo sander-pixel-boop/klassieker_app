@@ -443,14 +443,14 @@ with st.sidebar:
     
     if actieve_koersen:
         st.success(f"✅ Gereden koersen gedetecteerd (t/m {actieve_koersen[-1]})")
-        toon_uitslagen = st.checkbox("🏁 Koersen zijn begonnen (Toon uitslagen)", value=True)
+        toon_uitslagen = st.checkbox("🏁 Koersen zijn begonnen (Toon uitslagen)", value=True, help="Vervangt verwachte punten door echte uitslagen in de tabellen zodra een koers is gereden.")
         if st.checkbox("🔮 Toon alleen Resterende EV", value=True, help="Negeer behaalde punten."):
             skip_races = actieve_koersen
     else:
         toon_uitslagen = False
 
-    ev_method = st.selectbox("🧮 Rekenmodel (EV)", ["1. Scorito Ranking (Dynamisch)", "2. Originele Curve (Macht 4)", "3. Extreme Curve (Macht 10)", "4. Tiers & Spreiding (Realistisch)"])
-    use_transfers = st.checkbox("🔁 Bereken met wissel-strategie", value=True)
+    ev_method = st.selectbox("🧮 Rekenmodel (EV)", ["1. Scorito Ranking (Dynamisch)", "2. Originele Curve (Macht 4)", "3. Extreme Curve (Macht 10)", "4. Tiers & Spreiding (Realistisch)"], help="Kies hoe de AI punten berekent. 'Scorito Ranking' gebruikt een vlakkere verdeling, macht-curves geven extreme bonussen aan absolute specialisten.")
+    use_transfers = st.checkbox("🔁 Bereken met wissel-strategie", value=True, help="Laat de AI automatisch bepalen wie en wanneer je moet wisselen om binnen budget te blijven.")
     
     t_moments = ["GEEN", "GEEN", "GEEN"]
     if use_transfers:

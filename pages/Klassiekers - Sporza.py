@@ -374,12 +374,12 @@ with st.sidebar:
 
     st.divider()
     st.title("🚴 Sporza AI Coach")
-    ev_method = st.selectbox("🧮 Rekenmodel (EV)", ["1. Sporza Ranking (Dynamisch)", "2. Originele Curve (Macht 4)"])
-    toon_uitslagen = st.checkbox("🏁 Koersen zijn begonnen (Toon uitslagen)", value=True)
+    ev_method = st.selectbox("🧮 Rekenmodel (EV)", ["1. Sporza Ranking (Dynamisch)", "2. Originele Curve (Macht 4)"], help="Kies hoe de AI punten berekent. 'Originele Curve' geeft exponentiële waarde aan specialisten.")
+    toon_uitslagen = st.checkbox("🏁 Koersen zijn begonnen (Toon uitslagen)", value=True, help="Toont daadwerkelijke uitslagen en medailles in plaats van alleen de verwachte matrix.")
     
     st.divider()
     st.markdown("### 🔁 Transfer Strategie")
-    num_transfers = st.slider("Aantal geplande transfers", 0, 5, 0)
+    num_transfers = st.slider("Aantal geplande transfers", 0, 5, 0, help="Selecteer het aantal transfers dat je wilt plannen voor de berekening.")
     
     t_moments = []
     if num_transfers > 0:
