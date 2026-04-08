@@ -44,18 +44,26 @@ def get_numeric_status(is_on_startlist, is_starter, is_verreden=False, rank_str=
         return 999
 
 def format_race_status(val, limit):
-    if pd.isna(val): return ""
+    if pd.isna(val):
+        return ""
     try:
-        v = int(float(val))
+        v = float(val)
+        if v == 999:
+            return "❌"
+        elif v == 888:
+            return "❓"
+        elif v == 777:
+            return " DNS"
+        elif v == 666:
+            return " DNF"
+        elif v == 555:
+            return " OTL"
+        elif v <= limit:
+            return f"🟢 {int(v)}"
+        else:
+            return f"{int(v)}"
     except:
-        return str(val)
-        
-    if v == 999: return "-"
-    if v == 998: return "🪑"
-    if v == 997: return "✅"
-    if v == 996: return "❌ DNF"
-    if v <= limit: return f"🏅 {v}"
-    return str(v)
+        return ""
 
 # --- DATA LADEN (SPORZA SPECIFIEK) ---
 @st.cache_data

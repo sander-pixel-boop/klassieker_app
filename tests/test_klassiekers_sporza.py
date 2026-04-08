@@ -67,3 +67,46 @@ def test_bepaal_klassieker_type(sporza_module):
 
     # Test exact equality edge cases
     assert bepaal_klassieker_type({'SPR': 0, 'COB': 0, 'HLL': 0}) == 'Onbekend'
+
+
+def test_format_race_status(sporza_module):
+    import pandas as pd
+    import numpy as np
+
+    format_race_status = sporza_module.format_race_status
+
+    # Test NaN values
+    assert format_race_status(pd.NA, 10) == ""
+    assert format_race_status(np.nan, 10) == ""
+    assert format_race_status(None, 10) == ""
+
+    # Test special numeric codes
+    assert format_race_status(999, 20) == "❌"
+    assert format_race_status(888, 20) == "❓"
+    assert format_race_status(777, 20) == " DNS"
+    assert format_race_status(666, 20) == " DNF"
+    assert format_race_status(555, 20) == " OTL"
+
+    # Test values below or equal to limit
+    assert format_race_status(1, 20) == "🟢 1"
+    assert format_race_status(20, 20) == "🟢 20"
+
+    # Test values above limit
+    assert format_race_status(21, 20) == "21"
+    assert format_race_status(100, 20) == "100"
+
+    # Test string representations of numbers
+    assert format_race_status("999", 20) == "❌"
+    assert format_race_status("10.0", 20) == "🟢 10"
+    assert format_race_status("21", 20) == "21"
+
+    # Test float values
+    assert format_race_status(888.0, 20) == "❓"
+    assert format_race_status(5.5, 20) == "🟢 5" # float 5.5 becomes int 5
+    assert format_race_status(25.9, 20) == "25" # float 25.9 becomes int 25
+
+    # Test unparseable strings (error cases)
+    assert format_race_status("DNS", 20) == ""
+    assert format_race_status("DNF", 20) == ""
+    assert format_race_status("Random string", 20) == ""
+    assert format_race_status("", 20) == ""
