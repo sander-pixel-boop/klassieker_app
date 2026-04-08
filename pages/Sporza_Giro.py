@@ -154,7 +154,7 @@ def load_giro_data():
             st.error("🚨 Fout in de startlijst: de kolom `Prijs` is niet gevonden.")
             return pd.DataFrame()
 
-        merged_df['Prijs'] = pd.to_numeric(merged_df['Prijs'], errors='coerce').fillna(0)
+        merged_df['Prijs'] = pd.to_numeric(merged_df['Prijs'], errors='coerce').fillna(0.0).astype(float)
         merged_df.loc[merged_df['Prijs'] > 1000, 'Prijs'] = merged_df['Prijs'] / 1000000
         merged_df.loc[merged_df['Prijs'] == 0.8, 'Prijs'] = 0.75
 
