@@ -81,6 +81,10 @@ def normalize_name(text):
     text = text.lower().strip()
     return "".join(c for c in unicodedata.normalize('NFKD', text) if not unicodedata.combining(c))
 
+@functools.lru_cache(maxsize=32)
+def get_norm_lijst(alle_renners_tuple):
+    return {normalize_name(r): r for r in alle_renners_tuple}
+
 @functools.lru_cache(maxsize=2048)
 def match_naam_cached(naam, alle_renners_tuple):
     """Gecachte versie van naam matching om dure fuzzy matching te voorkomen."""
@@ -95,7 +99,7 @@ def match_naam_cached(naam, alle_renners_tuple):
             for r in alle_renners_tuple:
                 if correct in normalize_name(r): return r
 
-    norm_lijst = {normalize_name(r): r for r in alle_renners_tuple}
+    norm_lijst = get_norm_lijst(alle_renners_tuple)
     if naam_norm in norm_lijst: return norm_lijst[naam_norm]
 
     bests = process.extractBests(naam_norm, list(norm_lijst.keys()), scorer=fuzz.token_set_ratio, limit=3)
