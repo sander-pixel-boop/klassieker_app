@@ -19,15 +19,15 @@ def get_uitslagen_old(file_mod_time, alle_renners):
         }
 
         uitslag_parsed = []
-        for index, row in df_raw_uitslagen.iterrows():
-            koers_origineel = str(row['Race']).strip().upper()
+        for row in df_raw_uitslagen.itertuples():
+            koers_origineel = str(row.Race).strip().upper()
             koers = scorito_naar_sporza_map.get(koers_origineel, koers_origineel)
 
-            rank_str = str(row['Rnk']).strip().upper()
+            rank_str = str(row.Rnk).strip().upper()
             if rank_str in ['DNS', 'NAN', '']:
                 continue
 
-            rider_name = str(row['Rider']).strip()
+            rider_name = str(row.Rider).strip()
             match = process.extractOne(rider_name, alle_renners, scorer=fuzz.token_set_ratio)
             if match and match[1] > 70:
                 uitslag_parsed.append({
