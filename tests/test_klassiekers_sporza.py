@@ -18,6 +18,24 @@ def sporza_module():
         spec.loader.exec_module(sporza)
         return sporza
 
+def test_get_file_mod_time(sporza_module, tmp_path):
+    get_file_mod_time = sporza_module.get_file_mod_time
+
+    # Test 1: File exists -> returns modification time
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("hello")
+    mod_time = get_file_mod_time(str(test_file))
+    assert mod_time > 0
+
+    # Test 2: File does not exist -> returns 0
+    non_existent_file = tmp_path / "does_not_exist.txt"
+    assert get_file_mod_time(str(non_existent_file)) == 0
+
+    # Test 3: os.path.getmtime raises an exception (e.g. PermissionError) -> returns 0
+    with patch("os.path.getmtime", side_effect=PermissionError("Mocked error")):
+        assert get_file_mod_time(str(test_file)) == 0
+
+
 def test_bepaal_klassieker_type(sporza_module):
     bepaal_klassieker_type = sporza_module.bepaal_klassieker_type
 

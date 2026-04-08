@@ -30,7 +30,10 @@ def normalize_name_logic(text):
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
 def get_file_mod_time(filepath):
-    return os.path.getmtime(filepath) if os.path.exists(filepath) else 0
+    try:
+        return os.path.getmtime(filepath)
+    except Exception:
+        return 0
 
 # --- OPMAAK & SORTEER LOGICA ---
 def get_numeric_status(is_on_startlist, is_starter, is_verreden=False, rank_str=None):
