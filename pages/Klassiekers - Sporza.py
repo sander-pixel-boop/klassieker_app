@@ -637,7 +637,7 @@ else:
 with tab4:
     st.header("📋 Database: Alle Renners (Sporza Prijzen)")
     col_f1, col_f2, col_f3 = st.columns(3)
-    with col_f1: search_name = st.text_input("🔍 Zoek op naam of Ploeg:")
+    with col_f1: search_name = st.text_input("🔍 Zoek op naam of Ploeg:", placeholder="bijv. Van Aert of Visma")
     with col_f2: price_filter = st.slider("💰 Prijs range (Miljoen)", int(df['Prijs'].min()), int(df['Prijs'].max()), (int(df['Prijs'].min()), int(df['Prijs'].max())), 1)
     with col_f3: race_filter = st.multiselect("🏁 Rijdt geselecteerde koersen:", options=available_races)
 
