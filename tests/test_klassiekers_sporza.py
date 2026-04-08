@@ -49,3 +49,31 @@ def test_bepaal_klassieker_type(sporza_module):
 
     # Test exact equality edge cases
     assert bepaal_klassieker_type({'SPR': 0, 'COB': 0, 'HLL': 0}) == 'Onbekend'
+
+def test_get_numeric_status(sporza_module):
+    get_numeric_status = sporza_module.get_numeric_status
+
+    # Tests for when race has NOT been ridden yet (is_verreden=False)
+    assert get_numeric_status(is_on_startlist=False, is_starter=False, is_verreden=False) == 999
+    assert get_numeric_status(is_on_startlist=True, is_starter=False, is_verreden=False) == 888
+    assert get_numeric_status(is_on_startlist=True, is_starter=True, is_verreden=False) == 888
+
+    # Tests for when race HAS been ridden (is_verreden=True)
+
+    # Valid digit strings
+    assert get_numeric_status(is_on_startlist=True, is_starter=True, is_verreden=True, rank_str="1") == 1.0
+    assert get_numeric_status(is_on_startlist=True, is_starter=True, is_verreden=True, rank_str=" 42 ") == 42.0
+
+    # Special codes (DNS, DNF, OTL)
+    assert get_numeric_status(is_on_startlist=True, is_starter=True, is_verreden=True, rank_str="DNS") == 777
+    assert get_numeric_status(is_on_startlist=True, is_starter=True, is_verreden=True, rank_str="dns ") == 777
+    assert get_numeric_status(is_on_startlist=True, is_starter=True, is_verreden=True, rank_str="DNF") == 666
+    assert get_numeric_status(is_on_startlist=True, is_starter=True, is_verreden=True, rank_str="dnf") == 666
+    assert get_numeric_status(is_on_startlist=True, is_starter=True, is_verreden=True, rank_str="OTL") == 555
+
+    # Unparseable strings not matching special codes
+    assert get_numeric_status(is_on_startlist=True, is_starter=True, is_verreden=True, rank_str="UNKNOWN") == 999
+
+    # Empty or None rank_str (falls back to starter check)
+    assert get_numeric_status(is_on_startlist=True, is_starter=True, is_verreden=True, rank_str="") == 666
+    assert get_numeric_status(is_on_startlist=True, is_starter=False, is_verreden=True, rank_str=None) == 777

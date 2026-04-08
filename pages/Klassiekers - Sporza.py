@@ -35,17 +35,24 @@ def get_file_mod_time(filepath):
 # --- OPMAAK & SORTEER LOGICA ---
 def get_numeric_status(is_on_startlist, is_starter, is_verreden=False, rank_str=None):
     if is_verreden:
-        if rank_str and str(rank_str) not in ['nan', 'None', 'DNS', '']:
-            if str(rank_str).isdigit():
-                return int(rank_str)
-            else:
-                return 996 # DNF
+        if pd.notna(rank_str) and str(rank_str).strip() != "":
+            r = str(rank_str).strip().upper()
+            if r == "DNS": return 777
+            if r == "DNF": return 666
+            if r == "OTL": return 555
+            try:
+                return float(r)
+            except:
+                return 999
+        if is_starter:
+            return 666  # Gestart maar geen uitslag -> DNF
         else:
-            return 996 if is_on_startlist else 999
+            return 777  # Niet gestart -> DNS
     else:
         if is_on_startlist:
-            return 997 if is_starter else 998
-        return 999
+            return 888 # ❓ Staat op startlijst (nog niet gereden)
+        else:
+            return 999 # ❌ Doet (voorlopig) niet mee
 
 def format_race_status(val, limit):
     if pd.isna(val): return ""
@@ -54,10 +61,11 @@ def format_race_status(val, limit):
     except:
         return str(val)
         
-    if v == 999: return "-"
-    if v == 998: return "🪑"
-    if v == 997: return "✅"
-    if v == 996: return "❌ DNF"
+    if v == 999: return "❌"
+    if v == 888: return "❓"
+    if v == 777: return "DNS"
+    if v == 666: return "❌ DNF"
+    if v == 555: return "OTL"
     if v <= limit: return f"🏅 {v}"
     return str(v)
 
