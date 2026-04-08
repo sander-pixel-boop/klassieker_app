@@ -460,7 +460,10 @@ with tab2:
             .reset_index()
             .sort_values(by="Punten", ascending=False)
         )
-        draft_summary = pd.merge(draft_summary, df[['Naam', 'Prijs', 'EV']], on='Naam', how='left')
+        merge_cols = ['Naam', 'Ploeg', 'Type', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV']
+        # Alleen kolommen mergen die in df bestaan
+        merge_cols = [c for c in merge_cols if c in df.columns]
+        draft_summary = pd.merge(draft_summary, df[merge_cols], on='Naam', how='left')
         st.dataframe(draft_summary, hide_index=True, use_container_width=True)
         draft_counts = dict(zip(draft_summary['Naam'], draft_summary['Punten']))
     else:
@@ -504,16 +507,69 @@ with tab2:
     st.divider()
     st.subheader("3. Jouw Definitieve Selectie")
     if not huidig_team_df.empty:
+        # Bepaal de reden van toevoeging voor elke renner in de selectie
+        def bepalen_reden(renner_naam):
+            if renner_naam in draft_counts:
+                return "Geselecteerd in voorspellingen"
+            return "Toegevoegd via optimaal algoritme (EV)"
+
+        huidig_team_df['Reden'] = huidig_team_df['Naam'].apply(bepalen_reden)
+
         col_grafiek, col_tabel = st.columns([1, 2])
         with col_grafiek:
             plot_cols = [c for c in ['GC', 'SPR', 'ITT', 'MTN'] if c in huidig_team_df.columns]
             if plot_cols:
                 st.bar_chart(huidig_team_df[plot_cols].mean())
         with col_tabel:
+            display_cols = ['Naam', 'Ploeg', 'Type', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV', 'Reden']
+            display_cols = [c for c in display_cols if c in huidig_team_df.columns]
             st.dataframe(
-                huidig_team_df[['Naam', 'Ploeg', 'Type', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV']].sort_values('Prijs', ascending=False),
+                huidig_team_df[display_cols].sort_values('Prijs', ascending=False),
                 hide_index=True, use_container_width=True
             )
+        # Wissel Renners Tool
+        st.divider()
+        st.subheader("🔄 Wissel Renners")
+        st.write("Wissel een renner uit je huidige selectie voor een nieuwe renner binnen het beschikbare budget.")
+
+        col_uit, col_in, col_btn = st.columns([2, 2, 1])
+
+        with col_uit:
+            renner_uit = st.selectbox("Kies renner om te verwijderen:", options=["-"] + sorted(st.session_state.finaal_team))
+
+        with col_in:
+            if renner_uit != "-":
+                # Bereken budget dat vrijkomt
+                prijs_uit = huidig_team_df[huidig_team_df['Naam'] == renner_uit]['Prijs'].values[0]
+                nieuw_budget = (100 - totaal_prijs) + prijs_uit
+
+                # Filter beschikbare renners
+                beschikbare_renners_df = df[
+                    (~df['Naam'].isin(st.session_state.finaal_team)) &
+                    (df['Prijs'] <= nieuw_budget)
+                ].sort_values(['Prijs', 'EV'], ascending=[False, False])
+
+                opties_in = ["-"] + [f"{r.Naam} (€{r.Prijs}M)" for r in beschikbare_renners_df.itertuples()]
+                renner_in_display = st.selectbox(f"Kies renner om toe te voegen (Max €{nieuw_budget:.2f}M):", options=opties_in)
+                renner_in = renner_in_display.split(" (€")[0] if renner_in_display != "-" else "-"
+            else:
+                st.selectbox("Kies renner om toe te voegen:", options=["-"], disabled=True)
+                renner_in = "-"
+
+        with col_btn:
+            st.write("") # Padding voor uitlijning
+            st.write("")
+            if renner_uit != "-" and renner_in != "-":
+                if st.button("🔄 Wissel Uitvoeren", type="primary", use_container_width=True):
+                    # Update finaal team
+                    nieuw_team = [r for r in st.session_state.finaal_team if r != renner_uit]
+                    nieuw_team.append(renner_in)
+                    st.session_state.finaal_team = nieuw_team
+                    st.success(f"{renner_uit} is gewisseld voor {renner_in}!")
+                    st.rerun()
+            else:
+                st.button("🔄 Wissel Uitvoeren", disabled=True, use_container_width=True)
+
     else:
         st.info("Selecteer hierboven je team.")
 
