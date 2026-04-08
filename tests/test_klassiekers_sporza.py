@@ -18,9 +18,9 @@ def sporza_module():
         spec.loader.exec_module(sporza)
         return sporza
 
-def test_bepaal_klassieker_type(sporza_module):
-    bepaal_klassieker_type = sporza_module.bepaal_klassieker_type
+from utils.klassieker import bepaal_klassieker_type
 
+def test_bepaal_klassieker_type():
     # Test Sprinter
     assert bepaal_klassieker_type({'SPR': 90, 'COB': 0, 'HLL': 0}) == 'Sprint'
 

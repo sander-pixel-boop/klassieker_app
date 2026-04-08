@@ -5,6 +5,7 @@ import json
 import os
 import itertools
 from utils.db import init_connection
+from utils.klassieker import bepaal_klassieker_type
 from datetime import datetime
 from utils.name_matching import normalize_name_logic, match_naam_slim, match_uitslag_naam
 
@@ -89,19 +90,6 @@ def evaluate_plan_ev(df_eval, base_team, plan, available_races):
             if not res.empty: 
                 totaal += res.values[0]
     return totaal
-
-def bepaal_klassieker_type(row):
-    cob, hll, spr = row.get('COB', 0), row.get('HLL', 0), row.get('SPR', 0)
-    elite = []
-    if cob >= 85: elite.append('Kassei')
-    if hll >= 85: elite.append('Heuvel')
-    if spr >= 85: elite.append('Sprint')
-    if len(elite) == 3: return 'Allround / Multispecialist'
-    elif len(elite) == 2: return ' / '.join(elite)
-    elif len(elite) == 1: return elite[0]
-    else:
-        s = {'Kassei': cob, 'Heuvel': hll, 'Sprint': spr, 'Klimmer': row.get('MTN', 0), 'Tijdrit': row.get('ITT', 0), 'Klassement': row.get('GC', 0)}
-        return max(s, key=s.get) if sum(s.values()) > 0 else 'Onbekend'
 
 def get_numeric_status(is_on_startlist, is_starter, is_verreden=False, rank_str=None):
     if is_verreden:
