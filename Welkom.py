@@ -1,15 +1,12 @@
 import streamlit as st
-import hashlib
 from utils.db import init_connection
+from utils.crypto import hash_password, verify_password
 
 st.set_page_config(page_title="Wieler Spellen Solver", page_icon="🚴‍♂️", layout="wide")
 
 # --- DATABASE CONNECTIE ---
 supabase = init_connection()
 TABEL_NAAM = "gebruikers_data_test"
-
-def hash_wachtwoord(wachtwoord):
-    return hashlib.sha256(wachtwoord.encode()).hexdigest()
 
 # --- INLOG PAGINA (Landingspagina Lay-out) ---
 def login_page():
@@ -55,9 +52,21 @@ def login_page():
                             with st.spinner("Aanmelden..."):
                                 try:
                                     res = supabase.table(TABEL_NAAM).select("password").eq("username", inlog_naam.lower()).execute()
-                                    if res.data and res.data[0].get("password") == hash_wachtwoord(inlog_ww):
-                                        st.session_state["ingelogde_speler"] = inlog_naam.lower()
-                                        st.rerun()
+                                    if res.data:
+                                        stored_hash = res.data[0].get("password")
+                                        if verify_password(inlog_ww, stored_hash):
+                                            # Upgrade hash if it's legacy
+                                            if not stored_hash.startswith("pbkdf2_sha256$"):
+                                                try:
+                                                    new_hash = hash_password(inlog_ww)
+                                                    supabase.table(TABEL_NAAM).update({"password": new_hash}).eq("username", inlog_naam.lower()).execute()
+                                                except Exception:
+                                                    pass # Non-critical if upgrade fails
+
+                                            st.session_state["ingelogde_speler"] = inlog_naam.lower()
+                                            st.rerun()
+                                        else:
+                                            st.error("❌ Onjuiste gebruikersnaam of wachtwoord.")
                                     else:
                                         st.error("❌ Onjuiste gebruikersnaam of wachtwoord.")
                                 except Exception as e:
@@ -82,7 +91,7 @@ def login_page():
                                         try:
                                             supabase.table(TABEL_NAAM).insert({
                                                 "username": nieuw_naam.lower(),
-                                                "password": hash_wachtwoord(nieuw_ww)
+                                                "password": hash_password(nieuw_ww)
                                             }).execute()
                                             st.success("✅ Account succesvol aangemaakt! Je kunt nu inloggen.")
                                         except Exception as e:
