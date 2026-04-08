@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import json
 import os
-import hashlib
 from datetime import datetime
 from thefuzz import process, fuzz
 from utils.db import init_connection
