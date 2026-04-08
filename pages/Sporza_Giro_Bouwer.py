@@ -487,13 +487,20 @@ with tab2:
     def update_finaal_team():
         st.session_state.finaal_team = st.session_state._finaal_team_selector
 
+    def format_rider(naam):
+        if naam not in df['Naam'].values: return naam
+        r = df[df['Naam'] == naam].iloc[0]
+        ploeg = r.get('Ploeg', r.get('Team', '-'))
+        return f"{naam} ({ploeg}) - {r['Type']} - €{r['Prijs']}M - EV: {int(r['EV'])}"
+
     st.multiselect(
         "Selecteer handmatig je 16 definitieve renners:",
         options=df['Naam'].tolist(),
         default=st.session_state.finaal_team,
         max_selections=16,
         key="_finaal_team_selector",
-        on_change=update_finaal_team
+        on_change=update_finaal_team,
+        format_func=format_rider
     )
 
     c1, c2, c3 = st.columns(3)
@@ -504,6 +511,17 @@ with tab2:
     st.divider()
     st.subheader("3. Jouw Definitieve Selectie")
     if not huidig_team_df.empty:
+        # Bepaal reden
+        ev_80th = df['EV'].quantile(0.8) if not df.empty else 0
+        def bepaal_reden(row):
+            if draft_counts.get(row['Naam'], 0) > 0:
+                return "Veel gekozen in etappes"
+            elif row['EV'] >= ev_80th:
+                return "Hoge algemene verwachting (EV)"
+            return "Opvulling / Budget pick"
+
+        huidig_team_df['Reden'] = huidig_team_df.apply(bepaal_reden, axis=1)
+
         col_grafiek, col_tabel = st.columns([1, 2])
         with col_grafiek:
             plot_cols = [c for c in ['GC', 'SPR', 'ITT', 'MTN'] if c in huidig_team_df.columns]
@@ -511,11 +529,65 @@ with tab2:
                 st.bar_chart(huidig_team_df[plot_cols].mean())
         with col_tabel:
             st.dataframe(
-                huidig_team_df[['Naam', 'Ploeg', 'Type', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV']].sort_values('Prijs', ascending=False),
+                huidig_team_df[['Naam', 'Ploeg', 'Type', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV', 'Reden']].sort_values('Prijs', ascending=False),
                 hide_index=True, use_container_width=True
             )
     else:
         st.info("Selecteer hierboven je team.")
+
+    st.divider()
+    st.subheader("4. Wissel Renners")
+    if not huidig_team_namen:
+        st.info("Stel eerst je team samen.")
+    else:
+        wissel_col1, wissel_col2 = st.columns(2)
+        with wissel_col1:
+            rider_out = st.selectbox(
+                "❌ Renner verwijderen uit team:",
+                options=sorted(huidig_team_namen)
+            )
+        with wissel_col2:
+            available_riders = sorted([r for r in df['Naam'].tolist() if r not in huidig_team_namen])
+            rider_in = st.selectbox(
+                "✅ Renner toevoegen aan team:",
+                options=available_riders
+            )
+
+        if rider_out and rider_in:
+            r_out_data = df[df['Naam'] == rider_out].iloc[0]
+            r_in_data = df[df['Naam'] == rider_in].iloc[0]
+
+            st.markdown("#### Vergelijking")
+            comp_c1, comp_c2 = st.columns(2)
+
+            prijs_delta = round(r_in_data['Prijs'] - r_out_data['Prijs'], 2)
+            ev_delta = int(r_in_data['EV'] - r_out_data['EV'])
+
+            with comp_c1:
+                st.markdown(f"**{rider_out}**")
+                st.caption(f"{r_out_data.get('Ploeg', r_out_data.get('Team', '-'))} | {r_out_data['Type']}")
+                st.metric("Prijs", f"€{r_out_data['Prijs']}M")
+                st.metric("EV", int(r_out_data['EV']))
+                st.markdown(f"**SPR:** {r_out_data['SPR']} | **GC:** {r_out_data['GC']} | **ITT:** {r_out_data['ITT']} | **MTN:** {r_out_data['MTN']}")
+
+            with comp_c2:
+                st.markdown(f"**{rider_in}**")
+                st.caption(f"{r_in_data.get('Ploeg', r_in_data.get('Team', '-'))} | {r_in_data['Type']}")
+                st.metric("Prijs", f"€{r_in_data['Prijs']}M", delta=f"{prijs_delta}M", delta_color="inverse")
+                st.metric("EV", int(r_in_data['EV']), delta=ev_delta)
+                st.markdown(f"**SPR:** {r_in_data['SPR']} | **GC:** {r_in_data['GC']} | **ITT:** {r_in_data['ITT']} | **MTN:** {r_in_data['MTN']}")
+
+            nieuw_budget = round(100 - totaal_prijs + r_out_data['Prijs'] - r_in_data['Prijs'], 2)
+
+            st.markdown(f"**Nieuw budget na wissel:** €{nieuw_budget}M")
+            if nieuw_budget < 0:
+                st.error("🚨 Deze wissel overschrijdt het budget!")
+
+            if st.button("🔄 Bevestig Wissel", disabled=nieuw_budget < 0, type="primary"):
+                st.session_state.finaal_team.remove(rider_out)
+                st.session_state.finaal_team.append(rider_in)
+                st.session_state._finaal_team_selector = list(st.session_state.finaal_team)
+                st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════
 # TAB 3 – OPSTELLINGEN MATRIX + KOPMAN OVERZICHT
