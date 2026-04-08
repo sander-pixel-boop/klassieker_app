@@ -12,6 +12,9 @@ def match_naam_slim(naam, dict_met_namen):
     naam_norm = normalize_name_logic(naam)
     lijst_met_namen = list(dict_met_namen.keys())
 
+    if naam_norm in lijst_met_namen:
+        return dict_met_namen[naam_norm]
+
     bekende_gevallen = {
         "philipsen": "jasper philipsen",
         "pedersen": "mads pedersen",
@@ -28,9 +31,6 @@ def match_naam_slim(naam, dict_met_namen):
                 if correct in target:
                     return dict_met_namen[target]
 
-    if naam_norm in lijst_met_namen:
-        return dict_met_namen[naam_norm]
-
     bests = process.extractBests(naam_norm, lijst_met_namen, scorer=fuzz.token_set_ratio, limit=5)
     if bests and bests[0][1] >= 75:
         top_score = bests[0][1]
@@ -42,6 +42,11 @@ def match_naam_slim(naam, dict_met_namen):
 
 def match_uitslag_naam(naam, alle_renners):
     naam_norm = normalize_name_logic(naam)
+
+    for target in alle_renners:
+        if naam_norm == normalize_name_logic(target):
+            return target
+
     bekende_gevallen = {
         "philipsen": "jasper philipsen",
         "pedersen": "mads pedersen",
