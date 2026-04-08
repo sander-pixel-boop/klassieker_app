@@ -460,7 +460,7 @@ with tab2:
             .reset_index()
             .sort_values(by="Punten", ascending=False)
         )
-        draft_summary = pd.merge(draft_summary, df[['Naam', 'Prijs', 'EV']], on='Naam', how='left')
+        draft_summary = pd.merge(draft_summary, df[['Naam', 'Ploeg', 'Type', 'Prijs', 'GC', 'SPR', 'ITT', 'MTN', 'EV']], on='Naam', how='left')
         st.dataframe(draft_summary, hide_index=True, use_container_width=True)
         draft_counts = dict(zip(draft_summary['Naam'], draft_summary['Punten']))
     else:
