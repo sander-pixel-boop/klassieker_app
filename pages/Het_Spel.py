@@ -192,7 +192,8 @@ with tab2:
             options=beschikbare_extras,
             default=[x for x in huidige_picks.get("extras", []) if x in beschikbare_extras],
             max_selections=3,
-            key=f"extras_{koers_keuze}"
+            key=f"extras_{koers_keuze}",
+            help="Selecteer eventuele extra renners voor deze specifieke koers."
         )
         st.session_state.game_picks[koers_keuze]["extras"] = gekozen_extras
 
@@ -232,7 +233,8 @@ with tab2:
             "Kies je Kopman (dubbele punten) uit je 13 actieve renners:",
             options=opties_kopman,
             index=idx_kopman,
-            key=f"kopman_{koers_keuze}"
+            key=f"kopman_{koers_keuze}",
+            help="Kies de kopman voor je team. Deze renner krijgt dubbele punten."
         )
         st.session_state.game_picks[koers_keuze]["kopman"] = gekozen_kopman if gekozen_kopman else None
 

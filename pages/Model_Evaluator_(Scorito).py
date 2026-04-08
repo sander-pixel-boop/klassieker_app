@@ -341,7 +341,7 @@ else:
             
             # Detail Analyse Sectie
             st.subheader("🔍 Inzoomen per Koers")
-            geselecteerde_koers = st.selectbox("Selecteer een koers om kopmannen en puntenopbouw in te zien:", verreden_koersen)
+            geselecteerde_koers = st.selectbox("Selecteer een koers om kopmannen en puntenopbouw in te zien:", verreden_koersen, help="Kies een koers om te analyseren hoe de modellen hebben gepresteerd.")
             
             if geselecteerde_koers:
                 st.markdown(f"**🎯 Kopmannen ({geselecteerde_koers})**")
