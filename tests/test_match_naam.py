@@ -12,12 +12,15 @@ def test_match_naam_slim_exact_match():
     # Setup mock dictionary
     dict_met_namen = {
         "remco evenepoel": "Remco Evenepoel",
-        "primoz roglic": "Primož Roglič"
+        "primoz roglic": "Primož Roglič",
+        "casper pedersen": "Casper Pedersen",
+        "mads pedersen": "Mads Pedersen"
     }
 
     # Exact normalized match
     assert match_naam_slim("Remco Evenepoel", dict_met_namen) == "Remco Evenepoel"
     assert match_naam_slim("Primoz Roglic", dict_met_namen) == "Primož Roglič"
+    assert match_naam_slim("Casper Pedersen", dict_met_namen) == "Casper Pedersen"
 
 def test_match_naam_slim_bekende_gevallen():
     # Setup mock dictionary containing canonical targets
@@ -90,3 +93,11 @@ def test_match_uitslag_naam_no_match():
     ]
 
     assert match_uitslag_naam("Biniam Girmay", alle_renners) == "Biniam Girmay"
+
+def test_match_uitslag_naam_edge_cases():
+    alle_renners = [
+        "Casper Pedersen",
+        "Mads Pedersen"
+    ]
+    # "Casper Pedersen" has "pedersen" in it, but shouldn't match "Mads Pedersen" since we have a direct match.
+    assert match_uitslag_naam("Casper Pedersen", alle_renners) == "Casper Pedersen"
