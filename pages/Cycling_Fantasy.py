@@ -83,36 +83,36 @@ def load_static_data():
 # --- PDF PARSER VOOR PCS STARTLIJSTEN ---
 def parse_pcs_pdf(uploaded_file):
     try:
-        pdf_reader = PdfReader(uploaded_file)
+        import pdfplumber
         text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
+        with pdfplumber.open(uploaded_file) as pdf:
+            for page in pdf.pages:
+                text += page.extract_text() + "\n"
         
-        raw_chunks = re.split(r'  +|\n', text)
-        potential_names = []
-        for chunk in raw_chunks:
-            chunk = chunk.strip()
-            if not chunk: continue
-            
-            # Zoek naar patronen zoals "1. Tadej Pogacar" of "121 Philipsen Jasper"
-            match = re.search(r'^\d{1,3}\.?\s+([A-Za-zÀ-ÖØ-öø-ÿ\-\'\s]{4,})', chunk)
-            if match:
-                name = match.group(1).strip()
-                name = re.sub(r'\s+\d+$', '', name).strip() # Verwijder leeftijd-getallen aan eind
-                potential_names.append(name)
-            elif len(chunk) > 5 and not any(char.isdigit() for char in chunk):
-                potential_names.append(chunk)
+        # Regex to find lines like: 123 VAN AERT Wout 100
+        # This is very brittle, usually better to look for patterns of uppercase words followed by Mixed case
+        import re
+        pattern = re.compile(r'\d+\s+([A-Z\s]+)\s+([A-Z][a-z\s]+)')
 
-        return pd.DataFrame({'Renner': potential_names})
+        riders = []
+        for line in text.split('\n'):
+            match = pattern.search(line)
+            if match:
+                last_name = match.group(1).strip()
+                first_name = match.group(2).strip()
+                riders.append(f"{first_name} {last_name}")
+
+        return riders
     except Exception as e:
-        st.error(f"Fout bij lezen PDF: {e}")
-        return pd.DataFrame()
+        st.error(f"Error parsing PDF: {e}")
+        return []
 
 # --- STARTLIJST VERWERKEN ---
 def process_startlist(uploaded_file, df_static):
     try:
         if uploaded_file.name.lower().endswith('.pdf'):
-            df_start = parse_pcs_pdf(uploaded_file)
+            riders_list = parse_pcs_pdf(uploaded_file)
+            df_start = pd.DataFrame({'Renner': riders_list})
         elif uploaded_file.name.lower().endswith('.csv'):
             df_start = pd.read_csv(uploaded_file, sep=None, engine='python')
         else:
