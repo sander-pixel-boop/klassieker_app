@@ -3,7 +3,7 @@ import pandas as pd
 import json
 import os
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from thefuzz import process, fuzz
 from utils.db import init_connection
 from utils.crypto import generate_signature
@@ -24,17 +24,13 @@ tabel_naam = st.secrets["TABEL_NAAM"]
 
 # --- HULPFUNCTIES ---
 def is_team_locked():
-    if os.path.exists("uitslagen.csv"):
-        try:
-            df_u = pd.read_csv("uitslagen.csv", sep=None, engine='python')
-            df_u.columns = [str(c).strip().title() for c in df_u.columns]
-            if 'Race' in df_u.columns:
-                verreden = [str(x).strip().upper() for x in df_u['Race'].unique()]
-                if "NOK" in verreden:
-                    return True
-        except:
-            return False
-    return False
+    # Vergrendel de teams na de start van de Omloop
+    try:
+        lock_time = datetime(2025, 3, 1, 11, 0, tzinfo=timezone.utc)
+        current_time = datetime.now(timezone.utc)
+        return current_time > lock_time
+    except:
+        return False
 
 # --- DATA LADEN ---
 @st.cache_data
