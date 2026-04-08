@@ -206,8 +206,8 @@ with st.sidebar:
             df_race = calculate_cf_ev(raw_race, stat_mapping[koers_type], ev_method)
             st.divider()
             with st.expander("🔒 Forceer / Uitsluit"):
-                force_list = st.multiselect("🟢 Moet in team:", options=df_race['Renner'].tolist())
-                exclude_list = st.multiselect("🚫 Negeren:", options=[r for r in df_race['Renner'].tolist() if r not in force_list])
+                force_list = st.multiselect("🟢 Moet in team:", options=df_race['Renner'].tolist(), help="Kies renners die verplicht in je selectie moeten zitten.")
+                exclude_list = st.multiselect("🚫 Negeren:", options=[r for r in df_race['Renner'].tolist() if r not in force_list], help="Kies renners die je absoluut niet in je selectie wilt hebben.")
             
             if st.button("🚀 BEREKEN TEAM", type="primary", use_container_width=True):
                 with st.spinner("Team berekenen... Dit kan even duren."):

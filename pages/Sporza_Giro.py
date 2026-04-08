@@ -254,8 +254,8 @@ with st.sidebar:
     df['Combined_EV']   = (df['Prediction_EV'] * 1000) + df['Giro_EV']
 
     with st.expander("🔒 Forceren / Uitsluiten"):
-        force_base = st.multiselect("🟢 Moet in team:", options=df['Renner'].tolist())
-        ban_base   = st.multiselect("🔴 Niet in team:", options=[r for r in df['Renner'].tolist() if r not in force_base])
+        force_base = st.multiselect("🟢 Moet in team:", options=df['Renner'].tolist(), help="Kies renners die verplicht in je selectie moeten zitten.")
+        ban_base   = st.multiselect("🔴 Niet in team:", options=[r for r in df['Renner'].tolist() if r not in force_base], help="Kies renners die de AI absoluut moet negeren.")
 
     st.divider()
     if st.button("🚀 BEREKEN TEAM (Puur Statistische Suggesties)", type="primary", use_container_width=True):

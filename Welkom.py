@@ -43,8 +43,8 @@ def login_page():
             
             with tab1:
                 with st.form("login_form"):
-                    inlog_naam = st.text_input("Gebruikersnaam", key="inlog_naam", placeholder="bijv. woutje123")
-                    inlog_ww = st.text_input("Wachtwoord", type="password", key="inlog_ww", placeholder="Jouw geheime wachtwoord")
+                    inlog_naam = st.text_input("Gebruikersnaam", key="inlog_naam", placeholder="bijv. woutje123", help="Voer je accountnaam in om in te loggen.")
+                    inlog_ww = st.text_input("Wachtwoord", type="password", key="inlog_ww", placeholder="Jouw geheime wachtwoord", help="Voer het wachtwoord van je account in.")
                     submitted = st.form_submit_button("Inloggen", type="primary", use_container_width=True)
 
                     if submitted:
@@ -64,8 +64,8 @@ def login_page():
                         
             with tab2:
                 with st.form("register_form"):
-                    nieuw_naam = st.text_input("Kies een Gebruikersnaam", key="nieuw_naam", placeholder="Kies een unieke naam")
-                    nieuw_ww = st.text_input("Kies een Wachtwoord", type="password", key="nieuw_ww", placeholder="Minimaal 8 tekens aanbevolen")
+                    nieuw_naam = st.text_input("Kies een Gebruikersnaam", key="nieuw_naam", placeholder="Kies een unieke naam", help="Kies een unieke gebruikersnaam voor je account.")
+                    nieuw_ww = st.text_input("Kies een Wachtwoord", type="password", key="nieuw_ww", placeholder="Minimaal 8 tekens aanbevolen", help="Kies een sterk wachtwoord voor je account.")
                     submitted_reg = st.form_submit_button("Maak account aan", use_container_width=True)
 
                     if submitted_reg:

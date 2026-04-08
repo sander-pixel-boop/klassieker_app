@@ -412,9 +412,9 @@ with st.sidebar:
     df['Type'] = df.apply(bepaal_klassieker_type, axis=1)
 
     with st.expander("🔒 Renners Forceren / Uitsluiten", expanded=False):
-        force_base = st.multiselect("🟢 Moet in start-team:", options=df['Renner'].tolist())
-        ban_base = st.multiselect("🔴 Niet in start-team:", options=[r for r in df['Renner'].tolist() if r not in force_base])
-        exclude_list = st.multiselect("🚫 Compleet negeren (hele jaar):", options=[r for r in df['Renner'].tolist() if r not in force_base + ban_base])
+        force_base = st.multiselect("🟢 Moet in start-team:", options=df['Renner'].tolist(), help="Kies renners die verplicht in je start-team moeten zitten.")
+        ban_base = st.multiselect("🔴 Niet in start-team:", options=[r for r in df['Renner'].tolist() if r not in force_base], help="Kies renners die niet in je start-team mogen, maar later nog wel gekocht kunnen worden.")
+        exclude_list = st.multiselect("🚫 Compleet negeren (hele jaar):", options=[r for r in df['Renner'].tolist() if r not in force_base + ban_base], help="Kies renners die de AI het hele jaar door volledig moet negeren.")
 
     st.write("")
     if st.button("🚀 BEREKEN SPORZA TEAM", type="primary", use_container_width=True):
@@ -488,7 +488,7 @@ else:
             st.subheader("🛠️ Team Finetuner (Start-Team aanpassen)")
             c_fine1, c_fine2 = st.columns(2)
             with c_fine1: 
-                to_replace = st.multiselect("❌ Selecteer renner(s) om te verwijderen:", options=st.session_state.sporza_selected_riders)
+                to_replace = st.multiselect("❌ Selecteer renner(s) om te verwijderen:", options=st.session_state.sporza_selected_riders, help="Selecteer de renner(s) die je uit je huidige start-team wilt halen.")
             
             to_add = []
             if to_replace:
@@ -498,7 +498,7 @@ else:
                 
                 with c_fine2: 
                     available_replacements = [r for r in df['Renner'].tolist() if r not in st.session_state.sporza_selected_riders]
-                    to_add_manual = st.multiselect("📥 Handmatige vervanger(s):", options=available_replacements)
+                    to_add_manual = st.multiselect("📥 Handmatige vervanger(s):", options=available_replacements, help="Kies handmatig een vervanger uit de lijst van beschikbare renners.")
                     
                 sugg_df = df[~df['Renner'].isin(st.session_state.sporza_selected_riders)][df['Prijs'] <= max_affordable].sort_values(by='Sporza_EV', ascending=False).head(5)
                 
@@ -506,7 +506,7 @@ else:
                 if not sugg_df.empty:
                     st.info(f"💡 **Top AI Suggesties (Totaal overgebleven budget voor {len(to_replace)} renner(s): € {max_affordable}M):**")
                     st.dataframe(sugg_df[['Renner', 'Prijs', 'Waarde (EV/M)', 'Sporza_EV', 'Type']], hide_index=True, use_container_width=True)
-                    sugg_keuze = st.multiselect("👉 Of selecteer hier direct een AI-suggestie:", options=sugg_df['Renner'].tolist())
+                    sugg_keuze = st.multiselect("👉 Of selecteer hier direct een AI-suggestie:", options=sugg_df['Renner'].tolist(), help="Selecteer direct één van de voorgestelde renners om aan je team toe te voegen.")
 
                 to_add = list(set(to_add_manual + sugg_keuze))
                 
@@ -649,7 +649,7 @@ with tab4:
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1: search_name = st.text_input("🔍 Zoek op naam of Ploeg:", placeholder="bijv. Van Aert of Visma")
     with col_f2: price_filter = st.slider("💰 Prijs range (Miljoen)", int(df['Prijs'].min()), int(df['Prijs'].max()), (int(df['Prijs'].min()), int(df['Prijs'].max())), 1)
-    with col_f3: race_filter = st.multiselect("🏁 Rijdt geselecteerde koersen:", options=available_races)
+    with col_f3: race_filter = st.multiselect("🏁 Rijdt geselecteerde koersen:", options=available_races, help="Filter de database op renners die meedoen aan de geselecteerde koersen.")
 
     f_df = df.copy()
     if search_name: f_df = f_df[f_df['Renner'].str.contains(search_name, case=False, na=False) | f_df['Team'].str.contains(search_name, case=False, na=False)]

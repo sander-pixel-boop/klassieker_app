@@ -445,7 +445,8 @@ with tab2:
     geselecteerde_etappe = st.selectbox(
         "Kies een etappe:",
         options=gereden_etappes,
-        format_func=lambda x: f"Etappe {x}: {ETAPPE_ROUTE.get(x, '')} ({ETAPPE_TYPE.get(x, '')})"
+        format_func=lambda x: f"Etappe {x}: {ETAPPE_ROUTE.get(x, '')} ({ETAPPE_TYPE.get(x, '')})",
+        help="Selecteer een etappe om de gedetailleerde puntenopbouw te bekijken."
     )
 
     if geselecteerde_etappe and not df_det.empty:

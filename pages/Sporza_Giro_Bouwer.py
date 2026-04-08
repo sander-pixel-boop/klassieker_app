@@ -500,7 +500,8 @@ with tab2:
         max_selections=16,
         key="_finaal_team_selector",
         on_change=update_finaal_team,
-        format_func=format_rider
+        format_func=format_rider,
+        help="Kies maximaal 16 renners voor je selectie."
     )
 
     c1, c2, c3 = st.columns(3)
