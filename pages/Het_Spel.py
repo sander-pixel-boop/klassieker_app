@@ -35,8 +35,29 @@ def is_team_locked():
     return False
 
 # --- DATA LADEN ---
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_game_data():
+    try:
+        supabase = init_connection()
+        response = supabase.table('users').select('*').execute()
+
+        users_data = []
+        for row in response.data:
+            user_data = {
+                'username': row['username'],
+                'created_at': row['created_at'],
+                'sporza_team': row.get('sporza_team'),
+                'sporza_transfers': row.get('sporza_transfers'),
+                'scorito_team': row.get('scorito_team')
+            }
+            users_data.append(user_data)
+
+        return users_data
+    except:
+        return []
+
+@st.cache_data
+def load_csv_data():
     try:
         df_p = pd.read_csv("sporza_prijzen_startlijst.csv", sep=None, engine='python')
         df_s = pd.read_csv("renners_stats.csv", sep=None, engine='python')
@@ -60,7 +81,7 @@ def load_game_data():
     except:
         return pd.DataFrame({'Renner': ['Wout van Aert', 'Mathieu van der Poel', 'Tadej Pogačar']}), ["NOK", "MSR", "RVV"], {}
 
-df, races, k_map = load_game_data()
+df, races, k_map = load_csv_data()
 alle_renners = sorted(df['Renner'].dropna().unique()) if not df.empty else []
 team_locked = is_team_locked()
 
