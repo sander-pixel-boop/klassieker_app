@@ -9,6 +9,8 @@ from utils.db import init_connection
 from utils.name_matching import match_naam_slim, normalize_name_logic
 from datetime import datetime
 from claude_predictions import genereer_claude_etappe_voorspellingen
+from utils.giro_data import load_giro_data, calculate_giro_ev
+from utils.giro_solver import solve_giro_team
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Sporza Giro Suggesties Solver", layout="wide", page_icon="🤖")
@@ -85,86 +87,6 @@ def get_clickable_image_html(image_path, fallback_text, link):
     return f'<a href="{link}" target="_blank"><img src="{img_src}" width="100%" style="border-radius:8px;"></a>'
 
 # --- DATA LADEN ---
-@st.cache_data
-def load_giro_data():
-    prijzen_file = "giro262/sporza_giro26_startlijst.csv"
-    stats_file   = "renners_stats.csv"
-
-    if not os.path.exists(prijzen_file):
-        st.error(f"🚨 Het bestand `{prijzen_file}` ontbreekt in je map!")
-        return pd.DataFrame()
-    if not os.path.exists(stats_file):
-        st.error(f"🚨 Het bestand `{stats_file}` ontbreekt in je map!")
-        return pd.DataFrame()
-
-    try:
-        df_prog  = pd.read_csv(prijzen_file, sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
-        df_stats = pd.read_csv(stats_file,   sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
-
-        df_prog.columns  = df_prog.columns.str.strip()
-        df_stats.columns = df_stats.columns.str.strip()
-
-        if 'Naam' in df_prog.columns:  df_prog  = df_prog.rename(columns={'Naam': 'Renner'})
-        if 'Naam' in df_stats.columns: df_stats = df_stats.rename(columns={'Naam': 'Renner'})
-        if 'Ploeg' in df_stats.columns: df_stats = df_stats.rename(columns={'Ploeg': 'Team'})
-
-        df_stats = df_stats.drop_duplicates(subset=['Renner'], keep='first')
-        norm_to_stats = {normalize_name_logic(n): n for n in df_stats['Renner'].unique()}
-        df_prog['Renner_Stats'] = df_prog['Renner'].apply(lambda x: match_naam_slim(x, norm_to_stats))
-
-        merged_df = pd.merge(
-            df_prog, df_stats,
-            left_on='Renner_Stats', right_on='Renner',
-            how='left', suffixes=('', '_drop')
-        )
-        merged_df = merged_df.drop(columns=[c for c in merged_df.columns if '_drop' in c or c == 'Renner_Stats'])
-
-        if 'Prijs' not in merged_df.columns:
-            st.error("🚨 Fout in de startlijst: de kolom `Prijs` is niet gevonden.")
-            return pd.DataFrame()
-
-        merged_df['Prijs'] = pd.to_numeric(merged_df['Prijs'], errors='coerce').fillna(0.0).astype(float)
-        merged_df.loc[merged_df['Prijs'] > 1000, 'Prijs'] = merged_df['Prijs'] / 1000000
-        merged_df.loc[merged_df['Prijs'] == 0.8, 'Prijs'] = 0.75
-
-        merged_df = (
-            merged_df[merged_df['Prijs'] > 0]
-            .sort_values(by='Prijs', ascending=False)
-            .drop_duplicates(subset=['Renner'])
-        )
-
-        if merged_df.empty:
-            st.error("🚨 De bestanden zijn geladen, maar na filtering (Prijs > 0) bleven er 0 renners over.")
-            return pd.DataFrame()
-
-        for col in ['GC', 'SPR', 'ITT', 'MTN']:
-            if col not in merged_df.columns: merged_df[col] = 0
-            merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0).astype(int)
-
-        return merged_df
-    except Exception as e:
-        st.error(f"🚨 Er trad een fout op bij het laden van de data: {e}")
-        return pd.DataFrame()
-
-def calculate_giro_ev(df):
-    df = df.copy()
-    df['EV_GC']  = (df['GC']  / 100)**4 * 400
-    df['EV_SPR'] = (df['SPR'] / 100)**4 * 250
-    df['EV_ITT'] = (df['ITT'] / 100)**4 * 80
-    df['EV_MTN'] = (df['MTN'] / 100)**4 * 100
-    df['Giro_EV'] = (df['EV_GC'] + df['EV_SPR'] + df['EV_ITT'] + df['EV_MTN']).fillna(0).round(0).astype(int)
-    df['Waarde (EV/M)'] = (df['Giro_EV'] / df['Prijs']).replace([float('inf'), -float('inf')], 0).fillna(0).round(1)
-
-    def bepaal_rol(row):
-        if row['GC']  >= 85: return 'Klassementsrenner'
-        if row['SPR'] >= 85: return 'Sprinter'
-        if row['ITT'] >= 85 and row['GC'] < 75: return 'Tijdrijder'
-        if row['MTN'] >= 80 and row['GC'] < 80: return 'Aanvaller / Klimmer'
-        return 'Knecht / Vrijbuiter'
-
-    df['Type'] = df.apply(bepaal_rol, axis=1)
-    return df
-
 def calculate_prediction_ev(df, predictions, top_x):
     pts_map = [50, 40, 30, 25, 20, 16, 14, 12, 10, 8]
     pred_series = pd.Series(0, index=df.index)
@@ -176,25 +98,6 @@ def calculate_prediction_ev(df, predictions, top_x):
                 if not idx.empty:
                     pred_series.loc[idx[0]] += pts_map[pos]
     return pred_series
-
-# --- SOLVER ---
-def solve_giro_team(df, max_bud, max_ren, max_per_team, force_base, ban_base, ev_column):
-    prob = pulp.LpProblem("Sporza_Giro_Solver", pulp.LpMaximize)
-    x = pulp.LpVariable.dicts("Select", df.index, cat='Binary')
-    prob += pulp.lpSum([df.loc[i, ev_column] * x[i] for i in df.index])
-    prob += pulp.lpSum([x[i] for i in df.index]) == max_ren
-    prob += pulp.lpSum([df.loc[i, 'Prijs'] * x[i] for i in df.index]) <= max_bud
-    for team in df['Team'].unique():
-        team_indices = df[df['Team'] == team].index
-        prob += pulp.lpSum([x[i] for i in team_indices]) <= max_per_team
-    for i in df.index:
-        renner = df.loc[i, 'Renner']
-        if renner in force_base: prob += x[i] == 1
-        if renner in ban_base:   prob += x[i] == 0
-    prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=15))
-    if pulp.LpStatus[prob.status] == 'Optimal':
-        return [df.loc[i, 'Renner'] for i in df.index if x[i].varValue > 0.5]
-    return []
 
 # --- HOOFDCODE ---
 st.title("🤖 Sporza Giro — Suggesties Solver")
@@ -260,14 +163,14 @@ with st.sidebar:
     st.divider()
     if st.button("🚀 BEREKEN TEAM (Puur Statistische Suggesties)", type="primary", use_container_width=True):
         with st.spinner("Puur statistisch team berekenen... Dit kan even duren."):
-            res = solve_giro_team(df, max_budget, max_renners, max_per_ploeg, force_base, ban_base, "Giro_EV")
+            res = solve_giro_team(df, max_bud=max_budget, max_ren=max_renners, max_per_team=max_per_ploeg, force_base=force_base, ban_base=ban_base, ev_column="Giro_EV")
             if res:
                 st.session_state.giro_selected_riders = res
                 st.rerun()
 
     if st.button("🚀 BEREKEN TEAM (Suggesties + Voorspellingen)", use_container_width=True):
         with st.spinner("Team inclusief voorspellingen berekenen... Dit kan even duren."):
-            res = solve_giro_team(df, max_budget, max_renners, max_per_ploeg, force_base, ban_base, "Combined_EV")
+            res = solve_giro_team(df, max_bud=max_budget, max_ren=max_renners, max_per_team=max_per_ploeg, force_base=force_base, ban_base=ban_base, ev_column="Combined_EV")
             if res:
                 st.session_state.giro_selected_riders = res
                 st.rerun()
