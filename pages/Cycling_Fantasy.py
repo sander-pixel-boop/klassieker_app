@@ -195,9 +195,9 @@ with st.sidebar:
         'Klimmen (MTN)': 'MTN', 
         'Tijdrit (ITT)': 'ITT'
     }
-    koers_type = st.selectbox("🏁 Type Koers:", list(stat_mapping.keys()))
-    ev_method = st.selectbox("🧮 Rekenmodel", ["1. Ranking (CF Punten)", "2. Macht 4 Curve"])
-    max_bud = st.number_input("💰 Budget (Credits)", value=5000, step=200)
+    koers_type = st.selectbox("🏁 Type Koers:", list(stat_mapping.keys()), help="Kies het parcours-profiel. De AI gebruikt de bijbehorende statistiek om de prestatie te voorspellen.")
+    ev_method = st.selectbox("🧮 Rekenmodel", ["1. Ranking (CF Punten)", "2. Macht 4 Curve"], help="Kies hoe de AI punten berekent. 'Ranking' deelt standaard CF-punten uit op basis van de ranglijst. 'Macht 4 Curve' geeft exponentiële bonussen aan absolute specialisten.")
+    max_bud = st.number_input("💰 Budget (Credits)", value=5000, step=200, help="Het maximale aantal credits dat je mag besteden aan je 9 renners.")
     
     df_race = pd.DataFrame()
     if uploaded_file:
