@@ -8,7 +8,7 @@ from thefuzz import process, fuzz
 from utils.db import init_connection
 from utils.name_matching import match_naam_slim, normalize_name_logic
 from datetime import datetime
-from claude_predictions import genereer_claude_etappe_voorspellingen
+from utils.claude_predictions import genereer_claude_etappe_voorspellingen
 from utils.giro_data import load_giro_data, calculate_giro_ev
 from utils.giro_solver import solve_giro_team
 
@@ -51,7 +51,7 @@ GIRO_ETAPPES = [
 ]
 
 def laad_profiel_scores():
-    bestand = "giro262/profile_score.csv"
+    bestand = "data/giro262/profile_score.csv"
     if os.path.exists(bestand):
         try:
             df_scores = pd.read_csv(bestand, sep=None, engine='python')

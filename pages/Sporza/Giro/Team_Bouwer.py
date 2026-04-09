@@ -47,7 +47,7 @@ GIRO_ETAPPES = [
 ]
 
 def laad_profiel_scores():
-    bestand = "giro262/profile_score.csv"
+    bestand = "data/giro262/profile_score.csv"
     if os.path.exists(bestand):
         try:
             df_scores = pd.read_csv(bestand, sep=None, engine='python')

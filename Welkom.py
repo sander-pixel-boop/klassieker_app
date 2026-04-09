@@ -110,24 +110,24 @@ def home_page():
 # --- NAVIGATIE INSTELLEN ---
 login = st.Page(login_page, title="Inloggen", icon="🔒")
 home = st.Page(home_page, title="Home", icon="🏠", default=True)
-cf_pagina = st.Page("pages/Cycling_Fantasy.py", title="CF Dashboard", icon="🚴")
+cf_pagina = st.Page("pages/Cycling_Fantasy/Classics/Cycling_Fantasy.py", title="CF Dashboard", icon="🚴")
 
 # Scorito pagina's
-scorito_klassiekers = st.Page("pages/Klassiekers - Scorito.py", title="Klassiekers", icon="🏆")
-scorito_evaluator = st.Page("pages/Model_Evaluator_(Scorito).py", title="Evaluator", icon="📊")
-scorito_giro = st.Page("pages/Scorito_Grand_Tour.py", title="[Binnenkort] Giro d'Italia", icon="🇮🇹")
+scorito_klassiekers = st.Page("pages/Scorito/Classics/Klassiekers.py", title="Klassiekers", icon="🏆")
+scorito_evaluator = st.Page("pages/Scorito/Classics/Evaluator.py", title="Evaluator", icon="📊")
+scorito_giro = st.Page("pages/Scorito/Giro/Giro.py", title="[Binnenkort] Giro d'Italia", icon="🇮🇹")
 
 # Sporza pagina's
-sporza_klassiekers = st.Page("pages/Klassiekers - Sporza.py", title="Klassiekers", icon="🏁")
-sporza_evaluator = st.Page("pages/Sporza_Evaluator.py", title="Evaluator", icon="📊")
+sporza_klassiekers = st.Page("pages/Sporza/Classics/Klassiekers.py", title="Klassiekers", icon="🏁")
+sporza_evaluator = st.Page("pages/Sporza/Classics/Evaluator.py", title="Evaluator", icon="📊")
 
 # Sporza Grand Tour opties
-sporza_giro_ai = st.Page("pages/Sporza_Giro.py", title="Giro: AI Solver", icon="🤖")
-sporza_giro_bouwer = st.Page("pages/Sporza_Giro_Bouwer.py", title="Giro: Team Bouwer", icon="🛠️")
-sporza_giro_bouwer_c1 = st.Page("pages/Sporza_Giro_Bouwer_Concept1.py", title="Giro: Bouwer C1 (Master)", icon="🗂️")
-sporza_giro_bouwer_c2 = st.Page("pages/Sporza_Giro_Bouwer_Concept2.py", title="Giro: Bouwer C2 (Wizard)", icon="🪄")
-sporza_giro_bouwer_c3 = st.Page("pages/Sporza_Giro_Bouwer_Concept3.py", title="Giro: Bouwer C3 (Split)", icon="✂️")
-sporza_giro_evaluator = st.Page("pages/Sporza_Giro_Evaluator.py", title="[Beta] Giro: Evaluator", icon="📊")
+sporza_giro_ai = st.Page("pages/Sporza/Giro/AI_Solver.py", title="Giro: AI Solver", icon="🤖")
+sporza_giro_bouwer = st.Page("pages/Sporza/Giro/Team_Bouwer.py", title="Giro: Team Bouwer", icon="🛠️")
+sporza_giro_bouwer_c1 = st.Page("pages/Sporza/Giro/Bouwer_Concept1.py", title="Giro: Bouwer C1 (Master)", icon="🗂️")
+sporza_giro_bouwer_c2 = st.Page("pages/Sporza/Giro/Bouwer_Concept2.py", title="Giro: Bouwer C2 (Wizard)", icon="🪄")
+sporza_giro_bouwer_c3 = st.Page("pages/Sporza/Giro/Bouwer_Concept3.py", title="Giro: Bouwer C3 (Split)", icon="✂️")
+sporza_giro_evaluator = st.Page("pages/Sporza/Giro/Evaluator.py", title="[Beta] Giro: Evaluator", icon="📊")
 
 # --- KEUZE: WEL OF NIET INGELOGD ---
 if "ingelogde_speler" not in st.session_state:

@@ -12,7 +12,7 @@ def giro_bouwer_module():
     st.secrets = {"SUPABASE_URL": "http://mock", "SUPABASE_KEY": "mock"}
 
     with patch("supabase.create_client"):
-        spec = importlib.util.spec_from_file_location("sporza_giro", "pages/Sporza_Giro_Bouwer.py")
+        spec = importlib.util.spec_from_file_location("sporza_giro", "pages/Sporza/Giro/Team_Bouwer.py")
         sporza_giro = importlib.util.module_from_spec(spec)
         sys.modules["sporza_giro"] = sporza_giro
 

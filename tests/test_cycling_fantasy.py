@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 mock_st = MagicMock()
 sys.modules['streamlit'] = mock_st
 
-file_path = os.path.join(os.path.dirname(__file__), '..', 'pages', 'Cycling_Fantasy.py')
+file_path = os.path.join(os.path.dirname(__file__), '..', 'pages', 'Cycling_Fantasy', 'Classics', 'Cycling_Fantasy.py')
 
 with open(file_path, 'r', encoding='utf-8') as f:
     code = f.read()

@@ -22,7 +22,7 @@ sys.modules['streamlit'] = mock_st
 mock_supabase = MagicMock()
 sys.modules['supabase'] = mock_supabase
 
-file_path = os.path.join(os.path.dirname(__file__), '..', 'pages', 'Sporza_Giro.py')
+file_path = os.path.join(os.path.dirname(__file__), '..', 'pages', 'Sporza', 'Giro', 'AI_Solver.py')
 
 with open(file_path, 'r', encoding='utf-8') as f:
     code = f.read()

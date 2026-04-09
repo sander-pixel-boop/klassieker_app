@@ -47,7 +47,7 @@ GIRO_ETAPPES = [
 ]
 
 def laad_profiel_scores():
-    bestand = "giro262/profile_score.csv"
+    bestand = "data/giro262/profile_score.csv"
     if os.path.exists(bestand):
         try:
             df_scores = pd.read_csv(bestand, sep=None, engine='python')
@@ -177,134 +177,204 @@ with st.sidebar:
             st.metric("Handmatig", f"{ingesteld}/21")
 
 # --- HOOFDSCHERM ---
-st.title("✂️ Concept 3: Split View (Planning vs Execution)")
+st.title("🗂️ Concept 1: Master-Detail Layout")
 st.markdown("*Data en Statistieken van [Wielerorakel](https://wielerorakel.nl/)*")
 
 if df.empty:
     st.error("Databestanden niet gevonden.")
     st.stop()
 
-tab_plan, tab_exec = st.tabs(["🏗️ Planning & Selectie", "📅 De Koers (Executie)"])
+# Master-Detail Layout
+col_nav, col_stage, col_team = st.columns([1, 2.5, 1.5])
 
-with tab_plan:
-    st.markdown("### 1. Etappes Voorspellen")
+# Left Column: Navigation
+with col_nav:
+    st.subheader("📍 Etappes")
 
-    # Horizontal Navigation
-    if "aktieve_etappe_idx" not in st.session_state: st.session_state.aktieve_etappe_idx = 0
+    if "aktieve_etappe_idx" not in st.session_state:
+        st.session_state.aktieve_etappe_idx = 0
 
-    nav_cols = st.columns(7)
-    for i in range(21):
-        col_idx = i % 7
-        e = GIRO_ETAPPES[i]
+    for i, e in enumerate(GIRO_ETAPPES):
         eid_str = str(e["id"])
-        is_filled = len([k for k in st.session_state.etappe_keuzes.get(eid_str, []) if k]) > 0
-        btn_label = f"{'🟢' if is_filled else '⚪'} E{e['id']}"
-        btn_type = "primary" if st.session_state.aktieve_etappe_idx == i else "secondary"
-        if nav_cols[col_idx].button(btn_label, key=f"nav_h_{i}", use_container_width=True, type=btn_type):
+        keuzes = [k for k in st.session_state.etappe_keuzes.get(eid_str, []) if k]
+        status = "🟢" if len(keuzes) > 0 else "⚪"
+
+        button_style = "primary" if st.session_state.aktieve_etappe_idx == i else "secondary"
+
+        if st.button(f"{status} E{e['id']} - {e['type']}", key=f"nav_{i}", use_container_width=True, type=button_style):
             st.session_state.aktieve_etappe_idx = i
             st.rerun()
 
-    # Active Stage
+    st.markdown("---")
+    if st.button("🤖 Auto-vul Alle Etappes", use_container_width=True):
+        for e in GIRO_ETAPPES:
+            eid_str = str(e["id"])
+            cw = st.session_state.giro_weights_v2[eid_str]
+            som_input = sum(cw.values())
+            w = {k: v / som_input for k, v in cw.items()} if som_input > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+            df_stage = bereken_alle_stage_scores(df, w)
+            top_3_pure_names = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()[:3]
+            for idx, naam in enumerate(top_3_pure_names):
+                st.session_state.etappe_keuzes[eid_str][idx] = naam
+        st.rerun()
+
+# Middle Column: Active Stage Workspace
+with col_stage:
     etappe = GIRO_ETAPPES[st.session_state.aktieve_etappe_idx]
     eid    = str(etappe["id"])
     cw     = st.session_state.giro_weights_v2[eid]
 
-    st.divider()
-    c_stage_left, c_stage_right = st.columns([1, 2])
+    st.subheader(f"Etappe {etappe['id']}: {etappe['route']}")
 
-    with c_stage_left:
-        st.subheader(f"E{etappe['id']}: {etappe['route']}")
-        st.caption(f"{etappe['type']} - {etappe['date']}")
+    c_meta1, c_meta2 = st.columns(2)
+    c_meta1.metric("Type", etappe["type"])
+    c_meta2.metric("Datum", etappe["date"])
 
+    with st.expander("⚙️ Etappeprofiel weging & Kaart", expanded=False):
+        # Maps
         giro_link = "https://www.giroditalia.it/en/the-route/"
+        map_path  = f"giro262/giro26-{etappe['id']}-map.jpg"
         prof_path = f"giro262/giro26-{etappe['id']}-hp.jpg"
-        st.markdown(get_clickable_image_html(prof_path, f"Profiel+{etappe['id']}", giro_link), unsafe_allow_html=True)
+        i1, i2 = st.columns(2)
+        i1.markdown(get_clickable_image_html(map_path,  f"Kaart+{etappe['id']}", giro_link), unsafe_allow_html=True)
+        i2.markdown(get_clickable_image_html(prof_path, f"Profiel+{etappe['id']}", giro_link), unsafe_allow_html=True)
 
-        new_spr = st.number_input("SPR", 0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{eid}")
-        new_gc  = st.number_input("GC",  0.0, 1.0, float(cw["GC"]),  0.1, key=f"wgc_{eid}")
-        new_itt = st.number_input("ITT", 0.0, 1.0, float(cw["ITT"]), 0.1, key=f"witt_{eid}")
-        new_mtn = st.number_input("MTN", 0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{eid}")
+        st.divider()
+        wc1, wc2 = st.columns(2)
+        new_spr = wc1.number_input("Sprint (SPR)",      0.0, 1.0, float(cw["SPR"]), 0.1, key=f"wspr_{eid}")
+        new_gc  = wc1.number_input("Klassement (GC)",   0.0, 1.0, float(cw["GC"]),  0.1, key=f"wgc_{eid}")
+        new_itt = wc2.number_input("Tijdrit (ITT)",     0.0, 1.0, float(cw["ITT"]), 0.1, key=f"witt_{eid}")
+        new_mtn = wc2.number_input("Klim/Aanval (MTN)", 0.0, 1.0, float(cw["MTN"]), 0.1, key=f"wmtn_{eid}")
         st.session_state.giro_weights_v2[eid] = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
 
-    with c_stage_right:
-        som_input = new_spr + new_gc + new_itt + new_mtn
-        active_w = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn} if som_input > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
-        active_w = {k: v / (som_input or 1) for k, v in active_w.items()}
-        df_stage = bereken_alle_stage_scores(df, active_w)
+    som_input = new_spr + new_gc + new_itt + new_mtn
+    active_w = {"SPR": new_spr, "GC": new_gc, "ITT": new_itt, "MTN": new_mtn}
+    if som_input > 0:
+        active_w = {k: v / som_input for k, v in active_w.items()}
+    else:
+        active_w = {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
 
-        top_5 = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False]).head(5)
-        st.info(f"💡 **Top 5 Suggesties:** {', '.join([f'{n} ({int(s)})' for n, s in top_5[['Naam', 'StageScore']].values])}")
+    df_stage = bereken_alle_stage_scores(df, active_w)
+    top_5 = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False]).head(5)
+    top_5_namen = [f"{n} ({int(s)})" for n, s in top_5[['Naam', 'StageScore']].values]
+    top_3_pure_names = top_5['Naam'].tolist()[:3]
 
-        top_3_pure_names = top_5['Naam'].tolist()[:3]
-        if st.button("🤖 Top 3 overnemen", key=f"auto_{eid}", use_container_width=True):
-            for idx, naam in enumerate(top_3_pure_names): st.session_state.etappe_keuzes[eid][idx] = naam
-            st.rerun()
+    st.info(f"💡 **Suggesties Top 5:** {', '.join(top_5_namen)}")
 
-        def get_real_name(display_name): return None if display_name == "-" else display_name
-        renners_opties = ["-"] + df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()
+    st.markdown("##### 🏁 Jouw Voorspelling (top 3)")
+    if st.button("🤖 Suggesties Top 3 overnemen", key=f"auto_{eid}", use_container_width=True):
+        for idx, naam in enumerate(top_3_pure_names):
+            st.session_state.etappe_keuzes[eid][idx] = naam
+        st.rerun()
 
-        c1, c2, c3 = st.columns(3)
-        for i, col in enumerate([c1, c2, c3]):
-            cur = st.session_state.etappe_keuzes[eid][i]
-            idx = renners_opties.index(cur) if cur in renners_opties else 0
-            val = col.selectbox(f"Positie {i+1}", renners_opties, index=idx, key=f"sel_{eid}_{i}")
-            st.session_state.etappe_keuzes[eid][i] = get_real_name(val)
+    def get_display_name(naam):
+        if naam == "-": return naam
+        if naam in st.session_state.finaal_team: return f"⭐ {naam}"
+        return naam
 
-        kopman_opties = ["🤖 Auto"] + sorted(df['Naam'].tolist())
-        cur_kopman = st.session_state.kopman_keuzes.get(eid)
-        k_idx = kopman_opties.index(cur_kopman) if cur_kopman in kopman_opties else 0
+    def get_real_name(display_name):
+        if display_name == "-": return None
+        if display_name.startswith("⭐ "): return display_name[2:]
+        return display_name
 
-        gekozen_k = st.selectbox("Kopman:", kopman_opties, index=k_idx, key=f"kop_{eid}")
-        st.session_state.kopman_keuzes[eid] = None if gekozen_k == "🤖 Auto" else gekozen_k
+    renners_opties_stage_raw = ["-"] + df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()
+    renners_opties_stage = [get_display_name(r) for r in renners_opties_stage_raw]
 
-    st.markdown("---")
-    st.markdown("### 2. Team Selectie (16 Renners)")
+    c1, c2, c3 = st.columns(3)
+    for i, col in enumerate([c1, c2, c3]):
+        current_val = st.session_state.etappe_keuzes[eid][i]
+        display_val = get_display_name(current_val) if current_val else "-"
+        d_idx = renners_opties_stage.index(display_val) if display_val in renners_opties_stage else 0
+        keuze_display = col.selectbox(f"Positie {i+1}", renners_opties_stage, index=d_idx, key=f"sel_{eid}_{i}")
+        st.session_state.etappe_keuzes[eid][i] = get_real_name(keuze_display)
 
-    col_metrics, col_btn = st.columns([2, 1])
-    col_metrics.write(f"**Renners:** {aantal_renners} / 16 | **Budget Over:** €{100 - totaal_prijs:.1f}M")
-    if col_btn.button("🤖 Bereken Optimaal Team", use_container_width=True):
-        draft_data = [{"Naam": r, "Punten": 3 - i} for e_id, keuzes in st.session_state.etappe_keuzes.items() for i, r in enumerate(keuzes) if r and r != "-"]
-        draft_df = pd.DataFrame(draft_data)
-        draft_counts = dict(zip(draft_df.groupby("Naam")["Punten"].sum().index, draft_df.groupby("Naam")["Punten"].sum().values)) if not draft_df.empty else {}
+    st.divider()
+    st.markdown("##### 🎖️ Kopman — dubbele punten (x2)")
 
-        with st.spinner("Team berekenen..."):
-            res = solve_giro_team(df, draft_counts=draft_counts, max_bud=100.0, max_ren=16, ev_column="EV")
-            if res:
-                st.session_state.finaal_team = res
-                st.rerun()
+    if huidig_team_namen:
+        auto_kopman = bepaal_auto_kopman(huidig_team_namen, etappe["id"], df)
+        auto_hint   = f"Auto ({auto_kopman})" if auto_kopman else "Auto (geen team)"
+    else:
+        auto_kopman = None
+        auto_hint   = "Auto (stel eerst een team in via Kolom 3 om Auto te gebruiken)"
 
-    def update_finaal_team(): st.session_state.finaal_team = st.session_state._finaal_team_split
-    st.multiselect(
-        "Mijn Team:",
-        options=df['Naam'].tolist(),
-        default=st.session_state.finaal_team,
-        max_selections=16,
-        key="_finaal_team_split",
-        on_change=update_finaal_team,
-        label_visibility="collapsed"
+    kopman_opties = ["🤖 " + auto_hint] + sorted(df['Naam'].tolist())
+    huidige_keuze = st.session_state.kopman_keuzes.get(eid)
+    kopman_idx    = kopman_opties.index(huidige_keuze) if huidige_keuze and huidige_keuze in kopman_opties else 0
+
+    gekozen = st.selectbox(
+        "Kopman voor deze etappe:",
+        options=kopman_opties,
+        index=kopman_idx,
+        key=f"kopman_sel_{eid}",
+        help="'Auto' = best scorende renner in je team."
     )
 
-with tab_exec:
-    st.markdown("### Dagelijkse Opstellingen")
-    if not huidig_team_namen:
-        st.warning("Selecteer eerst een team in de Planning tab.")
+    if gekozen.startswith("🤖"):
+        st.session_state.kopman_keuzes[eid] = None
+        if auto_kopman:
+            st.success(f"Automatische kopman: **{auto_kopman}**")
     else:
-        matrix_data = {renner: {"Renner": renner} for renner in st.session_state.finaal_team}
-        for etappe in GIRO_ETAPPES:
-            eid = str(etappe["id"])
-            col_name = f"E{etappe['id']}"
-            for renner in st.session_state.finaal_team:
-                matrix_data[renner][col_name] = "-"
+        st.session_state.kopman_keuzes[eid] = gekozen
+        if huidig_team_namen and gekozen not in huidig_team_namen:
+            st.warning(f"⚠️ Let op: **{gekozen}** zit (nog) niet in je definitieve team van 16!")
+        else:
+            st.success(f"Handmatige kopman: **{gekozen}**")
 
-            cw = st.session_state.giro_weights_v2[eid]
-            w = cw if sum(cw.values()) > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
-            team_stage_df = bereken_alle_stage_scores(huidig_team_df, w)
+# Right Column: "Always-On" Team Tracker
+with col_team:
+    with st.container(border=True):
+        st.subheader("🛡️ Mijn Team")
 
-            top_9 = team_stage_df.sort_values('StageScore', ascending=False).head(9)['Naam'].tolist()
-            handmatig_km = st.session_state.kopman_keuzes.get(eid)
-            effectief_km = handmatig_km if handmatig_km in top_9 else (top_9[0] if top_9 else None)
+        c_renners, c_budget = st.columns(2)
+        c_renners.metric("Renners", f"{aantal_renners} / 16")
+        c_budget.metric("Budget", f"€ {100 - totaal_prijs:.1f}M")
 
-            for renner in top_9:
-                matrix_data[renner][col_name] = "©" if renner == effectief_km else "✅"
+        if st.button("🤖 Bereken Optimaal Team", use_container_width=True):
+            draft_data = []
+            for e_id, keuzes in st.session_state.etappe_keuzes.items():
+                for i, r in enumerate(keuzes):
+                    if r and r != "-":
+                        draft_data.append({"Naam": r, "Punten": 3 - i})
+            draft_df = pd.DataFrame(draft_data)
+            draft_counts = {}
+            if not draft_df.empty:
+                draft_counts = dict(zip(
+                    draft_df.groupby("Naam")["Punten"].sum().index,
+                    draft_df.groupby("Naam")["Punten"].sum().values
+                ))
 
-        st.dataframe(pd.DataFrame(list(matrix_data.values())), hide_index=True, use_container_width=True)
+            with st.spinner("Team berekenen..."):
+                res = solve_giro_team(df, draft_counts=draft_counts, max_bud=100.0, max_ren=16, ev_column="EV")
+                if res:
+                    st.session_state.finaal_team = res
+                    st.rerun()
+                else:
+                    st.error("Kon geen geldig team berekenen.")
+
+        def update_finaal_team():
+            st.session_state.finaal_team = st.session_state._finaal_team_selector_m
+
+        def format_rider(naam):
+            if naam not in df['Naam'].values: return naam
+            r = df[df['Naam'] == naam].iloc[0]
+            return f"{naam} - €{r['Prijs']}M"
+
+        st.multiselect(
+            "Selecteer 16 renners:",
+            options=df['Naam'].tolist(),
+            default=st.session_state.finaal_team,
+            max_selections=16,
+            key="_finaal_team_selector_m",
+            on_change=update_finaal_team,
+            format_func=format_rider,
+            label_visibility="collapsed"
+        )
+
+        if huidig_team_namen:
+            st.markdown("**Huidige Selectie:**")
+            st.dataframe(huidig_team_df[['Naam', 'Type', 'Prijs']].sort_values('Prijs', ascending=False), hide_index=True, use_container_width=True)
+
+            if st.button("🗑️ Wis Team", use_container_width=True):
+                st.session_state.finaal_team = []
+                st.rerun()
