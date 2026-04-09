@@ -124,6 +124,9 @@ sporza_evaluator = st.Page("pages/Sporza_Evaluator.py", title="Evaluator", icon=
 # Sporza Grand Tour opties
 sporza_giro_ai = st.Page("pages/Sporza_Giro.py", title="Giro: AI Solver", icon="🤖")
 sporza_giro_bouwer = st.Page("pages/Sporza_Giro_Bouwer.py", title="Giro: Team Bouwer", icon="🛠️")
+sporza_giro_bouwer_c1 = st.Page("pages/Sporza_Giro_Bouwer_Concept1.py", title="Giro: Bouwer C1 (Master)", icon="🗂️")
+sporza_giro_bouwer_c2 = st.Page("pages/Sporza_Giro_Bouwer_Concept2.py", title="Giro: Bouwer C2 (Wizard)", icon="🪄")
+sporza_giro_bouwer_c3 = st.Page("pages/Sporza_Giro_Bouwer_Concept3.py", title="Giro: Bouwer C3 (Split)", icon="✂️")
 sporza_giro_evaluator = st.Page("pages/Sporza_Giro_Evaluator.py", title="[Beta] Giro: Evaluator", icon="📊")
 
 # --- KEUZE: WEL OF NIET INGELOGD ---
@@ -136,7 +139,7 @@ else:
         "Scorito - Klassiekers": [scorito_klassiekers, scorito_evaluator],
         "Scorito - Grand Tours": [scorito_giro],
         "Sporza - Klassiekers": [sporza_klassiekers, sporza_evaluator],
-        "Sporza - Grand Tours": [sporza_giro_ai, sporza_giro_bouwer, sporza_giro_evaluator]
+        "Sporza - Grand Tours": [sporza_giro_ai, sporza_giro_bouwer, sporza_giro_bouwer_c1, sporza_giro_bouwer_c2, sporza_giro_bouwer_c3, sporza_giro_evaluator]
     })
 
 pg.run()
