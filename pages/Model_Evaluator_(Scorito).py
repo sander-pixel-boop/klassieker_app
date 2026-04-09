@@ -82,7 +82,7 @@ MIJN_EIGEN_KOPMANNEN = {
     "TA": {"C1": "Jasper Philipsen", "C2": "Jonathan Milan", "C3": "Paul Magnier"},
     "MSR": {"C1": "Tadej Pogacar", "C2": "Mathieu van der Poel", "C3": "Tom Pidcock"},
     "BDP": {"C1": "Jasper Philipsen", "C2": "Florian Vermeersch", "C3": "Remco Evenepoel"},
-    "E3": {"C1": "Mathieu van der Poel", "C2": "Mads Pedersen", "C3": "Christoph Laporte"},
+    "E3": {"C1": "Mathieu van der Poel", "C2": "Mads Pedersen", "C3": "Christophe Laporte"},
     "GW": {"C1": "Mathieu van der Poel", "C2": "Florian Vermeersch", "C3": "Jasper Philipsen"},    
     "DDV": {"C1": "Christophe Laporte", "C2": "Florian Vermeersch", "C3": "Mads Pedersen"},
     "RVV": {"C1": "Tadej Pogacar", "C2": "Mathieu van der Poel", "C3": "Mads Pedersen"},
