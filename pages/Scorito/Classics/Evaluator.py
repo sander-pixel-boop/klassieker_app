@@ -66,7 +66,7 @@ HARDCODED_TEAMS = {
     "Sander's Team": {
         "Start": ["Tadej Pogačar", "Jonathan Milan", "Tom Pidcock", "Christophe Laporte", "Tim Wellens", "Paul Magnier", "Romain Grégoire", "Mattias Skjelmose", "Jasper Stuyven", "Florian Vermeersch", "Milan Fretin", "Jordi Meeus", "Toms Skujiņš", "Mike Teunissen", "Jonas Vingegaard", "Gianni Vermeersch", "Jonas Abrahamsen", "Mathieu van der Poel", "Jasper Philipsen", "Laurence Pithie"],
         "Transfers": [
-            {"uit": "Mathieu van der Poel", "in": "Remco Evenepoel", "moment": "PR"},
+            {"uit": "Thomas Pidcock", "in": "Remco Evenepoel", "moment": "DDV"},
             {"uit": "Jonathan Milan", "in": "Mads Pedersen", "moment": "BDP"},
             {"uit": "Jonas Vingegaard", "in": "Marc Hirschi", "moment": "BDP"}
         ]
@@ -82,8 +82,11 @@ MIJN_EIGEN_KOPMANNEN = {
     "TA": {"C1": "Jasper Philipsen", "C2": "Jonathan Milan", "C3": "Paul Magnier"},
     "MSR": {"C1": "Tadej Pogacar", "C2": "Mathieu van der Poel", "C3": "Tom Pidcock"},
     "BDP": {"C1": "Jasper Philipsen", "C2": "Florian Vermeersch", "C3": "Remco Evenepoel"},
-    "E3": {"C1": "Mathieu van der Poel", "C2": "Mads Pedersen", "C3": "Christoph Laporte"},
-     "DDV": {"C1": "Christoph Laporte", "C2": "Florian Vermeersch", "C3": "Mads Pedersen"},
+    "E3": {"C1": "Mathieu van der Poel", "C2": "Mads Pedersen", "C3": "Christophe Laporte"},
+    "GW": {"C1": "Mathieu van der Poel", "C2": "Florian Vermeersch", "C3": "Jasper Philipsen"},
+    "DDV": {"C1": "Christophe Laporte", "C2": "Florian Vermeersch", "C3": "Mads Pedersen"},
+    "RVV": {"C1": "Tadej Pogacar", "C2": "Mathieu van der Poel", "C3": "Mads Pedersen"},
+    "SP": {"C1": "Jasper Philipsen", "C2": "Jordi Meeus", "C3": "Milan Fretin"},
 }
 
 # --- HULPFUNCTIES VOOR NAAM-MATCHING ---
@@ -273,8 +276,8 @@ else:
                         renner_ploeg = df_stats.loc[df_stats['Renner'] == renner, 'Team'].values
                         renner_ploeg = renner_ploeg[0] if len(renner_ploeg) > 0 else ""
                         
-                        if rank not in [1, 2, 3]: 
-                            for pos, punten_team in TEAMPUNTEN.items():
+                        for pos, punten_team in TEAMPUNTEN.items():
+                            if rank != pos:
                                 if winnende_ploegen.get(pos) == renner_ploeg and renner_ploeg != "Onbekend":
                                     punten += punten_team
                                     uitleg.append(f"Team P{pos} ({punten_team})")
