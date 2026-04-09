@@ -276,8 +276,8 @@ else:
                         renner_ploeg = df_stats.loc[df_stats['Renner'] == renner, 'Team'].values
                         renner_ploeg = renner_ploeg[0] if len(renner_ploeg) > 0 else ""
                         
-                        if rank not in [1, 2, 3]: 
-                            for pos, punten_team in TEAMPUNTEN.items():
+                        for pos, punten_team in TEAMPUNTEN.items():
+                            if rank != pos:
                                 if winnende_ploegen.get(pos) == renner_ploeg and renner_ploeg != "Onbekend":
                                     punten += punten_team
                                     uitleg.append(f"Team P{pos} ({punten_team})")
