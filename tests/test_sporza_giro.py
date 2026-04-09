@@ -22,7 +22,7 @@ sys.modules['streamlit'] = mock_st
 mock_supabase = MagicMock()
 sys.modules['supabase'] = mock_supabase
 
-file_path = os.path.join(os.path.dirname(__file__), '..', 'pages', 'Sporza_Giro.py')
+file_path = os.path.join(os.path.dirname(__file__), '..', 'pages', 'Sporza', 'Giro', 'AI_Solver.py')
 
 with open(file_path, 'r', encoding='utf-8') as f:
     code = f.read()
@@ -62,8 +62,10 @@ def test_laad_profiel_scores_success(mock_read_csv):
         assert list(df['Vlak']) == [1.0, 2.0, 0.0]
         assert list(df['Heuvel']) == [4.0, 5.0, 6.0]
 
+@patch('os.path.exists')
 @patch('pandas.read_csv')
-def test_laad_profiel_scores_exception(mock_read_csv):
+def test_laad_profiel_scores_exception(mock_read_csv, mock_exists):
+    mock_exists.return_value = True
     mock_read_csv.side_effect = Exception("Test Exception")
     mock_st.error.reset_mock()
     mock_st.warning.reset_mock()
@@ -73,8 +75,5 @@ def test_laad_profiel_scores_exception(mock_read_csv):
 
     if df is not None:
         assert df.empty
-        mock_st.error.assert_called_once()
-        assert "Fout bij laden profielen" in mock_st.error.call_args[0][0]
-    else:
-        # If testing against the current file version in the sandbox
-        mock_st.warning.assert_called_once()
+    mock_st.warning.assert_called_once()
+    assert "Fout bij inladen profile_score.csv:" in mock_st.warning.call_args[0][0]

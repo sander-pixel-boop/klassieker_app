@@ -22,9 +22,9 @@ mock_st.cache_data = dummy_cache_data
 # Mock st.cache_resource as well
 mock_st.cache_resource = dummy_cache_data
 
-from pages.Het_Spel import is_team_locked, load_game_data, load_csv_data
+from pages.Sporza.Classics.Het_Spel import is_team_locked, load_game_data, load_csv_data
 
-@patch('pages.Het_Spel.init_connection')
+@patch('pages.Sporza.Classics.Het_Spel.init_connection')
 def test_load_game_data_exception_handling(mock_init_connection):
     """
     Test that load_game_data handles exceptions during database operations gracefully
@@ -39,7 +39,7 @@ def test_load_game_data_exception_handling(mock_init_connection):
     # Verify that it caught the exception and returned the fallback empty list
     assert result == []
 
-@patch('pages.Het_Spel.pd.read_csv')
+@patch('pages.Sporza.Classics.Het_Spel.pd.read_csv')
 def test_load_csv_data_exception_handling(mock_read_csv):
     """
     Test that load_csv_data handles exceptions during file reading gracefully
@@ -56,8 +56,8 @@ def test_load_csv_data_exception_handling(mock_read_csv):
     assert races == ["NOK", "MSR", "RVV"]
     assert k_map == {}
 
-@patch('pages.Het_Spel.os.path.exists')
-@patch('pages.Het_Spel.pd.read_csv')
+@patch('pages.Sporza.Classics.Het_Spel.os.path.exists')
+@patch('pages.Sporza.Classics.Het_Spel.pd.read_csv')
 def test_is_team_locked_exception_handling(mock_read_csv, mock_exists):
     """
     Test that is_team_locked handles exceptions during file reading gracefully
@@ -75,7 +75,7 @@ def test_is_team_locked_exception_handling(mock_read_csv, mock_exists):
     # Verify that it caught the exception and returned False
     assert result is False
 
-@patch('pages.Het_Spel.os.path.exists')
+@patch('pages.Sporza.Classics.Het_Spel.os.path.exists')
 def test_is_team_locked_file_not_found(mock_exists):
     """
     Test that is_team_locked returns False when uitslagen.csv doesn't exist.
@@ -86,8 +86,8 @@ def test_is_team_locked_file_not_found(mock_exists):
 
     assert result is False
 
-@patch('pages.Het_Spel.os.path.exists')
-@patch('pages.Het_Spel.pd.read_csv')
+@patch('pages.Sporza.Classics.Het_Spel.os.path.exists')
+@patch('pages.Sporza.Classics.Het_Spel.pd.read_csv')
 def test_is_team_locked_success(mock_read_csv, mock_exists):
     """
     Test that is_team_locked returns True when NOK is found in the uitslagen.csv
@@ -103,8 +103,8 @@ def test_is_team_locked_success(mock_read_csv, mock_exists):
 
     assert result is True
 
-@patch('pages.Het_Spel.os.path.exists')
-@patch('pages.Het_Spel.pd.read_csv')
+@patch('pages.Sporza.Classics.Het_Spel.os.path.exists')
+@patch('pages.Sporza.Classics.Het_Spel.pd.read_csv')
 def test_is_team_locked_no_nok(mock_read_csv, mock_exists):
     """
     Test that is_team_locked returns False when NOK is NOT found in the uitslagen.csv
@@ -119,8 +119,8 @@ def test_is_team_locked_no_nok(mock_read_csv, mock_exists):
 
     assert result is False
 
-@patch('pages.Het_Spel.os.path.exists')
-@patch('pages.Het_Spel.pd.read_csv')
+@patch('pages.Sporza.Classics.Het_Spel.os.path.exists')
+@patch('pages.Sporza.Classics.Het_Spel.pd.read_csv')
 def test_is_team_locked_no_race_column(mock_read_csv, mock_exists):
     """
     Test that is_team_locked returns False when uitslagen.csv doesn't have a Race column

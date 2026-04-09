@@ -12,7 +12,7 @@ def sporza_module():
 
     # Mock create_client to avoid actual network calls during import
     with patch("supabase.create_client") as mock_create_client:
-        spec = importlib.util.spec_from_file_location("sporza", "pages/Klassiekers - Sporza.py")
+        spec = importlib.util.spec_from_file_location("sporza", "pages/Sporza/Classics/Klassiekers.py")
         sporza = importlib.util.module_from_spec(spec)
         sys.modules["sporza"] = sporza
 

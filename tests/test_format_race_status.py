@@ -4,7 +4,7 @@ import numpy as np
 import ast
 import os
 
-with open("pages/Klassiekers - Scorito.py", "r", encoding="utf-8") as f:
+with open("pages/Scorito/Classics/Klassiekers.py", "r", encoding="utf-8") as f:
     source = f.read()
 
 tree = ast.parse(source)
@@ -17,7 +17,7 @@ for node in tree.body:
         break
 
 if not func_ast:
-    raise ValueError("Function 'format_race_status' not found in pages/Klassiekers - Scorito.py")
+    raise ValueError("Function 'format_race_status' not found in pages/Scorito/Classics/Klassiekers.py")
 
 namespace = {"pd": pd, "np": np}
 exec(compile(func_ast, filename="<ast>", mode="exec"), namespace)

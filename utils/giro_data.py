@@ -5,8 +5,8 @@ from utils.name_matching import match_naam_slim, normalize_name_logic
 
 @st.cache_data
 def load_giro_data():
-    prijzen_file = "giro262/sporza_giro26_startlijst.csv"
-    stats_file   = "renners_stats.csv"
+    prijzen_file = "data/giro262/sporza_giro26_startlijst.csv"
+    stats_file   = "data/renners_stats.csv"
 
     if not os.path.exists(prijzen_file):
         st.error(f"🚨 Het bestand `{prijzen_file}` ontbreekt in je map!")

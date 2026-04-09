@@ -26,11 +26,11 @@ def get_file_mod_time(filepath):
     return os.path.getmtime(filepath) if os.path.exists(filepath) else 0
 
 def get_verreden_koersen():
-    if os.path.exists("uitslagen.csv"):
+    if os.path.exists("data/uitslagen.csv"):
         try:
-            df_u = pd.read_csv("uitslagen.csv", sep='\t', engine='python')
+            df_u = pd.read_csv("data/uitslagen.csv", sep='\t', engine='python')
             if 'Race' not in df_u.columns:
-                df_u = pd.read_csv("uitslagen.csv", sep=None, engine='python')
+                df_u = pd.read_csv("data/uitslagen.csv", sep=None, engine='python')
             if 'Race' in df_u.columns:
                 sporza_naar_scorito_map = {'OML': 'OHN', 'STR': 'SB', 'RVB': 'BDP', 'IFF': 'GW', 'BRP': 'BP', 'AGT': 'AGR', 'WAP': 'WP'}
                 races = [str(x).strip().upper() for x in df_u['Race'].unique()]
@@ -41,10 +41,10 @@ def get_verreden_koersen():
 
 @st.cache_data
 def get_uitslagen(file_mod_time, alle_renners):
-    if not os.path.exists("uitslagen.csv"):
+    if not os.path.exists("data/uitslagen.csv"):
         return pd.DataFrame()
     try:
-        df_raw_uitslagen = pd.read_csv("uitslagen.csv", sep=None, engine='python')
+        df_raw_uitslagen = pd.read_csv("data/uitslagen.csv", sep=None, engine='python')
         df_raw_uitslagen.columns = [str(c).strip().title() for c in df_raw_uitslagen.columns]
         
         if 'Race' not in df_raw_uitslagen.columns or 'Rider' not in df_raw_uitslagen.columns or 'Rnk' not in df_raw_uitslagen.columns:
@@ -138,7 +138,7 @@ def format_race_status(val, limit):
 def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
     try:
         # 1. SPORZA LADEN (BASIS)
-        df_prog = pd.read_csv("sporza_prijzen_startlijst.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
+        df_prog = pd.read_csv("data/sporza_prijzen_startlijst.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
         df_prog.columns = df_prog.columns.str.strip()
         if 'Naam' in df_prog.columns: df_prog = df_prog.rename(columns={'Naam': 'Renner'})
         if 'Prijs' in df_prog.columns: df_prog = df_prog.drop(columns=['Prijs'])
@@ -150,7 +150,7 @@ def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
         df_prog = df_prog.rename(columns=sporza_to_scorito)
         
         # 2. SCORITO LADEN (PRIJZEN + PN + TA)
-        df_scorito = pd.read_csv("bron_startlijsten.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
+        df_scorito = pd.read_csv("data/bron_startlijsten.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
         df_scorito.columns = df_scorito.columns.str.strip()
         if 'Naam' in df_scorito.columns: df_scorito = df_scorito.rename(columns={'Naam': 'Renner'})
         
@@ -168,7 +168,7 @@ def load_and_merge_data(prog_mod_time, scorito_mod_time, stats_mod_time):
         df_prijzen = df_scorito[scorito_cols].drop_duplicates(subset=['Renner'])
 
         # 3. STATS LADEN
-        df_stats = pd.read_csv("renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip') 
+        df_stats = pd.read_csv("data/renners_stats.csv", sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
         df_stats.columns = df_stats.columns.str.strip()
         if 'Naam' in df_stats.columns: df_stats = df_stats.rename(columns={'Naam': 'Renner'})
         if 'Team' not in df_stats.columns and 'Ploeg' in df_stats.columns: df_stats = df_stats.rename(columns={'Ploeg': 'Team'})
@@ -366,9 +366,9 @@ def rebuild_team_and_transfers(df, max_bud, min_bud, max_ren, new_base_team, t_m
     return None, None
 
 # --- HOOFDCODE ---
-prog_t = get_file_mod_time("sporza_prijzen_startlijst.csv")
-scor_t = get_file_mod_time("bron_startlijsten.csv")
-stat_t = get_file_mod_time("renners_stats.csv")
+prog_t = get_file_mod_time("data/sporza_prijzen_startlijst.csv")
+scor_t = get_file_mod_time("data/bron_startlijsten.csv")
+stat_t = get_file_mod_time("data/renners_stats.csv")
 df_raw, available_races, koers_mapping = load_and_merge_data(prog_t, scor_t, stat_t)
 
 if df_raw.empty:
@@ -742,7 +742,7 @@ else:
         
         if toon_uitslagen:
             st.success("✅ Actuele uitslagen ingeladen! Top 20 finishes worden beloond met medailles (🏅). Tabel blijft perfect sorteerbaar.")
-            u_time = get_file_mod_time("uitslagen.csv")
+            u_time = get_file_mod_time("data/uitslagen.csv")
             df_uitslagen = get_uitslagen(u_time, df['Renner'].tolist())
             verreden_koersen = df_uitslagen['Race'].unique() if not df_uitslagen.empty else []
         else:
@@ -828,7 +828,7 @@ with tab4:
     d_df = f_df[['Renner', 'Team', 'Prijs', 'Waarde (EV/M)', 'Type', 'Scorito_EV'] + available_races].copy()
     
     if toon_uitslagen:
-        u_time = get_file_mod_time("uitslagen.csv")
+        u_time = get_file_mod_time("data/uitslagen.csv")
         df_uitslagen_db = get_uitslagen(u_time, df['Renner'].tolist())
         verreden_koersen_db = df_uitslagen_db['Race'].unique() if not df_uitslagen_db.empty else []
     else:

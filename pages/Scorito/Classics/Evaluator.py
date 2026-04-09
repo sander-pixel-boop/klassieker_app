@@ -96,11 +96,11 @@ def get_file_mod_time(filepath):
 @st.cache_data
 def load_data(stats_mod_time):
     try:
-        df_stats = pd.read_csv("renners_stats.csv", sep='\t')
+        df_stats = pd.read_csv("data/renners_stats.csv", sep='\t')
         if len(df_stats.columns) < 3:
-            df_stats = pd.read_csv("renners_stats.csv", sep=None, engine='python')
+            df_stats = pd.read_csv("data/renners_stats.csv", sep=None, engine='python')
     except:
-        df_stats = pd.read_csv("renners_stats.csv", sep=None, engine='python')
+        df_stats = pd.read_csv("data/renners_stats.csv", sep=None, engine='python')
 
     if 'Naam' in df_stats.columns:
         df_stats = df_stats.rename(columns={'Naam': 'Renner'})
@@ -117,20 +117,20 @@ def load_data(stats_mod_time):
     alle_renners = sorted(df_stats['Renner'].dropna().unique())
     return df_stats, alle_renners
 
-stats_time = get_file_mod_time("renners_stats.csv")
+stats_time = get_file_mod_time("data/renners_stats.csv")
 df_stats, alle_renners = load_data(stats_time)
 
 st.divider()
 
 # --- GRAFIEK EN BEREKENING ---
-if not os.path.exists("uitslagen.csv"):
+if not os.path.exists("data/uitslagen.csv"):
     st.error("Bestand `uitslagen.csv` niet gevonden. Zorg dat dit bestand in de hoofddirectory staat.")
 else:
     try:
-        df_raw_uitslagen = pd.read_csv("uitslagen.csv", sep='\t', engine='python')
+        df_raw_uitslagen = pd.read_csv("data/uitslagen.csv", sep='\t', engine='python')
     except Exception as e:
         try:
-             df_raw_uitslagen = pd.read_csv("uitslagen.csv", sep=None, engine='python')
+             df_raw_uitslagen = pd.read_csv("data/uitslagen.csv", sep=None, engine='python')
         except Exception as e2:
              st.error(f"Fout bij inlezen van uitslagen.csv: {e2}")
              st.stop()
