@@ -3,12 +3,12 @@ from unittest.mock import MagicMock
 import sys
 import hashlib
 
-# Mock streamlit before importing utils.crypto
+# Mock streamlit before importing app_utils.crypto
 mock_st = MagicMock()
 mock_st.secrets = {"CRYPTO_SALT": "GeheimeKlassiekerSleutel2026"}
 sys.modules["streamlit"] = mock_st
 
-from utils.crypto import generate_signature, hash_wachtwoord, verify_wachtwoord
+from app_utils.crypto import generate_signature, hash_wachtwoord, verify_wachtwoord
 
 def test_hash_wachtwoord_format():
     ww = "test1234"

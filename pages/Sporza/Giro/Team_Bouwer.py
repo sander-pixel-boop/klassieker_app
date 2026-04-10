@@ -4,9 +4,9 @@ import unicodedata
 import os
 import base64
 import pulp
-from utils.db import init_connection
-from utils.giro_data import load_giro_data, calculate_giro_ev
-from utils.giro_solver import solve_giro_team
+from app_utils.db import init_connection
+from app_utils.giro_data import load_giro_data, calculate_giro_ev
+from app_utils.giro_solver import solve_giro_team
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Giro Etappe Bouwer", layout="wide", page_icon="🇮🇹")

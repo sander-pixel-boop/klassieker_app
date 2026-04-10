@@ -1,5 +1,5 @@
 import pytest
-from utils.name_matching import normalize_name_logic, match_naam_slim, match_uitslag_naam
+from app_utils.name_matching import normalize_name_logic, match_naam_slim, match_uitslag_naam
 
 def test_normalize_name_logic():
     assert normalize_name_logic("Tadej Pogačar") == "tadej pogacar"

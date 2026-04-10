@@ -5,12 +5,12 @@ import json
 import os
 import base64
 from thefuzz import process, fuzz
-from utils.db import init_connection
-from utils.name_matching import match_naam_slim, normalize_name_logic
+from app_utils.db import init_connection
+from app_utils.name_matching import match_naam_slim, normalize_name_logic
 from datetime import datetime
-from utils.claude_predictions import genereer_claude_etappe_voorspellingen
-from utils.giro_data import load_giro_data, calculate_giro_ev
-from utils.giro_solver import solve_giro_team
+from app_utils.claude_predictions import genereer_claude_etappe_voorspellingen
+from app_utils.giro_data import load_giro_data, calculate_giro_ev
+from app_utils.giro_solver import solve_giro_team
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Sporza Giro Suggesties Solver", layout="wide", page_icon="🤖")
