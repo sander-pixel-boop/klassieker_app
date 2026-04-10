@@ -130,7 +130,7 @@ cf_pagina = st.Page("pages/Cycling_Fantasy/Classics/Dashboard.py", title="CF Das
 # Scorito pagina's
 scorito_klassiekers = st.Page("pages/Scorito/Classics/Klassiekers.py", title="Klassiekers", icon="🏆", url_path="scorito_klassiekers")
 scorito_evaluator = st.Page("pages/Scorito/Classics/Evaluator.py", title="Evaluator", icon="📊", url_path="scorito_evaluator")
-scorito_giro = st.Page("pages/Scorito/Giro/Team_Bouwer.py", title="Giro d'Italia", icon="🇮🇹", url_path="scorito_giro")
+scorito_giro = st.Page("pages/Scorito/Giro/scorito_giro_team_bouwer.py", title="Giro d'Italia", icon="🇮🇹", url_path="scorito_giro")
 
 # Sporza pagina's
 sporza_klassiekers = st.Page("pages/Sporza/Classics/Klassiekers.py", title="Klassiekers", icon="🏁", url_path="sporza_klassiekers")
