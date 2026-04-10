@@ -260,8 +260,9 @@ with tab_builder:
             active_w = {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
 
         df_stage = bereken_alle_stage_scores(df, active_w)
-        top_5_namen = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()[:5]
-        top_3_pure_names = top_5_namen[:3]
+        top_5 = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False]).head(5)
+        top_5_namen = [f"{n} ({int(s)})" for n, s in top_5[['Naam', 'StageScore']].values]
+        top_3_pure_names = top_5['Naam'].tolist()[:3]
 
         if huidig_team_namen:
             st.markdown("**Huidige Selectie:**")
