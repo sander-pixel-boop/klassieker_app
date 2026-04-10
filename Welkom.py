@@ -67,7 +67,10 @@ def login_page():
                                     else:
                                         st.error("❌ Onjuiste gebruikersnaam of wachtwoord.")
                                 except Exception as e:
-                                    st.error(f"❌ Kan geen verbinding maken met de database. Probeer het later opnieuw. Error: {e}")
+                                    if "Name or service not known" in str(e) or "Invalid URL" in str(e) or "ConnectError" in str(e):
+                                        st.error("❌ Database configuratie ontbreekt of is ongeldig. Controleer je `.streamlit/secrets.toml` of klik op 'Doorgaan als gast'.")
+                                    else:
+                                        st.error(f"❌ Kan geen verbinding maken met de database. Probeer het later opnieuw. Error: {e}")
                         else:
                             st.warning("Vul beide velden in.")
                         
@@ -94,7 +97,10 @@ def login_page():
                                         except Exception as e:
                                             st.error(f"Fout bij aanmaken account: {e}")
                                 except Exception as e:
-                                    st.error(f"❌ Kan geen verbinding maken met de database. Probeer het later opnieuw. Error: {e}")
+                                    if "Name or service not known" in str(e) or "Invalid URL" in str(e) or "ConnectError" in str(e):
+                                        st.error("❌ Database configuratie ontbreekt of is ongeldig. Controleer je `.streamlit/secrets.toml` of klik op 'Doorgaan als gast'.")
+                                    else:
+                                        st.error(f"❌ Kan geen verbinding maken met de database. Probeer het later opnieuw. Error: {e}")
                         else:
                             st.warning("Vul beide velden in.")
         
