@@ -123,6 +123,7 @@ if "etappe_keuzes"  not in st.session_state: st.session_state.etappe_keuzes  = _
 if "giro_weights_v2" not in st.session_state: st.session_state.giro_weights_v2 = _default_weights.copy()
 if "finaal_team"    not in st.session_state: st.session_state.finaal_team    = []
 if "kopman_keuzes"  not in st.session_state: st.session_state.kopman_keuzes  = _default_kopman.copy()
+if "_finaal_team_selector_m" not in st.session_state: st.session_state._finaal_team_selector_m = []
 
 huidig_team_namen = st.session_state.finaal_team
 huidig_team_df    = df[df['Naam'].isin(huidig_team_namen)].copy() if not df.empty else pd.DataFrame()
@@ -157,6 +158,7 @@ with st.sidebar:
                 st.session_state.etappe_keuzes  = db_data.get("etappe_keuzes",  _default_keuzes.copy())
                 st.session_state.giro_weights_v2 = db_data.get("weights",       _default_weights.copy())
                 st.session_state.finaal_team    = db_data.get("team",           [])
+                st.session_state._finaal_team_selector_m = list(st.session_state.finaal_team)
                 st.session_state.kopman_keuzes  = db_data.get("kopman_keuzes",  _default_kopman.copy())
                 st.rerun()
     else:
@@ -348,6 +350,7 @@ with col_team:
                 res = solve_giro_team(df, draft_counts=draft_counts, max_bud=100.0, max_ren=16, ev_column="EV")
                 if res:
                     st.session_state.finaal_team = res
+                    st.session_state._finaal_team_selector_m = list(res)
                     st.rerun()
                 else:
                     st.error("Kon geen geldig team berekenen.")
@@ -377,4 +380,101 @@ with col_team:
 
             if st.button("🗑️ Wis Team", use_container_width=True):
                 st.session_state.finaal_team = []
+                st.session_state._finaal_team_selector_m = []
                 st.rerun()
+
+st.divider()
+
+if not st.session_state.finaal_team:
+    st.warning("Stel eerst een definitief team samen om de overview te zien.")
+else:
+    # --- TEAM & KOPMAN OVERVIEW ---
+    st.header("Team & Kopman Overzicht")
+
+    # ── Kopman Overzicht Tabel ────────────────────────────────────────
+    st.subheader("🎖️ Kopman per Etappe")
+    st.markdown(
+        "Handmatig ingestelde kopmannen zijn gemarkeerd met **✏️**. "
+        "Auto-kopmannen (op basis van etappeprofiel) zijn gemarkeerd met **🤖**."
+    )
+
+    kopman_overzicht = []
+    for etappe in GIRO_ETAPPES:
+        eid = str(etappe["id"])
+        handmatig = st.session_state.kopman_keuzes.get(eid)
+        auto_k    = bepaal_auto_kopman(huidig_team_namen, etappe["id"], df)
+
+        if handmatig:
+            effectief_kopman = handmatig
+            bron = "✏️ Handmatig"
+        else:
+            effectief_kopman = auto_k
+            bron = "🤖 Auto"
+
+        kopman_overzicht.append({
+            "E":      f"E{etappe['id']}",
+            "Datum":  etappe["date"],
+            "Route":  etappe["route"],
+            "Type":   etappe["type"],
+            "Kopman": effectief_kopman or "-",
+            "Bron":   bron,
+        })
+
+    df_kopman_ovz = pd.DataFrame(kopman_overzicht)
+
+    def kleur_kopman(row):
+        if "Handmatig" in row["Bron"]:
+            return ["background-color: rgba(255,215,0,0.15)"] * len(row)
+        return [""] * len(row)
+
+    st.dataframe(
+        df_kopman_ovz.style.apply(kleur_kopman, axis=1),
+        hide_index=True,
+        use_container_width=True
+    )
+
+    st.divider()
+
+    # ── Opstellingen Matrix ───────────────────────────────────────────
+    st.subheader("📅 Dagelijkse Opstellingen Matrix")
+    st.write(
+        "**©** = Kopman (dubbele punten) &nbsp;|&nbsp; "
+        "**✅** = Basis &nbsp;|&nbsp; **-** = Bank"
+    )
+
+    matrix_data = {renner: {"Renner": renner} for renner in st.session_state.finaal_team}
+
+    for etappe in GIRO_ETAPPES:
+        eid      = str(etappe["id"])
+        col_name = f"E{etappe['id']}"
+        cw       = st.session_state.giro_weights_v2[eid]
+
+        for renner in st.session_state.finaal_team:
+            matrix_data[renner][col_name] = "-"
+
+        voorspeld = [n for n in st.session_state.etappe_keuzes[eid] if n and n in st.session_state.finaal_team]
+        w = cw if sum(cw.values()) > 0 else {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
+
+        team_stage_df = bereken_alle_stage_scores(huidig_team_df, w)
+
+        voorspeld_df = team_stage_df[team_stage_df['Naam'].isin(voorspeld)] if voorspeld else pd.DataFrame()
+        rest_df      = team_stage_df[~team_stage_df['Naam'].isin(voorspeld)].sort_values('StageScore', ascending=False)
+        top_9_df     = pd.concat([voorspeld_df, rest_df]).head(9)
+
+        # Bepaal kopman voor deze etappe
+        handmatig_km  = st.session_state.kopman_keuzes.get(eid)
+        starters_lijst = top_9_df['Naam'].tolist()
+        if handmatig_km and handmatig_km in starters_lijst:
+            effectief_km = handmatig_km
+        elif handmatig_km and handmatig_km not in starters_lijst:
+            # Handmatig kopman zit niet in de 9 starters → waarschuwing
+            effectief_km = handmatig_km  # toch tonen zodat gebruiker het ziet
+        else:
+            # Auto: eerste (hoogst scorende) starter
+            effectief_km = starters_lijst[0] if starters_lijst else None
+
+        for renner_naam in starters_lijst:
+            matrix_data[renner_naam][col_name] = "©" if renner_naam == effectief_km else "✅"
+
+    matrix_df_display = pd.DataFrame(list(matrix_data.values()))
+    st.dataframe(matrix_df_display, hide_index=True, use_container_width=True)
