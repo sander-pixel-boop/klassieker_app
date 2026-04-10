@@ -113,8 +113,10 @@ def match_naam(naam, alle_renners):
 
 @st.cache_data
 def load_stats():
-    if not os.path.exists("data/renners_stats.csv"): return pd.DataFrame()
-    df = pd.read_csv("data/renners_stats.csv", sep=None, engine='python')
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    stats_file = os.path.join(base_dir, "data", "renners_stats.csv")
+    if not os.path.exists(stats_file): return pd.DataFrame()
+    df = pd.read_csv(stats_file, sep=None, engine='python')
     if 'Naam' in df.columns: df = df.rename(columns={'Naam': 'Renner'})
     for col in ['GC', 'SPR', 'ITT', 'MTN']:
         if col not in df.columns: df[col] = 0
