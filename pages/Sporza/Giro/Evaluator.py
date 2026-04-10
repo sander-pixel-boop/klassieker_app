@@ -18,7 +18,7 @@ if "ingelogde_speler" not in st.session_state:
 speler_naam = st.session_state["ingelogde_speler"]
 
 supabase = init_connection()
-TABEL_NAAM = "gebruikers_data_test"
+TABEL_NAAM = st.secrets.get("TABEL_NAAM", "gebruikers_data_test")
 
 # --- CONSTANTEN ---
 GIRO_ETAPPES = list(range(1, 22))  # 21 etappes
