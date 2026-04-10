@@ -273,13 +273,15 @@ with tab_builder:
             with wissel_col1:
                 rider_out = st.selectbox(
                     "❌ Verwijder:",
-                    options=sorted(huidig_team_namen)
+                    options=sorted(huidig_team_namen),
+                    key="wissel_uit_col_stage"
                 )
             with wissel_col2:
                 available_riders = sorted([r for r in df['Naam'].tolist() if r not in huidig_team_namen])
                 rider_in = st.selectbox(
                     "✅ Toevoegen:",
-                    options=available_riders
+                    options=available_riders,
+                    key="wissel_in_col_stage"
                 )
 
             if rider_out and rider_in:
@@ -304,7 +306,7 @@ with tab_builder:
                 if nieuw_budget < 0:
                     st.error("🚨 Deze wissel overschrijdt het budget!")
                 else:
-                    if st.button("🔄 Bevestig Wissel", use_container_width=True, type="primary"):
+                    if st.button("🔄 Bevestig Wissel", use_container_width=True, type="primary", key="btn_bevestig_wissel_stage"):
                         st.session_state.finaal_team.remove(rider_out)
                         st.session_state.finaal_team.append(rider_in)
                         st.session_state._finaal_team_selector_m = list(st.session_state.finaal_team)
@@ -432,13 +434,15 @@ with tab_builder:
                 with wissel_col1:
                     rider_out = st.selectbox(
                         "❌ Verwijder:",
-                        options=sorted(huidig_team_namen)
+                        options=sorted(huidig_team_namen),
+                        key="wissel_uit_col_team"
                     )
                 with wissel_col2:
                     available_riders = sorted([r for r in df['Naam'].tolist() if r not in huidig_team_namen])
                     rider_in = st.selectbox(
                         "✅ Toevoegen:",
-                        options=available_riders
+                        options=available_riders,
+                        key="wissel_in_col_team"
                     )
 
                 if rider_out and rider_in:
@@ -450,7 +454,7 @@ with tab_builder:
                     if nieuw_budget < 0:
                         st.error("🚨 Deze wissel overschrijdt het budget!")
                     else:
-                        if st.button("🔄 Bevestig Wissel", use_container_width=True, type="primary"):
+                        if st.button("🔄 Bevestig Wissel", use_container_width=True, type="primary", key="btn_bevestig_wissel_team"):
                             st.session_state.finaal_team.remove(rider_out)
                             st.session_state.finaal_team.append(rider_in)
                             st.session_state._finaal_team_selector_m = list(st.session_state.finaal_team)
