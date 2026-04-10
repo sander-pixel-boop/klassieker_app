@@ -378,6 +378,37 @@ with col_team:
             st.markdown("**Huidige Selectie:**")
             st.dataframe(huidig_team_df[['Naam', 'Type', 'Prijs']].sort_values('Prijs', ascending=False), hide_index=True, use_container_width=True)
 
+            st.markdown("##### 🔄 Wissel Renners")
+            wissel_col1, wissel_col2 = st.columns(2)
+            with wissel_col1:
+                rider_out = st.selectbox(
+                    "❌ Verwijder:",
+                    options=sorted(huidig_team_namen)
+                )
+            with wissel_col2:
+                available_riders = sorted([r for r in df['Naam'].tolist() if r not in huidig_team_namen])
+                rider_in = st.selectbox(
+                    "✅ Toevoegen:",
+                    options=available_riders
+                )
+
+            if rider_out and rider_in:
+                r_out_data = df[df['Naam'] == rider_out].iloc[0]
+                r_in_data = df[df['Naam'] == rider_in].iloc[0]
+                nieuw_budget = round(100 - totaal_prijs + r_out_data['Prijs'] - r_in_data['Prijs'], 2)
+                st.markdown(f"**Nieuw budget na wissel:** €{nieuw_budget}M")
+
+                if nieuw_budget < 0:
+                    st.error("🚨 Deze wissel overschrijdt het budget!")
+                else:
+                    if st.button("🔄 Bevestig Wissel", use_container_width=True, type="primary"):
+                        st.session_state.finaal_team.remove(rider_out)
+                        st.session_state.finaal_team.append(rider_in)
+                        st.session_state._finaal_team_selector_m = list(st.session_state.finaal_team)
+                        st.rerun()
+
+            st.divider()
+
             if st.button("🗑️ Wis Team", use_container_width=True):
                 st.session_state.finaal_team = []
                 st.session_state._finaal_team_selector_m = []
