@@ -5,7 +5,7 @@ import unicodedata
 import os
 import functools
 from thefuzz import process, fuzz
-from utils.db import init_connection
+from app_utils.db import init_connection
 from datetime import datetime
 
 # --- CONFIGURATIE ---

@@ -4,9 +4,9 @@ import pulp
 import json
 import os
 import itertools
-from utils.db import init_connection
+from app_utils.db import init_connection
 from datetime import datetime
-from utils.name_matching import normalize_name_logic, match_naam_slim, match_uitslag_naam
+from app_utils.name_matching import normalize_name_logic, match_naam_slim, match_uitslag_naam
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Scorito Klassiekers AI", layout="wide", page_icon="🏆")

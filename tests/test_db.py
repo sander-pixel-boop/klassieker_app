@@ -23,7 +23,7 @@ sys.modules["streamlit"] = mock_st
 sys.modules["supabase"] = mock_supabase
 
 # Now import the module to test
-from utils.db import init_connection
+from app_utils.db import init_connection
 
 def test_init_connection_success():
     """Test that init_connection correctly initializes the Supabase client with secrets."""

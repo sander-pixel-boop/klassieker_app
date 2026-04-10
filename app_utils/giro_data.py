@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 import streamlit as st
-from utils.name_matching import match_naam_slim, normalize_name_logic
+from app_utils.name_matching import match_naam_slim, normalize_name_logic
 
 @st.cache_data
 def load_giro_data():

@@ -4,8 +4,8 @@ import pulp
 import json
 import os
 from thefuzz import process, fuzz
-from utils.db import init_connection
-from utils.name_matching import normalize_name_logic
+from app_utils.db import init_connection
+from app_utils.name_matching import normalize_name_logic
 from datetime import datetime
 
 # --- CONFIGURATIE ---

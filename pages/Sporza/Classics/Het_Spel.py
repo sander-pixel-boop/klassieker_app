@@ -3,8 +3,8 @@ import pandas as pd
 import os
 from datetime import datetime
 from thefuzz import process, fuzz
-from utils.db import init_connection
-from utils.crypto import generate_signature
+from app_utils.db import init_connection
+from app_utils.crypto import generate_signature
 
 # 1. Paginaconfiguratie
 st.set_page_config(page_title="Custom Klassiekers Spel", layout="wide", page_icon="🎮")

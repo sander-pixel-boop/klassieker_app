@@ -1,6 +1,6 @@
 import streamlit as st
-from utils.db import init_connection
-from utils.crypto import hash_wachtwoord, verify_wachtwoord
+from app_utils.db import init_connection
+from app_utils.crypto import hash_wachtwoord, verify_wachtwoord
 
 st.set_page_config(page_title="Wieler Spellen Solver", page_icon="🚴‍♂️", layout="wide")
 
