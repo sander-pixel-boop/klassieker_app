@@ -22,9 +22,9 @@ tabel_naam = st.secrets["TABEL_NAAM"]
 
 # --- HULPFUNCTIES ---
 def is_team_locked():
-    if os.path.exists("uitslagen.csv"):
+    if os.path.exists("data/uitslagen.csv"):
         try:
-            df_u = pd.read_csv("uitslagen.csv", sep=None, engine='python')
+            df_u = pd.read_csv("data/uitslagen.csv", sep=None, engine='python')
             df_u.columns = [str(c).strip().title() for c in df_u.columns]
             if 'Race' in df_u.columns:
                 verreden = [str(x).strip().upper() for x in df_u['Race'].unique()]
@@ -59,8 +59,8 @@ def load_game_data():
 @st.cache_data
 def load_csv_data():
     try:
-        df_p = pd.read_csv("sporza_prijzen_startlijst.csv", sep=None, engine='python')
-        df_s = pd.read_csv("renners_stats.csv", sep=None, engine='python')
+        df_p = pd.read_csv("data/sporza_prijzen_startlijst.csv", sep=None, engine='python')
+        df_s = pd.read_csv("data/renners_stats.csv", sep=None, engine='python')
         if 'Naam' in df_p.columns: df_p = df_p.rename(columns={'Naam': 'Renner'})
         if 'Naam' in df_s.columns: df_s = df_s.rename(columns={'Naam': 'Renner'})
         

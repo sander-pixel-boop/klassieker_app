@@ -113,8 +113,8 @@ def match_naam(naam, alle_renners):
 
 @st.cache_data
 def load_stats():
-    if not os.path.exists("renners_stats.csv"): return pd.DataFrame()
-    df = pd.read_csv("renners_stats.csv", sep=None, engine='python')
+    if not os.path.exists("data/renners_stats.csv"): return pd.DataFrame()
+    df = pd.read_csv("data/renners_stats.csv", sep=None, engine='python')
     if 'Naam' in df.columns: df = df.rename(columns={'Naam': 'Renner'})
     for col in ['GC', 'SPR', 'ITT', 'MTN']:
         if col not in df.columns: df[col] = 0
@@ -128,7 +128,7 @@ def load_giro_results():
     Kolommen: Stage, Rnk, Rider
     Rnk kan 1-200, DNF, DNS, OTL zijn.
     """
-    path = "giro262/giro_uitslagen.csv"
+    path = "data/giro262/giro_uitslagen.csv"
     if not os.path.exists(path): return pd.DataFrame()
     try:
         df = pd.read_csv(path, sep=None, engine='python')

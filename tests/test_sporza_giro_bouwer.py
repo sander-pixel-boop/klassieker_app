@@ -11,8 +11,10 @@ def giro_bouwer_module():
     st.session_state["ingelogde_speler"] = "test"
     st.secrets = {"SUPABASE_URL": "http://mock", "SUPABASE_KEY": "mock"}
 
-    with patch("supabase.create_client"):
-        spec = importlib.util.spec_from_file_location("sporza_giro", "pages/Sporza_Giro_Bouwer.py")
+    with patch("supabase.create_client"), patch("utils.giro_data.load_giro_data") as mock_load:
+        import pandas as pd
+        mock_load.return_value = pd.DataFrame(columns=["Renner", "Prijs", "GC", "SPR", "ITT", "MTN"])
+        spec = importlib.util.spec_from_file_location("sporza_giro", "pages/Sporza/Giro/Team_Bouwer.py")
         sporza_giro = importlib.util.module_from_spec(spec)
         sys.modules["sporza_giro"] = sporza_giro
 

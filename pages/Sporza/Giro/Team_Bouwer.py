@@ -47,7 +47,7 @@ GIRO_ETAPPES = [
 ]
 
 def laad_profiel_scores():
-    bestand = "giro262/profile_score.csv"
+    bestand = "data/giro262/profile_score.csv"
     if os.path.exists(bestand):
         try:
             df_scores = pd.read_csv(bestand, sep=None, engine='python')
@@ -315,8 +315,8 @@ with tab1:
 
     with col_img:
         giro_link = "https://www.giroditalia.it/en/the-route/"
-        map_path  = f"giro262/giro26-{etappe['id']}-map.jpg"
-        prof_path = f"giro262/giro26-{etappe['id']}-hp.jpg"
+        map_path  = f"data/giro262/giro26-{etappe['id']}-map.jpg"
+        prof_path = f"data/giro262/giro26-{etappe['id']}-hp.jpg"
         i1, i2 = st.columns(2)
         i1.markdown(get_clickable_image_html(map_path,  f"Kaart+{etappe['id']}", giro_link), unsafe_allow_html=True)
         i2.markdown(get_clickable_image_html(prof_path, f"Profiel+{etappe['id']}", giro_link), unsafe_allow_html=True)

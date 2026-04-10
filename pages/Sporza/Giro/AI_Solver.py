@@ -8,7 +8,7 @@ from thefuzz import process, fuzz
 from utils.db import init_connection
 from utils.name_matching import match_naam_slim, normalize_name_logic
 from datetime import datetime
-from claude_predictions import genereer_claude_etappe_voorspellingen
+from utils.claude_predictions import genereer_claude_etappe_voorspellingen
 from utils.giro_data import load_giro_data, calculate_giro_ev
 from utils.giro_solver import solve_giro_team
 
@@ -51,7 +51,7 @@ GIRO_ETAPPES = [
 ]
 
 def laad_profiel_scores():
-    bestand = "giro262/profile_score.csv"
+    bestand = "data/giro262/profile_score.csv"
     if os.path.exists(bestand):
         try:
             df_scores = pd.read_csv(bestand, sep=None, engine='python')
@@ -254,8 +254,8 @@ with tab2:
         with st.expander(f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']}) | 🎯 {weight_str}{picks_badge}"):
 
             giro_link = "https://www.giroditalia.it/en/the-route/"
-            map_path  = f"giro262/giro26-{etappe['id']}-map.jpg"
-            prof_path = f"giro262/giro26-{etappe['id']}-hp.jpg"
+            map_path  = f"data/giro262/giro26-{etappe['id']}-map.jpg"
+            prof_path = f"data/giro262/giro26-{etappe['id']}-hp.jpg"
 
             st.markdown("*(Klik op een afbeelding voor de officiële info)*")
             i1, i2 = st.columns(2)

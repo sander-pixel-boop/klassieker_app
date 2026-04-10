@@ -14,8 +14,8 @@ st.set_page_config(page_title="Cycling Fantasy AI", layout="wide", page_icon="ðŸ
 # --- PADEN NAAR BRONBESTANDEN (IN MAIN) ---
 # Omdat dit script in pages/ staat, zoeken we in de root map.
 # Streamlit Cloud voert uit vanuit de root, dus directe bestandsnamen werken meestal.
-STATS_PATH = "renners_stats.csv"
-PRICES_PATH = "cf_prijzen.csv"
+STATS_PATH = "data/renners_stats.csv"
+PRICES_PATH = "data/cf_prijzen.csv"
 
 # --- STATISCHE DATA LADEN (STATS + PRIJZEN) ---
 @st.cache_data
