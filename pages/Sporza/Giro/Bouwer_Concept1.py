@@ -259,6 +259,10 @@ with tab_builder:
         else:
             active_w = {"SPR": 0.25, "GC": 0.25, "ITT": 0.25, "MTN": 0.25}
 
+        df_stage = bereken_alle_stage_scores(df, active_w)
+        top_5_namen = df_stage.sort_values(by=['StageScore', 'EV'], ascending=[False, False])['Naam'].tolist()[:5]
+        top_3_pure_names = top_5_namen[:3]
+
         if huidig_team_namen:
             st.markdown("**Huidige Selectie:**")
             st.dataframe(huidig_team_df[['Naam', 'Type', 'Prijs']].sort_values('Prijs', ascending=False), hide_index=True, use_container_width=True)
