@@ -28,7 +28,7 @@ Stack (most recent call last):
     pg.run()
   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/navigation/page.py", line 490, in run
     exec(code, module.__dict__)  # noqa: S102
-  File "/app/pages/Sporza/Giro/Bouwer_Concept1.py", line 366, in <module>
+  File "/app/pages/Sporza/Giro/Bouwer_Concept1.py", line 369, in <module>
     st.multiselect(
   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/runtime/metrics_util.py", line 563, in wrapped_func
     result = non_optional_func(*args, **kwargs)
