@@ -398,6 +398,19 @@ with col_team:
                 nieuw_budget = round(100 - totaal_prijs + r_out_data['Prijs'] - r_in_data['Prijs'], 2)
                 st.markdown(f"**Nieuw budget na wissel:** €{nieuw_budget}M")
 
+                st.markdown("##### 📊 Vergelijking")
+                comp_cols = st.columns(6)
+
+                def format_delta(in_val, out_val):
+                    return round(in_val - out_val, 1)
+
+                comp_cols[0].metric("Prijs", f"€{r_in_data['Prijs']}M", f"{format_delta(r_in_data['Prijs'], r_out_data['Prijs'])}M", delta_color="inverse")
+                comp_cols[1].metric("EV", int(r_in_data['EV']), int(format_delta(r_in_data['EV'], r_out_data['EV'])))
+                comp_cols[2].metric("GC", int(r_in_data['GC']), int(format_delta(r_in_data['GC'], r_out_data['GC'])))
+                comp_cols[3].metric("SPR", int(r_in_data['SPR']), int(format_delta(r_in_data['SPR'], r_out_data['SPR'])))
+                comp_cols[4].metric("ITT", int(r_in_data['ITT']), int(format_delta(r_in_data['ITT'], r_out_data['ITT'])))
+                comp_cols[5].metric("MTN", int(r_in_data['MTN']), int(format_delta(r_in_data['MTN'], r_out_data['MTN'])))
+
                 if nieuw_budget < 0:
                     st.error("🚨 Deze wissel overschrijdt het budget!")
                 else:

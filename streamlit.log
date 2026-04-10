@@ -6,9 +6,9 @@ Collecting usage statistics. To deactivate, set browser.gatherUsageStats to fals
 
   Local URL: http://localhost:8501
   Network URL: http://192.168.0.2:8501
-  External URL: http://35.224.132.190:8501
+  External URL: http://34.134.215.5:8501
 
-2026-04-10 10:11:43.219 The widget with key "_finaal_team_selector_m" was created with a default value but also had its value set via the Session State API.
+2026-04-10 12:50:37.554 The widget with key "_finaal_team_selector_m" was created with a default value but also had its value set via the Session State API.
 Stack (most recent call last):
   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/threading.py", line 1032, in _bootstrap
     self._bootstrap_inner()
@@ -24,7 +24,7 @@ Stack (most recent call last):
     result = func()
   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 689, in code_to_exec
     exec(code, module.__dict__)  # noqa: S102
-  File "/app/Welkom.py", line 145, in <module>
+  File "/app/Welkom.py", line 154, in <module>
     pg.run()
   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/navigation/page.py", line 490, in run
     exec(code, module.__dict__)  # noqa: S102
@@ -40,32 +40,47 @@ Stack (most recent call last):
     check_session_state_rules(
   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/elements/lib/policies.py", line 91, in check_session_state_rules
     _LOGGER.warning(
-2026-04-10 10:11:46.381 Please replace `use_container_width` with `width`.
+2026-04-10 12:50:42.764 Please replace `use_container_width` with `width`.
 
 `use_container_width` will be removed after 2025-12-31.
 
 For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
-2026-04-10 10:11:46.597 Please replace `use_container_width` with `width`.
+2026-04-10 12:50:42.984 Please replace `use_container_width` with `width`.
 
 `use_container_width` will be removed after 2025-12-31.
 
 For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
-2026-04-10 10:11:46.807 Please replace `use_container_width` with `width`.
+2026-04-10 12:50:43.135 Please replace `use_container_width` with `width`.
 
 `use_container_width` will be removed after 2025-12-31.
 
 For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
-2026-04-10 10:12:30.876 Please replace `use_container_width` with `width`.
+2026-04-10 12:51:26.590 Please replace `use_container_width` with `width`.
 
 `use_container_width` will be removed after 2025-12-31.
 
 For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
-2026-04-10 10:12:30.979 Please replace `use_container_width` with `width`.
+2026-04-10 12:51:26.702 Please replace `use_container_width` with `width`.
 
 `use_container_width` will be removed after 2025-12-31.
 
 For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
-2026-04-10 10:12:31.138 Please replace `use_container_width` with `width`.
+2026-04-10 12:51:26.843 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-04-10 12:52:33.653 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-04-10 12:52:33.766 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-04-10 12:52:33.898 Please replace `use_container_width` with `width`.
 
 `use_container_width` will be removed after 2025-12-31.
 
