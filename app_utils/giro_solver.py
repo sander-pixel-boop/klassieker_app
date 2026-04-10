@@ -2,7 +2,7 @@ import pulp
 import pandas as pd
 
 def solve_giro_team(df, draft_counts=None, max_bud=100.0, max_ren=16, max_per_team=None, force_base=None, ban_base=None, ev_column='EV'):
-    prob = pulp.LpProblem("Sporza_Giro_Solver", pulp.LpMaximize)
+    prob = pulp.LpProblem("Scorito_Giro_Solver", pulp.LpMaximize)
     x = pulp.LpVariable.dicts("Select", df.index, cat='Binary')
 
     df_solve = df.copy()
