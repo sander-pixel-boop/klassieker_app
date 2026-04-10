@@ -22,7 +22,7 @@ if "ingelogde_speler" not in st.session_state:
 speler_naam = st.session_state["ingelogde_speler"]
 
 supabase = init_connection()
-TABEL_NAAM = "gebruikers_data_test"
+TABEL_NAAM = st.secrets.get("TABEL_NAAM", "gebruikers_data_test")
 DB_KOLOM = "sporza_giro_team26"
 
 # --- ETAPPE DATA ---

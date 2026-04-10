@@ -1,31 +1,42 @@
 import pytest
 from unittest.mock import MagicMock
 import sys
+import hashlib
 
 # Mock streamlit before importing utils.crypto
 mock_st = MagicMock()
 mock_st.secrets = {"CRYPTO_SALT": "GeheimeKlassiekerSleutel2026"}
 sys.modules["streamlit"] = mock_st
 
-from utils.crypto import generate_signature, hash_wachtwoord
+from utils.crypto import generate_signature, hash_wachtwoord, verify_wachtwoord
 
-def test_hash_wachtwoord_basic():
+def test_hash_wachtwoord_format():
     ww = "test1234"
-    # SHA-256 for "test1234"
-    expected = "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244"
-    assert hash_wachtwoord(ww) == expected
+    hashed = hash_wachtwoord(ww)
+    assert hashed.startswith("pbkdf2_sha256$600000$")
+    parts = hashed.split("$")
+    assert len(parts) == 4
+    # The salt should be 32 hex chars (16 bytes)
+    assert len(parts[2]) == 32
+    # The hash should be 64 hex chars (32 bytes)
+    assert len(parts[3]) == 64
 
-def test_hash_wachtwoord_deterministic():
+def test_hash_wachtwoord_is_salted():
+    ww = "test1234"
+    # Even with same password, salting should result in different hashes
+    assert hash_wachtwoord(ww) != hash_wachtwoord(ww)
+
+def test_verify_wachtwoord_pbkdf2():
     ww = "cycling2024"
-    assert hash_wachtwoord(ww) == hash_wachtwoord(ww)
+    hashed = hash_wachtwoord(ww)
+    assert verify_wachtwoord(ww, hashed) is True
+    assert verify_wachtwoord("wrongpassword", hashed) is False
 
-def test_hash_wachtwoord_distinct():
-    assert hash_wachtwoord("wachtwoord1") != hash_wachtwoord("wachtwoord2")
-
-def test_hash_wachtwoord_empty():
-    # SHA-256 for empty string
-    expected = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    assert hash_wachtwoord("") == expected
+def test_verify_wachtwoord_legacy():
+    ww = "legacy123"
+    legacy_hash = hashlib.sha256(ww.encode()).hexdigest()
+    assert verify_wachtwoord(ww, legacy_hash) is True
+    assert verify_wachtwoord("wrongpassword", legacy_hash) is False
 
 def test_generate_signature_basic():
     data = {"name": "Wout", "team": "Visma"}

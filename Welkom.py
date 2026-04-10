@@ -1,12 +1,12 @@
 import streamlit as st
 from utils.db import init_connection
-from utils.crypto import hash_wachtwoord
+from utils.crypto import hash_wachtwoord, verify_wachtwoord
 
 st.set_page_config(page_title="Wieler Spellen Solver", page_icon="🚴‍♂️", layout="wide")
 
 # --- DATABASE CONNECTIE ---
 supabase = init_connection()
-TABEL_NAAM = "gebruikers_data_test"
+TABEL_NAAM = st.secrets.get("TABEL_NAAM", "gebruikers_data_test")
 
 # --- INLOG PAGINA (Landingspagina Lay-out) ---
 def login_page():
@@ -52,13 +52,22 @@ def login_page():
                             with st.spinner("Aanmelden..."):
                                 try:
                                     res = supabase.table(TABEL_NAAM).select("password").eq("username", inlog_naam.lower()).execute()
-                                    if res.data and res.data[0].get("password") == hash_wachtwoord(inlog_ww):
-                                        st.session_state["ingelogde_speler"] = inlog_naam.lower()
-                                        st.rerun()
+                                    if res.data:
+                                        db_password = res.data[0].get("password")
+                                        if verify_wachtwoord(inlog_ww, db_password):
+                                            # Upgrade legacy SHA-256 hash to PBKDF2 hash automatically
+                                            if not db_password.startswith("pbkdf2_sha256$"):
+                                                new_hash = hash_wachtwoord(inlog_ww)
+                                                supabase.table(TABEL_NAAM).update({"password": new_hash}).eq("username", inlog_naam.lower()).execute()
+
+                                            st.session_state["ingelogde_speler"] = inlog_naam.lower()
+                                            st.rerun()
+                                        else:
+                                            st.error("❌ Onjuiste gebruikersnaam of wachtwoord.")
                                     else:
                                         st.error("❌ Onjuiste gebruikersnaam of wachtwoord.")
                                 except Exception as e:
-                                    st.error("❌ Kan geen verbinding maken met de database. Probeer het later opnieuw.")
+                                    st.error(f"❌ Kan geen verbinding maken met de database. Probeer het later opnieuw. Error: {e}")
                         else:
                             st.warning("Vul beide velden in.")
                         
@@ -85,7 +94,7 @@ def login_page():
                                         except Exception as e:
                                             st.error(f"Fout bij aanmaken account: {e}")
                                 except Exception as e:
-                                    st.error("❌ Kan geen verbinding maken met de database. Probeer het later opnieuw.")
+                                    st.error(f"❌ Kan geen verbinding maken met de database. Probeer het later opnieuw. Error: {e}")
                         else:
                             st.warning("Vul beide velden in.")
         
