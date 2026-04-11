@@ -221,10 +221,10 @@ elif st.session_state.wizard_step == 2:
     if "aktieve_etappe_idx" not in st.session_state: st.session_state.aktieve_etappe_idx = 0
 
     nav_left, nav_mid, nav_right = st.columns([1, 4, 1])
-    if nav_left.button("◀ Vorige Etappe", use_container_width=True, disabled=st.session_state.aktieve_etappe_idx == 0):
+    if nav_left.button("◀ Vorige Etappe", use_container_width=True, disabled=st.session_state.aktieve_etappe_idx == 0, help="Je bent al bij de eerste etappe." if st.session_state.aktieve_etappe_idx == 0 else "Ga naar de vorige etappe."):
         st.session_state.aktieve_etappe_idx -= 1
         st.rerun()
-    if nav_right.button("Volgende Etappe ▶", use_container_width=True, disabled=st.session_state.aktieve_etappe_idx == len(GIRO_ETAPPES) - 1):
+    if nav_right.button("Volgende Etappe ▶", use_container_width=True, disabled=st.session_state.aktieve_etappe_idx == len(GIRO_ETAPPES) - 1, help="Je bent al bij de laatste etappe." if st.session_state.aktieve_etappe_idx == len(GIRO_ETAPPES) - 1 else "Ga naar de volgende etappe."):
         st.session_state.aktieve_etappe_idx += 1
         st.rerun()
 
