@@ -182,6 +182,16 @@ with st.sidebar:
 st.title("🗂️ Concept 1: Master-Detail Layout")
 st.markdown("*Data en Statistieken van [Wielerorakel](https://wielerorakel.nl/)*")
 
+with st.expander("ℹ️ Hoe werkt deze tool?"):
+    st.markdown("""
+    Deze tool gebruikt een **Master-Detail Layout** met drie kolommen:
+    1. **Linkerkolom (Navigatie):** Navigeer tussen de verschillende etappes.
+    2. **Middelste kolom (Actieve Etappe):** Bekijk het etappeprofiel, stel de weging in, en voorspel de top 3 en kopman voor de actieve etappe.
+    3. **Rechterkolom (Team):** Bekijk je huidige team en budget, voeg renners toe of verwijder ze, en bereken het optimale team.
+
+    Onderaan de pagina vind je een overzicht van je dagelijkse opstellingen en kopmannen.
+    """)
+
 if df.empty:
     st.error("Databestanden niet gevonden.")
     st.stop()

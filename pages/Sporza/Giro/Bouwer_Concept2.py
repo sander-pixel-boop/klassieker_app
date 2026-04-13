@@ -180,6 +180,15 @@ with st.sidebar:
 st.title("🪄 Concept 2: Step-by-Step Wizard Layout")
 st.markdown("*Data en Statistieken van [Wielerorakel](https://wielerorakel.nl/)*")
 
+with st.expander("ℹ️ Hoe werkt deze tool?"):
+    st.markdown("""
+    Deze tool gebruikt een **Step-by-Step Wizard Layout** met vier stappen:
+    1. **1. Orientatie:** Bekijk de statistieken en prijzen van alle renners.
+    2. **2. De Tekentafel:** Navigeer door de etappes, bekijk het profiel, pas de weging aan en voorspel de top 3 per etappe.
+    3. **3. Team Selectie:** Bekijk je voorspellingen, bereken het optimale team, of selecteer zelf handmatig je 16 renners.
+    4. **4. De Koers (Overzicht):** Bekijk het uiteindelijke overzicht van je dagelijkse opstellingen en kopmannen per etappe.
+    """)
+
 if df.empty:
     st.error("Databestanden niet gevonden.")
     st.stop()
