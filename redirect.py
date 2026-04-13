@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # --- VUL HIER JE NIEUWE URL IN ---
-nieuwe_url = "https://JOUW-NIEUWE-NAAM.streamlit.app"
+nieuwe_url = "https://wielerspelknecht.streamlit.app"
 
 st.set_page_config(page_title="App Verhuisd", page_icon="🚀")
 
