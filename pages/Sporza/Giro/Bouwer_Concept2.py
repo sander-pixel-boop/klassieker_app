@@ -193,7 +193,7 @@ steps = ["1. Orientatie", "2. De Tekentafel", "3. Team Selectie", "4. De Koers (
 for i, col in enumerate(cols):
     step_num = i + 1
     if step_num == st.session_state.wizard_step:
-        col.button(f"**{steps[i]}**", use_container_width=True, type="primary", disabled=True)
+        col.button(f"**{steps[i]}**", use_container_width=True, type="primary", disabled=True, help="Je bevindt je momenteel in deze stap.")
     else:
         if col.button(steps[i], use_container_width=True):
             st.session_state.wizard_step = step_num
@@ -221,10 +221,12 @@ elif st.session_state.wizard_step == 2:
     if "aktieve_etappe_idx" not in st.session_state: st.session_state.aktieve_etappe_idx = 0
 
     nav_left, nav_mid, nav_right = st.columns([1, 4, 1])
-    if nav_left.button("◀ Vorige Etappe", use_container_width=True, disabled=st.session_state.aktieve_etappe_idx == 0):
+    is_first = st.session_state.aktieve_etappe_idx == 0
+    if nav_left.button("◀ Vorige Etappe", use_container_width=True, disabled=is_first, help="Je bent al bij de eerste etappe." if is_first else None):
         st.session_state.aktieve_etappe_idx -= 1
         st.rerun()
-    if nav_right.button("Volgende Etappe ▶", use_container_width=True, disabled=st.session_state.aktieve_etappe_idx == len(GIRO_ETAPPES) - 1):
+    is_last = st.session_state.aktieve_etappe_idx == len(GIRO_ETAPPES) - 1
+    if nav_right.button("Volgende Etappe ▶", use_container_width=True, disabled=is_last, help="Je bent al bij de laatste etappe." if is_last else None):
         st.session_state.aktieve_etappe_idx += 1
         st.rerun()
 
