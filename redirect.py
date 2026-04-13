@@ -1,10 +1,10 @@
 import streamlit as st
 
-nieuwe_url = "https://wielerspelhelper.streamlit.app"
+nieuwe_url = "https://wielerspelknecht.streamlit.app"
 
 st.set_page_config(page_title="App Verhuisd", page_icon="🚀")
 
-st.warning(f"⚠️ De Wielermanager AI is verhuisd naar een nieuwe link:\n\n**[{nieuwe_url}]({nieuwe_url})**")
+st.warning(f"⚠️ De Wielerspel Knecht is verhuisd naar een nieuwe link:\n\n**[{nieuwe_url}]({nieuwe_url})**")
 st.write("Sla de nieuwe link op in je favorieten. Je wordt over 5 seconden automatisch doorgestuurd.")
 
 # Automatische redirect (HTML/JS)
