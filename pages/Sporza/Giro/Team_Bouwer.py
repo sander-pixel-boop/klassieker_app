@@ -214,11 +214,13 @@ with tab1:
     # Top nav: previous / stage selector / next
     nav_left, nav_mid, nav_right = st.columns([1, 4, 1])
     with nav_left:
-        if st.button("◀ Vorige", use_container_width=True, disabled=st.session_state.aktieve_etappe_idx == 0):
+        is_first = st.session_state.aktieve_etappe_idx == 0
+        if st.button("◀ Vorige", use_container_width=True, disabled=is_first, help="Je bent al bij de eerste etappe." if is_first else None):
             st.session_state.aktieve_etappe_idx -= 1
             st.rerun()
     with nav_right:
-        if st.button("Volgende ▶", use_container_width=True, disabled=st.session_state.aktieve_etappe_idx == len(GIRO_ETAPPES) - 1):
+        is_last = st.session_state.aktieve_etappe_idx == len(GIRO_ETAPPES) - 1
+        if st.button("Volgende ▶", use_container_width=True, disabled=is_last, help="Je bent al bij de laatste etappe." if is_last else None):
             st.session_state.aktieve_etappe_idx += 1
             st.rerun()
     with nav_mid:
@@ -563,7 +565,7 @@ with tab2:
             if nieuw_budget < 0:
                 st.error("🚨 Deze wissel overschrijdt het budget!")
 
-            if st.button("🔄 Bevestig Wissel", disabled=nieuw_budget < 0, type="primary"):
+            if st.button("🔄 Bevestig Wissel", disabled=nieuw_budget < 0, type="primary", help="Je hebt onvoldoende budget voor deze wissel." if nieuw_budget < 0 else None):
                 st.session_state.finaal_team.remove(rider_out)
                 st.session_state.finaal_team.append(rider_in)
                 st.session_state._finaal_team_selector = list(st.session_state.finaal_team)
