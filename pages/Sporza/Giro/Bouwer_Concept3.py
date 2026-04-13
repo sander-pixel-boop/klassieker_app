@@ -180,6 +180,13 @@ with st.sidebar:
 st.title("✂️ Concept 3: Split View (Planning vs Execution)")
 st.markdown("*Data en Statistieken van [Wielerorakel](https://wielerorakel.nl/)*")
 
+with st.expander("ℹ️ Hoe werkt deze tool?"):
+    st.markdown("""
+    Deze tool gebruikt een **Split View Layout** met twee hoofdtabs:
+    1. **🏗️ Planning & Selectie:** Voorspel eerst de etappes door ze bovenaan te selecteren, wegingen in te stellen en de top 3 en kopman te voorspellen. Scrol daarna naar beneden om handmatig je 16 renners te selecteren of het optimale team te berekenen.
+    2. **📅 De Koers (Executie):** Na het selecteren van je team, bekijk je in deze tab het complete overzicht van je dagelijkse opstellingen en kopmannen.
+    """)
+
 if df.empty:
     st.error("Databestanden niet gevonden.")
     st.stop()
