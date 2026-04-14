@@ -79,6 +79,10 @@ df = calculate_giro_ev(df_raw)
 # --- SESSION STATE INITIALISATIE ---
 if "concept5_team" not in st.session_state:
     st.session_state.concept5_team = []
+if "c5_stage_starters" not in st.session_state:
+    st.session_state.c5_stage_starters = {}
+if "c5_stage_captains" not in st.session_state:
+    st.session_state.c5_stage_captains = {}
 
 # Update sessie state vanuit database
 try:
@@ -162,38 +166,109 @@ if set(nieuwe_selectie) != set(st.session_state.concept5_team):
     st.session_state.concept5_team = nieuwe_selectie
     st.rerun()
 
-# --- STAGE MATRIX ---
-st.divider()
-st.subheader("De Koers (Dagelijkse Opstellingen)")
+# --- ETAPPE OVERZICHT & OPSTELLINGEN ---
+if len(st.session_state.concept5_team) == 16:
+    st.divider()
+    st.subheader("Etappe Overzicht & Opstellingen")
+    st.markdown("Bekijk de profielen en selecteer je 9 starters en kopman per etappe.")
 
-if not st.session_state.concept5_team:
-    st.info("Selecteer renners om hun inzetbaarheid per etappe te zien.")
-else:
-    matrix_data = {renner: {"Renner": renner} for renner in st.session_state.concept5_team}
     huidig_team_df = df[df['Naam'].isin(st.session_state.concept5_team)].copy()
 
-    for etappe in GIRO_ETAPPES:
-        col_name = f"E{etappe['id']}"
-        for renner in st.session_state.concept5_team:
-            matrix_data[renner][col_name] = "-"
-
-        # Calculate stage scores
+    def auto_fill_stage(etappe, team_df):
         w = etappe['w']
         som_input = sum(w.values()) or 1.0
         norm_w = {k: v / som_input for k, v in w.items()}
 
-        huidig_team_df['StageScore'] = (
-            huidig_team_df.get('SPR', 0) * norm_w.get('SPR', 0) +
-            huidig_team_df.get('GC',  0) * norm_w.get('GC',  0) +
-            huidig_team_df.get('ITT', 0) * norm_w.get('ITT', 0) +
-            huidig_team_df.get('MTN', 0) * norm_w.get('MTN', 0)
+        team_df['StageScore'] = (
+            team_df.get('SPR', 0) * norm_w.get('SPR', 0) +
+            team_df.get('GC',  0) * norm_w.get('GC',  0) +
+            team_df.get('ITT', 0) * norm_w.get('ITT', 0) +
+            team_df.get('MTN', 0) * norm_w.get('MTN', 0)
         )
 
-        # Get top 9
-        top_9 = huidig_team_df.sort_values('StageScore', ascending=False).head(9)['Naam'].tolist()
-        effectief_km = top_9[0] if top_9 else None
+        top_9 = team_df.sort_values('StageScore', ascending=False).head(9)['Naam'].tolist()
+        capt = top_9[0] if top_9 else None
+        return top_9, capt
 
-        for renner in top_9:
-            matrix_data[renner][col_name] = "©" if renner == effectief_km else "✅"
+    if st.button("🤖 Vul alle opstellingen automatisch in", type="primary", use_container_width=True):
+        for etappe in GIRO_ETAPPES:
+            eid = str(etappe['id'])
+            starters, capt = auto_fill_stage(etappe, huidig_team_df.copy())
+            st.session_state.c5_stage_starters[eid] = starters
+            st.session_state.c5_stage_captains[eid] = capt
+            # Explicitly update the widget keys to ensure the UI updates
+            st.session_state[f"starters_{eid}"] = starters
+            st.session_state[f"capt_{eid}"] = capt
+        st.rerun()
+
+    for etappe in GIRO_ETAPPES:
+        eid = str(etappe['id'])
+        with st.expander(f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']})"):
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                img_path = f"data/giro262/giro26-{etappe['id']}-hp.jpg"
+                if os.path.exists(img_path):
+                    st.image(img_path, use_container_width=True)
+                else:
+                    st.info("Geen profiel beschikbaar.")
+            with col2:
+                # Clean up state if team members changed
+                valid_team = st.session_state.concept5_team
+
+                if eid in st.session_state.c5_stage_starters:
+                    st.session_state.c5_stage_starters[eid] = [r for r in st.session_state.c5_stage_starters[eid] if r in valid_team]
+                    if st.session_state.c5_stage_captains.get(eid) not in valid_team:
+                        st.session_state.c5_stage_captains[eid] = st.session_state.c5_stage_starters[eid][0] if st.session_state.c5_stage_starters[eid] else None
+
+                # Set defaults if not in state
+                if eid not in st.session_state.c5_stage_starters:
+                    starters, capt = auto_fill_stage(etappe, huidig_team_df.copy())
+                    st.session_state.c5_stage_starters[eid] = starters
+                    st.session_state.c5_stage_captains[eid] = capt
+
+                selected_starters = st.multiselect(
+                    "Kies 9 starters",
+                    options=st.session_state.concept5_team,
+                    default=st.session_state.c5_stage_starters[eid],
+                    max_selections=9,
+                    key=f"starters_{eid}"
+                )
+                st.session_state.c5_stage_starters[eid] = selected_starters
+
+                # Ensure captain is valid
+                capt_options = selected_starters if selected_starters else st.session_state.concept5_team
+                current_capt = st.session_state.c5_stage_captains.get(eid)
+                capt_idx = capt_options.index(current_capt) if current_capt in capt_options else 0
+
+                selected_capt = st.selectbox(
+                    "Kies Kopman (x2 ptn)",
+                    options=capt_options,
+                    index=capt_idx,
+                    key=f"capt_{eid}"
+                )
+                st.session_state.c5_stage_captains[eid] = selected_capt
+
+    # --- STAGE MATRIX ---
+    st.divider()
+    st.subheader("De Koers (Dagelijkse Opstellingen)")
+
+    matrix_data = {renner: {"Renner": renner} for renner in st.session_state.concept5_team}
+
+    for etappe in GIRO_ETAPPES:
+        eid = str(etappe['id'])
+        col_name = f"E{etappe['id']}"
+        for renner in st.session_state.concept5_team:
+            matrix_data[renner][col_name] = "-"
+
+        # Use user selections from session state
+        starters = st.session_state.c5_stage_starters.get(eid, [])
+        effectief_km = st.session_state.c5_stage_captains.get(eid)
+
+        for renner in starters:
+            if renner in matrix_data:
+                matrix_data[renner][col_name] = "©" if renner == effectief_km else "✅"
 
     st.dataframe(pd.DataFrame(list(matrix_data.values())), hide_index=True, use_container_width=True)
+else:
+    st.divider()
+    st.info("Selecteer precies 16 renners om de etappe opstellingen te zien.")
