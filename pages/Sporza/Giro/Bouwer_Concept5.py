@@ -167,79 +167,129 @@ if set(nieuwe_selectie) != set(st.session_state.concept5_team):
     st.rerun()
 
 # --- ETAPPE OVERZICHT & OPSTELLINGEN ---
-if len(st.session_state.concept5_team) == 16:
-    st.divider()
-    st.subheader("Etappe Overzicht & Opstellingen")
-    st.markdown("Bekijk de profielen en selecteer je 9 starters en kopman per etappe.")
+st.divider()
+st.subheader("Etappes: Bouw je team & Opstellingen")
+st.markdown("Bekijk de profielen en selecteer je 9 starters en kopman per etappe.")
 
-    huidig_team_df = df[df['Naam'].isin(st.session_state.concept5_team)].copy()
+huidig_team_df = df[df['Naam'].isin(st.session_state.concept5_team)].copy()
 
-    def auto_fill_stage(etappe, team_df):
-        w = etappe['w']
-        som_input = sum(w.values()) or 1.0
-        norm_w = {k: v / som_input for k, v in w.items()}
+def auto_fill_stage(etappe, team_df):
+    if team_df.empty:
+        return [], None
+    w = etappe['w']
+    som_input = sum(w.values()) or 1.0
+    norm_w = {k: v / som_input for k, v in w.items()}
 
-        team_df['StageScore'] = (
-            team_df.get('SPR', 0) * norm_w.get('SPR', 0) +
-            team_df.get('GC',  0) * norm_w.get('GC',  0) +
-            team_df.get('ITT', 0) * norm_w.get('ITT', 0) +
-            team_df.get('MTN', 0) * norm_w.get('MTN', 0)
-        )
+    team_df['StageScore'] = (
+        team_df.get('SPR', 0) * norm_w.get('SPR', 0) +
+        team_df.get('GC',  0) * norm_w.get('GC',  0) +
+        team_df.get('ITT', 0) * norm_w.get('ITT', 0) +
+        team_df.get('MTN', 0) * norm_w.get('MTN', 0)
+    )
 
-        top_9 = team_df.sort_values('StageScore', ascending=False).head(9)['Naam'].tolist()
-        capt = top_9[0] if top_9 else None
-        return top_9, capt
+    top_9 = team_df.sort_values('StageScore', ascending=False).head(9)['Naam'].tolist()
+    capt = top_9[0] if top_9 else None
+    return top_9, capt
 
-    if st.button("🤖 Vul alle opstellingen automatisch in", type="primary", use_container_width=True):
-        for etappe in GIRO_ETAPPES:
-            eid = str(etappe['id'])
-            starters, capt = auto_fill_stage(etappe, huidig_team_df.copy())
-            st.session_state.c5_stage_starters[eid] = starters
-            st.session_state.c5_stage_captains[eid] = capt
-            # Explicitly update the widget keys to ensure the UI updates
-            st.session_state[f"starters_{eid}"] = starters
-            st.session_state[f"capt_{eid}"] = capt
-        st.rerun()
-
+if st.button("🤖 Vul alle opstellingen automatisch in", type="primary", use_container_width=True):
     for etappe in GIRO_ETAPPES:
         eid = str(etappe['id'])
-        with st.expander(f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']})"):
-            col1, col2 = st.columns([1, 1])
-            with col1:
-                img_path = f"data/giro262/giro26-{etappe['id']}-hp.jpg"
-                if os.path.exists(img_path):
-                    st.image(img_path, use_container_width=True)
-                else:
-                    st.info("Geen profiel beschikbaar.")
-            with col2:
-                # Clean up state if team members changed
-                valid_team = st.session_state.concept5_team
+        starters, capt = auto_fill_stage(etappe, huidig_team_df.copy())
+        st.session_state.c5_stage_starters[eid] = starters
+        st.session_state.c5_stage_captains[eid] = capt
+        # Explicitly update the widget keys to ensure the UI updates
+        st.session_state[f"starters_{eid}"] = starters
+        st.session_state[f"capt_{eid}"] = capt
+    st.rerun()
 
-                if eid in st.session_state.c5_stage_starters:
-                    st.session_state.c5_stage_starters[eid] = [r for r in st.session_state.c5_stage_starters[eid] if r in valid_team]
-                    if st.session_state.c5_stage_captains.get(eid) not in valid_team:
-                        st.session_state.c5_stage_captains[eid] = st.session_state.c5_stage_starters[eid][0] if st.session_state.c5_stage_starters[eid] else None
+def get_stage_suggestions(etappe, df_all, current_team, n=5):
+    w = etappe['w']
+    som_input = sum(w.values()) or 1.0
+    norm_w = {k: v / som_input for k, v in w.items()}
 
-                # Set defaults if not in state
-                if eid not in st.session_state.c5_stage_starters:
-                    starters, capt = auto_fill_stage(etappe, huidig_team_df.copy())
-                    st.session_state.c5_stage_starters[eid] = starters
-                    st.session_state.c5_stage_captains[eid] = capt
+    # Filter out already selected riders
+    df_avail = df_all[~df_all['Naam'].isin(current_team)].copy()
+    if df_avail.empty:
+        return []
 
-                selected_starters = st.multiselect(
-                    "Kies 9 starters",
-                    options=st.session_state.concept5_team,
-                    default=st.session_state.c5_stage_starters[eid],
-                    max_selections=9,
-                    key=f"starters_{eid}"
-                )
-                st.session_state.c5_stage_starters[eid] = selected_starters
+    df_avail['TempStageScore'] = (
+        df_avail.get('SPR', 0) * norm_w.get('SPR', 0) +
+        df_avail.get('GC',  0) * norm_w.get('GC',  0) +
+        df_avail.get('ITT', 0) * norm_w.get('ITT', 0) +
+        df_avail.get('MTN', 0) * norm_w.get('MTN', 0)
+    )
 
-                # Ensure captain is valid
-                capt_options = selected_starters if selected_starters else st.session_state.concept5_team
-                current_capt = st.session_state.c5_stage_captains.get(eid)
-                capt_idx = capt_options.index(current_capt) if current_capt in capt_options else 0
+    # Sort by TempStageScore descending
+    suggestions = df_avail.sort_values('TempStageScore', ascending=False).head(n)
 
+    return suggestions.to_dict('records')
+
+for etappe in GIRO_ETAPPES:
+    eid = str(etappe['id'])
+    with st.expander(f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']})"):
+        # Suggesties sectie
+        suggesties = get_stage_suggestions(etappe, df, st.session_state.concept5_team, n=5)
+        if suggesties:
+            st.markdown("💡 **Suggesties voor deze etappe:**")
+            sug_cols = st.columns(len(suggesties))
+            for i, sug in enumerate(suggesties):
+                with sug_cols[i]:
+                    prijs = sug['Prijs']
+                    naam = sug['Naam']
+                    score = sug['TempStageScore']
+
+                    team_vol = len(st.session_state.concept5_team) >= 16
+                    budget_te_weinig = prijs > budget_over
+                    disabled = team_vol or budget_te_weinig
+
+                    help_text = f"Verwachte etappe score: {score:.1f}"
+                    if team_vol:
+                        help_text = "Je team is al vol (16 renners)."
+                    elif budget_te_weinig:
+                        help_text = f"Niet genoeg budget (€{budget_over:.1f}M over, kost €{prijs:.1f}M)."
+
+                    if st.button(f"➕ {naam}\n€{prijs:.1f}M", key=f"sug_{eid}_{i}_{naam}", disabled=disabled, help=help_text, use_container_width=True):
+                        st.session_state.concept5_team.append(naam)
+                        st.rerun()
+            st.markdown("---")
+
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            img_path = f"data/giro262/giro26-{etappe['id']}-hp.jpg"
+            if os.path.exists(img_path):
+                st.image(img_path, use_container_width=True)
+            else:
+                st.info("Geen profiel beschikbaar.")
+        with col2:
+            # Clean up state if team members changed
+            valid_team = st.session_state.concept5_team
+
+            if eid in st.session_state.c5_stage_starters:
+                st.session_state.c5_stage_starters[eid] = [r for r in st.session_state.c5_stage_starters[eid] if r in valid_team]
+                if st.session_state.c5_stage_captains.get(eid) not in valid_team:
+                    st.session_state.c5_stage_captains[eid] = st.session_state.c5_stage_starters[eid][0] if st.session_state.c5_stage_starters[eid] else None
+
+            # Set defaults if not in state
+            if eid not in st.session_state.c5_stage_starters:
+                starters, capt = auto_fill_stage(etappe, huidig_team_df.copy())
+                st.session_state.c5_stage_starters[eid] = starters
+                st.session_state.c5_stage_captains[eid] = capt
+
+            selected_starters = st.multiselect(
+                "Kies 9 starters",
+                options=st.session_state.concept5_team,
+                default=st.session_state.c5_stage_starters[eid],
+                max_selections=9,
+                key=f"starters_{eid}"
+            )
+            st.session_state.c5_stage_starters[eid] = selected_starters
+
+            # Ensure captain is valid
+            capt_options = selected_starters if selected_starters else st.session_state.concept5_team
+            current_capt = st.session_state.c5_stage_captains.get(eid)
+            capt_idx = capt_options.index(current_capt) if current_capt in capt_options else 0
+
+            if capt_options:
                 selected_capt = st.selectbox(
                     "Kies Kopman (x2 ptn)",
                     options=capt_options,
@@ -247,8 +297,12 @@ if len(st.session_state.concept5_team) == 16:
                     key=f"capt_{eid}"
                 )
                 st.session_state.c5_stage_captains[eid] = selected_capt
+            else:
+                st.info("Kies eerst starters om een kopman te selecteren.")
+                st.session_state.c5_stage_captains[eid] = None
 
-    # --- STAGE MATRIX ---
+# --- STAGE MATRIX ---
+if st.session_state.concept5_team:
     st.divider()
     st.subheader("De Koers (Dagelijkse Opstellingen)")
 
@@ -269,6 +323,3 @@ if len(st.session_state.concept5_team) == 16:
                 matrix_data[renner][col_name] = "©" if renner == effectief_km else "✅"
 
     st.dataframe(pd.DataFrame(list(matrix_data.values())), hide_index=True, use_container_width=True)
-else:
-    st.divider()
-    st.info("Selecteer precies 16 renners om de etappe opstellingen te zien.")
