@@ -161,3 +161,39 @@ nieuwe_selectie = edited_df[edited_df['Geselecteerd']]['Naam'].tolist()
 if set(nieuwe_selectie) != set(st.session_state.concept5_team):
     st.session_state.concept5_team = nieuwe_selectie
     st.rerun()
+
+# --- STAGE MATRIX ---
+st.divider()
+st.subheader("De Koers (Dagelijkse Opstellingen)")
+
+if not st.session_state.concept5_team:
+    st.info("Selecteer renners om hun inzetbaarheid per etappe te zien.")
+else:
+    matrix_data = {renner: {"Renner": renner} for renner in st.session_state.concept5_team}
+    huidig_team_df = df[df['Naam'].isin(st.session_state.concept5_team)].copy()
+
+    for etappe in GIRO_ETAPPES:
+        col_name = f"E{etappe['id']}"
+        for renner in st.session_state.concept5_team:
+            matrix_data[renner][col_name] = "-"
+
+        # Calculate stage scores
+        w = etappe['w']
+        som_input = sum(w.values()) or 1.0
+        norm_w = {k: v / som_input for k, v in w.items()}
+
+        huidig_team_df['StageScore'] = (
+            huidig_team_df.get('SPR', 0) * norm_w.get('SPR', 0) +
+            huidig_team_df.get('GC',  0) * norm_w.get('GC',  0) +
+            huidig_team_df.get('ITT', 0) * norm_w.get('ITT', 0) +
+            huidig_team_df.get('MTN', 0) * norm_w.get('MTN', 0)
+        )
+
+        # Get top 9
+        top_9 = huidig_team_df.sort_values('StageScore', ascending=False).head(9)['Naam'].tolist()
+        effectief_km = top_9[0] if top_9 else None
+
+        for renner in top_9:
+            matrix_data[renner][col_name] = "©" if renner == effectief_km else "✅"
+
+    st.dataframe(pd.DataFrame(list(matrix_data.values())), hide_index=True, use_container_width=True)
