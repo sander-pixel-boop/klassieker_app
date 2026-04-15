@@ -240,6 +240,9 @@ def get_stage_suggestions_all(etappe, df_all, n=5):
 
 for etappe in GIRO_ETAPPES:
     eid = str(etappe['id'])
+    if f"winners_select_{eid}" not in st.session_state:
+        st.session_state[f"winners_select_{eid}"] = st.session_state.c5_stage_winners.get(eid, [])
+
     with st.expander(f"Etappe {etappe['id']}: {etappe['route']} ({etappe['type']})"):
         # Suggesties sectie
         suggesties = get_stage_suggestions_all(etappe, df, n=5)
@@ -258,6 +261,7 @@ for etappe in GIRO_ETAPPES:
                     if is_selected:
                         if st.button(f"✅ {naam}\n€{prijs:.1f}M", key=f"sug_win_{eid}_{i}_{naam}", help=f"Verwachte etappe score: {score:.1f}", use_container_width=True):
                             st.session_state.c5_stage_winners[eid].remove(naam)
+                            st.session_state[f"winners_select_{eid}"] = st.session_state.c5_stage_winners[eid]
                             st.rerun()
                     else:
                         disabled = vol
@@ -265,6 +269,7 @@ for etappe in GIRO_ETAPPES:
                         if st.button(f"➕ {naam}\n€{prijs:.1f}M", key=f"sug_win_{eid}_{i}_{naam}", disabled=disabled, help=help_text, use_container_width=True):
                             huidige = st.session_state.c5_stage_winners.get(eid, [])
                             st.session_state.c5_stage_winners[eid] = huidige + [naam]
+                            st.session_state[f"winners_select_{eid}"] = st.session_state.c5_stage_winners[eid]
                             st.rerun()
             st.markdown("---")
 
@@ -279,7 +284,6 @@ for etappe in GIRO_ETAPPES:
             selected_winners = st.multiselect(
                 "Kies tot 3 mogelijke winnaars",
                 options=df['Naam'].tolist(),
-                default=st.session_state.c5_stage_winners.get(eid, []),
                 max_selections=3,
                 key=f"winners_select_{eid}"
             )
