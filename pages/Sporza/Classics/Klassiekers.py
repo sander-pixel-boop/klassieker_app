@@ -477,10 +477,55 @@ else:
                     kosten_text = "Gratis" if i < 3 else f"-€{penalties[i+1]-penalties[i]}M Boete"
                     
                     st.markdown(f"***Wissel {i+1} (ná {t['moment']} | Speling: €{budget_now}M | {kosten_text})***")
-                    c_uit, c_in = st.columns(2)
+                    c_uit, c_in, c_del = st.columns([4, 4, 1])
                     with c_uit: st.error(f"❌ {t['uit']}")
                     with c_in: st.success(f"📥 {t['in']}")
+                    with c_del:
+                        if st.button("🗑️", key=f"del_sporza_tr_{i}", help="Verwijder specifieke wissel"):
+                            st.session_state.sporza_transfer_plan.pop(i)
+                            st.rerun()
                     st.write("")
+
+            # --- Handmatige Wissels Toevoegen ---
+            with st.expander("✏️ Handmatige Wissel Toevoegen", expanded=(len(st.session_state.sporza_transfer_plan) < 5)):
+                if len(st.session_state.sporza_transfer_plan) >= 5:
+                    st.warning("Maximum van 5 wissels bereikt. Verwijder er eerst één via het prullenbak-icoon hierboven.")
+                else:
+                    m_race = st.selectbox("Wisselmoment (Ná race):", options=available_races[:-1], index=len(available_races)-2)
+
+                    actief_op_moment = list(st.session_state.sporza_selected_riders)
+                    idx_m = available_races.index(m_race)
+                    for t in st.session_state.sporza_transfer_plan:
+                        if available_races.index(t['moment']) <= idx_m:
+                            if t['uit'] in actief_op_moment: actief_op_moment.remove(t['uit'])
+                            if t['in'] not in actief_op_moment: actief_op_moment.append(t['in'])
+
+                    m_uit = st.selectbox("❌ Wie gaat eruit?", options=sorted(actief_op_moment))
+                    m_in_opties = [r for r in df['Renner'].tolist() if r not in actief_op_moment]
+                    m_in = st.selectbox("📥 Wie komt erin?", options=sorted(m_in_opties))
+
+                    if st.button("➕ Voeg Wissel Toe", use_container_width=True):
+                        test_team = list(actief_op_moment)
+                        test_team.remove(m_uit)
+                        test_team.append(m_in)
+                        test_kosten = df[df['Renner'].isin(test_team)]['Prijs'].sum()
+
+                        aantal_transfers_na_toevoegen = len(st.session_state.sporza_transfer_plan) + 1
+                        penalties = [0, 0, 0, 0, 1, 3, 6, 10, 15]
+                        budget_limiet = 120 - penalties[aantal_transfers_na_toevoegen]
+
+                        # Controleer ploeglimieten
+                        teams = df[df['Renner'].isin(test_team)]['Team'].value_counts()
+                        invalid_teams = teams[teams > 4]
+
+                        if test_kosten > budget_limiet:
+                            st.error(f"Budget overschreden! Het team zou € {test_kosten}M kosten (Max budget met {aantal_transfers_na_toevoegen} wissels: € {budget_limiet}M).")
+                        elif not invalid_teams.empty:
+                            st.error(f"Max 4 renners per ploeg overschreden voor ploeg(en): {', '.join(invalid_teams.index)}.")
+                        else:
+                            st.session_state.sporza_transfer_plan.append({"uit": m_uit, "in": m_in, "moment": m_race})
+                            st.session_state.sporza_transfer_plan.sort(key=lambda x: available_races.index(x['moment']))
+                            st.rerun()
 
         st.divider()
 
