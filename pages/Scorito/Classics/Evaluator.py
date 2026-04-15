@@ -2,8 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
-from thefuzz import process, fuzz
-from app_utils.name_matching import normalize_name_logic, match_uitslag_naam
+from app_utils.name_matching import match_uitslag_naam
 
 # --- CONFIGURATIE ---
 st.set_page_config(page_title="Model Evaluator", layout="wide", page_icon="📊")
