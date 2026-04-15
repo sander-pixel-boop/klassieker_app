@@ -43,12 +43,17 @@ def test_init_connection_success():
     assert client == mock_client_instance
 
 def test_init_connection_missing_secrets():
-    """Test that init_connection raises a KeyError when secrets are missing."""
+    """Test that init_connection handles missing secrets gracefully."""
     # Temporarily remove a secret
     original_url = mock_st.secrets.pop("SUPABASE_URL")
 
-    with pytest.raises(KeyError):
-        init_connection()
+    mock_st.error.reset_mock()
+    mock_st.stop.reset_mock()
+
+    init_connection()
+
+    mock_st.error.assert_called_once()
+    mock_st.stop.assert_called_once()
 
     # Restore the secret
     mock_st.secrets["SUPABASE_URL"] = original_url
