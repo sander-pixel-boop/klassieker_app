@@ -281,13 +281,19 @@ for etappe in GIRO_ETAPPES:
             else:
                 st.info("Geen profiel beschikbaar.")
         with col2:
+            def update_winners(etappe_id=eid):
+                st.session_state.c5_stage_winners[etappe_id] = st.session_state[f"winners_select_{etappe_id}"]
+
             selected_winners = st.multiselect(
                 "Kies tot 3 mogelijke winnaars",
                 options=df['Naam'].tolist(),
                 max_selections=3,
-                key=f"winners_select_{eid}"
+                key=f"winners_select_{eid}",
+                on_change=update_winners,
+                args=(eid,)
             )
-            st.session_state.c5_stage_winners[eid] = selected_winners
+            # DO NOT overwrite st.session_state.c5_stage_winners[eid] here directly,
+            # as that breaks the update logic when buttons are used!
 
 
 # --- RIDER SELECTION ---
