@@ -18,7 +18,7 @@ speler_naam = st.session_state["ingelogde_speler"]
 
 # 3. Database Connectie
 supabase = init_connection()
-tabel_naam = st.secrets["TABEL_NAAM"]
+tabel_naam = st.secrets.get("TABEL_NAAM", "gebruikers_data_test")
 
 # --- HULPFUNCTIES ---
 def is_team_locked():
@@ -39,7 +39,7 @@ def is_team_locked():
 def load_game_data():
     try:
         supabase = init_connection()
-        response = supabase.table('users').select('*').execute()
+        response = supabase.table(tabel_naam).select('username, created_at, sporza_team, sporza_transfers, scorito_team').execute()
 
         users_data = []
         for row in response.data:
