@@ -138,11 +138,7 @@ sporza_evaluator = st.Page("pages/Sporza/Classics/Evaluator.py", title="Evaluato
 
 # Sporza Grand Tour opties
 sporza_giro_ai = st.Page("pages/Sporza/Giro/AI_Solver.py", title="Giro: AI Solver", icon="🤖", url_path="sporza_giro_ai")
-sporza_giro_bouwer = st.Page("pages/Sporza/Giro/Team_Bouwer.py", title="Giro: Bouwer C1", icon="🛠️", url_path="sporza_giro_bouwer")
-sporza_giro_bouwer_c1 = st.Page("pages/Sporza/Giro/Bouwer_Concept1.py", title="Giro: Bouwer C2", icon="🗂️", url_path="sporza_giro_bouwer_c1")
-sporza_giro_bouwer_c2 = st.Page("pages/Sporza/Giro/Bouwer_Concept2.py", title="Giro: Bouwer C3", icon="🪄", url_path="sporza_giro_bouwer_c2")
-sporza_giro_bouwer_c3 = st.Page("pages/Sporza/Giro/Bouwer_Concept3.py", title="Giro: Bouwer C4", icon="✂️", url_path="sporza_giro_bouwer_c3")
-sporza_giro_bouwer_c5 = st.Page("pages/Sporza/Giro/Bouwer_Concept5.py", title="Giro: Bouwer C5", icon="💡", url_path="sporza_giro_bouwer_c5")
+sporza_giro_redirect = st.Page("pages/Sporza/Giro/Sporza_Giro_Redirect.py", title="Giro: Bouwer", icon="🛠️", url_path="sporza_giro_bouwer_redirect")
 sporza_giro_evaluator = st.Page("pages/Sporza/Giro/Evaluator.py", title="[Beta] Giro: Evaluator", icon="📊", url_path="sporza_giro_evaluator")
 
 # --- KEUZE: WEL OF NIET INGELOGD ---
@@ -155,7 +151,7 @@ else:
         "Scorito - Klassiekers": [scorito_klassiekers, scorito_evaluator],
         "Scorito - Grand Tours": [scorito_giro],
         "Sporza - Klassiekers": [sporza_klassiekers, sporza_evaluator],
-        "Sporza - Grand Tours": [sporza_giro_bouwer, sporza_giro_bouwer_c1, sporza_giro_bouwer_c2, sporza_giro_bouwer_c3, sporza_giro_bouwer_c5, sporza_giro_evaluator]
+        "Sporza - Grand Tours": [sporza_giro_ai, sporza_giro_redirect, sporza_giro_evaluator]
     })
 
 pg.run()
