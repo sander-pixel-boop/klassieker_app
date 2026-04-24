@@ -87,6 +87,11 @@ MIJN_EIGEN_KOPMANNEN = {
     "RVV": {"C1": "Tadej Pogacar", "C2": "Mathieu van der Poel", "C3": "Mads Pedersen"},
     "SP": {"C1": "Jasper Philipsen", "C2": "Jordi Meeus", "C3": "Milan Fretin"},
     "PR": {"C1": "Mathieu van der Poel", "C2": "Tadej Pogacar", "C3": "Mads Pedersen"},
+     "BP": {"C1": "Romain Grégoire", "C2": "Florian Vermeersch", "C3": "Tim Wellens"},
+     "AGR": {"C1": "Remco Evenepoel", "C2": "Mattias Skjelmose", "C3": "Romain Grégoire"},
+    "WP": {"C1": "Mattias Skjelmose", "C2": "Romain Grégoire", "C3": "Marc Hirschi"},
+     "LBL": {"C1": "Tadej Pogacar", "C2": "Remco Evenepoel", "C3": "Mattias Skjelmose"},
+    
 }
 
 # --- HULPFUNCTIES VOOR NAAM-MATCHING ---
