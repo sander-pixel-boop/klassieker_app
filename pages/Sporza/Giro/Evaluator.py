@@ -265,8 +265,8 @@ with st.sidebar:
 
     st.divider()
     st.markdown("#### ⚙️ Instellingen")
-    n_starters = st.number_input("Starters per etappe", 6, 12, 9)
-    toon_details = st.checkbox("Toon puntenopbouw per renner", value=True)
+    n_starters = st.number_input("Starters per etappe", 6, 12, 9, help="Kies hoeveel renners er per etappe worden opgesteld (Scorito: 9, Sporza: vaak variabel, maar 9 is een goede default).")
+    toon_details = st.checkbox("Toon puntenopbouw per renner", value=True, help="Vink uit om alleen de totale teamscores te zien en de tabellen overzichtelijker te maken.")
 
     st.divider()
     st.markdown("#### 📄 Resultaten status")

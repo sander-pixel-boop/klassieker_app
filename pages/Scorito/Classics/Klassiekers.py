@@ -465,9 +465,9 @@ with st.sidebar:
         t_moments = sorted([t1, t2, t3], key=lambda x: available_races.index(x))
     
     with st.expander("⚙️ Budget & Limieten", expanded=False):
-        max_ren = st.number_input("Totaal aantal renners", value=20)
-        max_bud = st.number_input("Max Budget", value=45000000, step=500000)
-        min_bud = st.number_input("Min Budget", value=43000000, step=500000)
+        max_ren = st.number_input("Totaal aantal renners", value=20, help="Het totale aantal renners in je Scorito-team (standaard: 20).")
+        max_bud = st.number_input("Max Budget", value=45000000, step=500000, help="Maximaal beschikbaar budget (Scorito: meestal €45.000.000).")
+        min_bud = st.number_input("Min Budget", value=43000000, step=500000, help="Minimaal budget dat je wilt besteden (om te voorkomen dat de solver een té goedkoop team maakt).")
         
     df = calculate_dynamic_ev(df_raw, available_races, koers_mapping, ev_method, skip_races)
 

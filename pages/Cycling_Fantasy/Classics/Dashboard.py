@@ -197,7 +197,7 @@ with st.sidebar:
     }
     koers_type = st.selectbox("🏁 Type Koers:", list(stat_mapping.keys()))
     ev_method = st.selectbox("🧮 Rekenmodel", ["1. Ranking (CF Punten)", "2. Macht 4 Curve"])
-    max_bud = st.number_input("💰 Budget (Credits)", value=5000, step=200)
+    max_bud = st.number_input("💰 Budget (Credits)", value=5000, step=200, help="Maximaal aantal credits beschikbaar voor je Cycling Fantasy team.")
     
     df_race = pd.DataFrame()
     if uploaded_file:
