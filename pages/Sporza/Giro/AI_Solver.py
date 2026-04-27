@@ -147,10 +147,10 @@ with st.sidebar:
 
     st.divider()
 
-    top_x_voorspellingen = st.number_input("Top X per etappe (Suggesties)", 1, 10, 3)
-    max_budget           = st.number_input("Budget (Miljoen)", value=100.0)
-    max_renners          = st.number_input("Aantal Renners",   value=16)
-    max_per_ploeg        = st.number_input("Max per ploeg",    value=3)
+    top_x_voorspellingen = st.number_input("Top X per etappe (Suggesties)", 1, 10, 3, help="Bepaalt hoeveel renners Claude per etappe voorspelt en hoeveel bonus-EV ze daarvoor krijgen.")
+    max_budget           = st.number_input("Budget (Miljoen)", value=100.0, help="Stel het maximale budget in voor je team (standaard: 100.0M).")
+    max_renners          = st.number_input("Aantal Renners",   value=16, help="Stel het aantal renners in voor je team (standaard: 16).")
+    max_per_ploeg        = st.number_input("Max per ploeg",    value=3, help="Maximaal aantal renners dat je van dezelfde ploeg mag selecteren (standaard: 3).")
 
     df = calculate_giro_ev(df_raw)
     df['Prediction_EV'] = calculate_prediction_ev(df, st.session_state.giro_stage_predictions, top_x_voorspellingen)
